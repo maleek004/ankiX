@@ -12,6 +12,9 @@ export function AuthProvider({ children }){
     // noop: token is persisted in api.js localStorage by login
   },[])
 
+
+
+
   const login = async (email, password) => {
     const data = await api.login(email, password)
     if(data?.user){
@@ -21,7 +24,7 @@ export function AuthProvider({ children }){
     return data
   }
 
-  const register = async (email, password, displayName) => {
+  const register = async (email, password) => {
     const data = await api.register(email, password)
     return data
   }
