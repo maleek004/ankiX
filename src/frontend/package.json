@@ -1,0 +1,25 @@
+{
+  "name": "ankix-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ci": "vitest --run --reporter dot"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.30.4"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "jsdom": "^29.1.1",
+    "vite": "^5.1.0",
+    "vitest": "^4.1.10"
+  }
+}
