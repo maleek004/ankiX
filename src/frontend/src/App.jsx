@@ -15,7 +15,7 @@ export default function App(){
       <BrowserRouter>
         <div className="app">
           <NavBar />
-          <main>
+          <main className="main-content">
             <Routes>
               <Route path="/" element={<Home/>} />
               <Route path="/login" element={<Login/>} />
