@@ -19,6 +19,14 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<ReviewRecord> ReviewRecords => Set<ReviewRecord>();
 
+    // Phase 1 stubs — Exercise functionality implemented in Phase 2
+    public DbSet<Exercise> Exercises => Set<Exercise>();
+
+    public DbSet<CardExercise> CardExercises => Set<CardExercise>();
+
+    // Followups
+    public DbSet<CardFollowup> CardFollowups => Set<CardFollowup>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>()
@@ -33,5 +41,19 @@ public sealed class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<ReviewRecord>()
             .HasIndex(record => new { record.UserId, record.NextReviewAt });
+
+        // CardExercise: composite PK is the join key — no surrogate Id needed
+        modelBuilder.Entity<CardExercise>()
+            .HasKey(ce => new { ce.CardId, ce.ExerciseId });
+
+        modelBuilder.Entity<CardExercise>()
+            .HasIndex(ce => ce.ExerciseId); // efficient lookup: "all cards for exercise X"
+
+        // CardFollowup: index on CardId for fast per-card retrieval
+        modelBuilder.Entity<CardFollowup>()
+            .HasIndex(f => f.CardId);
+
+        modelBuilder.Entity<CardFollowup>()
+            .HasIndex(f => f.AuthorUserId);
     }
 }

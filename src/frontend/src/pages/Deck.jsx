@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 
 export default function Deck(){
@@ -16,27 +16,89 @@ export default function Deck(){
   const [validationSpec, setValidationSpec] = useState('')
   const [type, setType] = useState('basic')
 
+  // Followups
+  const [showFollowups, setShowFollowups] = useState(false)
+  const [followups, setFollowups] = useState([])
+  const [followupsLoading, setFollowupsLoading] = useState(false)
+  const [newQuestion, setNewQuestion] = useState('')
+  const [submittingFollowup, setSubmittingFollowup] = useState(false)
+
   useEffect(()=>{
     let mounted = true
     import('../api.js').then(m=>Promise.all([m.getDeck(id).catch(()=>null), m.getCards(id).catch(()=>[])]))
-      .then(([d,cs])=>{ 
-        if(!mounted) return; 
-        setDeck(d); 
-        setCards(cs || []);
-        setCurrentIndex(0);
-        setShowAnswer(false);
+      .then(([d,cs])=>{
+        if(!mounted) return
+        setDeck(d)
+        setCards(cs || [])
+        setCurrentIndex(0)
+        setShowAnswer(false)
+        setShowFollowups(false)
+        setFollowups([])
       })
       .catch(err=>{ console.warn('deck load',err); setDeck(null); setCards([]) })
     return ()=>{ mounted = false }
   },[id])
 
+  // Reset followup panel whenever the card changes
+  useEffect(()=>{
+    setShowFollowups(false)
+    setFollowups([])
+    setNewQuestion('')
+  },[currentIndex])
+
   const currentCard = cards[currentIndex]
+
+  const loadFollowups = useCallback(async (cardId) => {
+    setFollowupsLoading(true)
+    try {
+      const data = await import('../api.js').then(m => m.getFollowups(cardId))
+      setFollowups(data || [])
+    } catch(err) {
+      console.warn('Could not load followups:', err.message || err)
+      setFollowups([])
+    } finally {
+      setFollowupsLoading(false)
+    }
+  }, [])
+
+  const handleToggleFollowups = () => {
+    if (!showFollowups && currentCard) {
+      loadFollowups(currentCard.id)
+    }
+    setShowFollowups(prev => !prev)
+  }
+
+  const handleSubmitFollowup = async (e) => {
+    e.preventDefault()
+    if (!newQuestion.trim() || !currentCard) return
+    setSubmittingFollowup(true)
+    try {
+      const created = await import('../api.js').then(m => m.addFollowup(currentCard.id, newQuestion.trim()))
+      setFollowups(prev => [created, ...prev])
+      setNewQuestion('')
+    } catch(err) {
+      alert('Could not add follow-up: ' + (err.message || err))
+    } finally {
+      setSubmittingFollowup(false)
+    }
+  }
 
   const handleNextCard = () => {
     setShowAnswer(false)
     setUserCode('')
     setCodeResult(null)
     setCurrentIndex(prev => prev + 1)
+  }
+
+  // Submit review to the backend then advance to the next card.
+  // Advancement is optimistic — a network failure is logged but doesn't block study.
+  const rateCard = async (outcome) => {
+    try {
+      await import('../api.js').then(m => m.submitReview(currentCard.id, outcome))
+    } catch(err) {
+      console.warn('Review submission failed (continuing study):', err.message || err)
+    }
+    handleNextCard()
   }
 
   const addCard = async (e) => {
@@ -114,8 +176,8 @@ export default function Deck(){
               <li key={c.id} style={{ marginBottom: 6 }}>
                 <strong>{c.prompt}</strong> ({c.type})
                 {' '}
-                <button 
-                  style={{ color: '#dc3545', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem' }} 
+                <button
+                  style={{ color: '#dc3545', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem' }}
                   onClick={() => removeCard(c.id)}
                 >
                   [Delete]
@@ -147,7 +209,7 @@ export default function Deck(){
             {/* Front Prompt */}
             <div className="card-prompt">{currentCard.prompt}</div>
 
-            {/* Micro-coding Editor (If Card Type is Micro-Coding) */}
+            {/* Micro-coding Editor */}
             {currentCard.type === 'micro-coding' && (
               <div className="code-box">
                 <textarea
@@ -159,12 +221,73 @@ export default function Deck(){
               </div>
             )}
 
-            {/* Answer Section (Revealed when Show Answer is clicked) */}
+            {/* Answer Section — revealed after Show Answer */}
             {showAnswer && (
               <>
                 <hr className="card-divider" />
                 <div className="card-answer">
                   {currentCard.validationSpec || 'Correct answer verified.'}
+                </div>
+
+                {/* ── Followups Toggle ── only visible once answer is shown ── */}
+                <div className="followups-wrapper">
+                  <button
+                    className="btn-followups-toggle"
+                    onClick={handleToggleFollowups}
+                  >
+                    {showFollowups ? '▲ Hide Follow-ups' : '▼ Follow-ups'}
+                    {followups.length > 0 && !showFollowups && (
+                      <span className="followups-badge">{followups.length}</span>
+                    )}
+                  </button>
+
+                  {showFollowups && (
+                    <div className="followups-panel">
+                      {/* Add a new follow-up */}
+                      <form className="followup-form" onSubmit={handleSubmitFollowup}>
+                        <input
+                          className="form-control followup-input"
+                          placeholder="A question this card sparked in your mind..."
+                          value={newQuestion}
+                          onChange={e => setNewQuestion(e.target.value)}
+                          disabled={submittingFollowup}
+                        />
+                        <button
+                          type="submit"
+                          className="btn-primary"
+                          disabled={submittingFollowup || !newQuestion.trim()}
+                        >
+                          {submittingFollowup ? 'Posting...' : 'Ask'}
+                        </button>
+                      </form>
+
+                      {/* List of follow-ups */}
+                      {followupsLoading ? (
+                        <p className="followups-loading">Loading follow-ups...</p>
+                      ) : followups.length === 0 ? (
+                        <p className="followups-empty">No follow-ups yet. Be the first to ask!</p>
+                      ) : (
+                        <ul className="followups-list">
+                          {followups.map(f => (
+                            <li key={f.id} className="followup-item">
+                              <div className="followup-meta">
+                                <span className="followup-author">{f.authorDisplayName}</span>
+                                <span className="followup-date">
+                                  {new Date(f.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <p className="followup-text">{f.questionText}</p>
+                              {f.linkedCardId && (
+                                <Link to={`/decks/${id}`} className="followup-answer-link">
+                                  → Answered by a card
+                                </Link>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -180,19 +303,19 @@ export default function Deck(){
               <div className="rating-buttons-group">
                 <div className="rating-col">
                   <span className="rating-interval">&lt;1m</span>
-                  <button className="btn-rating again" onClick={handleNextCard}>Again</button>
+                  <button className="btn-rating again" onClick={() => rateCard('Again')}>Again</button>
                 </div>
                 <div className="rating-col">
                   <span className="rating-interval">&lt;6m</span>
-                  <button className="btn-rating" onClick={handleNextCard}>Hard</button>
+                  <button className="btn-rating" onClick={() => rateCard('Hard')}>Hard</button>
                 </div>
                 <div className="rating-col">
                   <span className="rating-interval">&lt;10m</span>
-                  <button className="btn-rating" onClick={handleNextCard}>Good</button>
+                  <button className="btn-rating" onClick={() => rateCard('Good')}>Good</button>
                 </div>
                 <div className="rating-col">
                   <span className="rating-interval">4d</span>
-                  <button className="btn-rating" onClick={handleNextCard}>Easy</button>
+                  <button className="btn-rating" onClick={() => rateCard('Easy')}>Easy</button>
                 </div>
               </div>
             )}
@@ -202,4 +325,3 @@ export default function Deck(){
     </div>
   )
 }
-

@@ -7,12 +7,26 @@ public sealed class ReviewSchedulerService : IReviewSchedulerService
     public ReviewScheduleResult CalculateNextSchedule(ReviewRecord? previousRecord, string outcome)
     {
         string normalizedOutcome = outcome.Trim();
+
+        // "Again" maps to quality=1 in SM-2 — failed recall, reset immediately
+        if (normalizedOutcome == "Again")
+        {
+            decimal againEase = previousRecord?.EaseFactor ?? 2.50m;
+            decimal againNextEase = Math.Max(1.30m, againEase - 0.20m);
+            return new ReviewScheduleResult
+            {
+                EaseFactor = againNextEase,
+                IntervalDays = 1,
+                NextReviewAt = DateTime.UtcNow.AddDays(1)
+            };
+        }
+
         int quality = normalizedOutcome switch
         {
             "Hard" => 3,
             "Good" => 4,
             "Easy" => 5,
-            _ => throw new ArgumentException("Outcome must be one of Hard, Good, Easy.")
+            _ => throw new ArgumentException("Outcome must be one of Again, Hard, Good, Easy.")
         };
 
         decimal previousEase = previousRecord?.EaseFactor ?? 2.50m;

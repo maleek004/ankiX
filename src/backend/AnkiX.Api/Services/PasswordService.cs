@@ -11,8 +11,12 @@ public sealed class PasswordService : IPasswordService
     public string HashPassword(string password)
     {
         byte[] salt = RandomNumberGenerator.GetBytes(SaltSize);
-        Rfc2898DeriveBytes deriveBytes = new Rfc2898DeriveBytes(password, salt, Iterations, HashAlgorithmName.SHA256);
-        byte[] hash = deriveBytes.GetBytes(HashSize);
+        byte[] hash = Rfc2898DeriveBytes.Pbkdf2(
+            password,
+            salt,
+            Iterations,
+            HashAlgorithmName.SHA256,
+            HashSize);
         string encodedSalt = Convert.ToBase64String(salt);
         string encodedHash = Convert.ToBase64String(hash);
         return $"{encodedSalt}:{encodedHash}";
@@ -28,8 +32,12 @@ public sealed class PasswordService : IPasswordService
 
         byte[] salt = Convert.FromBase64String(parts[0]);
         byte[] expectedHash = Convert.FromBase64String(parts[1]);
-        Rfc2898DeriveBytes deriveBytes = new Rfc2898DeriveBytes(password, salt, Iterations, HashAlgorithmName.SHA256);
-        byte[] providedHash = deriveBytes.GetBytes(HashSize);
+        byte[] providedHash = Rfc2898DeriveBytes.Pbkdf2(
+            password,
+            salt,
+            Iterations,
+            HashAlgorithmName.SHA256,
+            HashSize);
         return CryptographicOperations.FixedTimeEquals(expectedHash, providedHash);
     }
 }

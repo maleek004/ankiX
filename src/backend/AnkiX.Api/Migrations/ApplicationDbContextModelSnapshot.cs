@@ -55,6 +55,55 @@ namespace AnkiX.Api.Migrations
                     b.ToTable("Cards");
                 });
 
+            modelBuilder.Entity("AnkiX.Api.Models.CardExercise", b =>
+                {
+                    b.Property<int>("CardId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ExerciseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("CardId", "ExerciseId");
+
+                    b.HasIndex("ExerciseId");
+
+                    b.ToTable("CardExercises");
+                });
+
+            modelBuilder.Entity("AnkiX.Api.Models.CardFollowup", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("AuthorUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CardId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("LinkedCardId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("QuestionText")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorUserId");
+
+                    b.HasIndex("CardId");
+
+                    b.ToTable("CardFollowups");
+                });
+
             modelBuilder.Entity("AnkiX.Api.Models.CardRun", b =>
                 {
                     b.Property<long>("Id")
@@ -115,6 +164,27 @@ namespace AnkiX.Api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Decks");
+                });
+
+            modelBuilder.Entity("AnkiX.Api.Models.Exercise", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Exercises");
                 });
 
             modelBuilder.Entity("AnkiX.Api.Models.ReviewRecord", b =>

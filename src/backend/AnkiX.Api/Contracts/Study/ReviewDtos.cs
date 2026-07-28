@@ -8,7 +8,7 @@ public sealed class ReviewRequest
     public int CardId { get; set; }
 
     [Required]
-    [RegularExpression("Hard|Good|Easy")]
+    [RegularExpression("Again|Hard|Good|Easy")]
     public string Outcome { get; set; } = string.Empty;
 }
 

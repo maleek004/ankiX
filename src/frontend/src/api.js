@@ -105,3 +105,35 @@ export async function deleteCard(deckId, cardId){
   if(!res.ok) throw new Error('Failed to delete card')
   return true
 }
+
+export async function submitReview(cardId, outcome){
+  const res = await fetch(`${API_BASE}/reviews`,{
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ cardId, outcome })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to submit review')
+  }
+  return res.json()
+}
+
+export async function getFollowups(cardId){
+  const res = await fetch(`${API_BASE}/cards/${cardId}/followups`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch followups')
+  return res.json()
+}
+
+export async function addFollowup(cardId, questionText){
+  const res = await fetch(`${API_BASE}/cards/${cardId}/followups`,{
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ questionText })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to add followup')
+  }
+  return res.json()
+}

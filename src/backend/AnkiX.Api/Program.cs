@@ -83,6 +83,13 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+// Always ensure the database schema is up to date on startup using EF Core Migrations.
+using (var startupScope = app.Services.CreateScope())
+{
+    var startupDb = startupScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    startupDb.Database.Migrate();
+}
+
 // Seed data when invoked with the 'seed' argument: dotnet run -- seed
 bool shouldSeed = (args is not null && args.Any(a => string.Equals(a, "seed", StringComparison.OrdinalIgnoreCase)))
     || string.Equals(Environment.GetEnvironmentVariable("ANKIX_SEED"), "true", StringComparison.OrdinalIgnoreCase);
@@ -93,9 +100,6 @@ if (shouldSeed)
     var services = scope.ServiceProvider;
     var db = services.GetRequiredService<ApplicationDbContext>();
     var pwdSvc = services.GetRequiredService<IPasswordService>();
-
-    // Ensure DB is available
-    db.Database.EnsureCreated();
 
     // Seed only if no users exist
     if (!db.Users.Any())
