@@ -28,7 +28,8 @@ public sealed class DecksController : ControllerBase
             {
                 Id = deck.Id,
                 Title = deck.Title,
-                Description = deck.Description
+                Description = deck.Description,
+                CreatedByUserId = deck.CreatedByUserId
             })
             .ToListAsync();
 

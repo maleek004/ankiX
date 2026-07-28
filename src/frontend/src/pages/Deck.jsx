@@ -23,9 +23,14 @@ export default function Deck(){
   const [newQuestion, setNewQuestion] = useState('')
   const [submittingFollowup, setSubmittingFollowup] = useState(false)
 
+  const [canCreate, setCanCreate] = useState(false)
+
   useEffect(()=>{
     let mounted = true
-    import('../api.js').then(m=>Promise.all([m.getDeck(id).catch(()=>null), m.getCards(id).catch(()=>[])]))
+    import('../api.js').then(m => {
+      setCanCreate(m.canCreateContent())
+      return Promise.all([m.getDeck(id).catch(()=>null), m.getCards(id).catch(()=>[])])
+    })
       .then(([d,cs])=>{
         if(!mounted) return
         setDeck(d)
@@ -132,11 +137,15 @@ export default function Deck(){
       {/* Top Toolbar */}
       <div className="study-top-bar">
         <div className="study-toolbar-left">
-          <button className="btn-study-tool" onClick={() => setIsEditing(!isEditing)}>
-            {isEditing ? 'Close Edit' : 'Edit'}
-          </button>
+          {canCreate && (
+            <>
+              <button className="btn-study-tool" onClick={() => setIsEditing(!isEditing)}>
+                {isEditing ? 'Close Edit' : 'Edit'}
+              </button>
+              <button className="btn-study-tool" onClick={() => setIsEditing(true)}>+</button>
+            </>
+          )}
           <button className="btn-study-tool" onClick={() => alert('Deck limits option')}>Limits</button>
-          <button className="btn-study-tool" onClick={() => setIsEditing(true)}>+</button>
         </div>
         <div className="study-counts-right">
           <span className="count-blue">{cards.length - currentIndex > 0 ? cards.length - currentIndex : 0}</span>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -11,63 +11,64 @@ namespace AnkiX.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "CardExercises",
-                columns: table => new
-                {
-                    CardId = table.Column<int>(type: "int", nullable: false),
-                    ExerciseId = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_CardExercises", x => new { x.CardId, x.ExerciseId });
-                });
+            migrationBuilder.Sql(@"
+                IF OBJECT_ID(N'[dbo].[CardExercises]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [CardExercises] (
+                        [CardId] int NOT NULL,
+                        [ExerciseId] int NOT NULL,
+                        CONSTRAINT [PK_CardExercises] PRIMARY KEY ([CardId], [ExerciseId])
+                    );
+                END
+            ");
 
-            migrationBuilder.CreateTable(
-                name: "CardFollowups",
-                columns: table => new
-                {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    CardId = table.Column<int>(type: "int", nullable: false),
-                    AuthorUserId = table.Column<int>(type: "int", nullable: false),
-                    QuestionText = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
-                    LinkedCardId = table.Column<int>(type: "int", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_CardFollowups", x => x.Id);
-                });
+            migrationBuilder.Sql(@"
+                IF OBJECT_ID(N'[dbo].[CardFollowups]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [CardFollowups] (
+                        [Id] bigint IDENTITY(1,1) NOT NULL,
+                        [CardId] int NOT NULL,
+                        [AuthorUserId] int NOT NULL,
+                        [QuestionText] nvarchar(1000) NOT NULL,
+                        [LinkedCardId] int NULL,
+                        [CreatedAt] datetime2 NOT NULL,
+                        CONSTRAINT [PK_CardFollowups] PRIMARY KEY ([Id])
+                    );
+                END
+            ");
 
-            migrationBuilder.CreateTable(
-                name: "Exercises",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Title = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Exercises", x => x.Id);
-                });
+            migrationBuilder.Sql(@"
+                IF OBJECT_ID(N'[dbo].[Exercises]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [Exercises] (
+                        [Id] int IDENTITY(1,1) NOT NULL,
+                        [Title] nvarchar(200) NOT NULL,
+                        [CreatedAt] datetime2 NOT NULL,
+                        CONSTRAINT [PK_Exercises] PRIMARY KEY ([Id])
+                    );
+                END
+            ");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_CardExercises_ExerciseId",
-                table: "CardExercises",
-                column: "ExerciseId");
+            migrationBuilder.Sql(@"
+                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = N'IX_CardExercises_ExerciseId' AND object_id = OBJECT_ID(N'[dbo].[CardExercises]'))
+                BEGIN
+                    CREATE INDEX [IX_CardExercises_ExerciseId] ON [CardExercises] ([ExerciseId]);
+                END
+            ");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_CardFollowups_AuthorUserId",
-                table: "CardFollowups",
-                column: "AuthorUserId");
+            migrationBuilder.Sql(@"
+                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = N'IX_CardFollowups_AuthorUserId' AND object_id = OBJECT_ID(N'[dbo].[CardFollowups]'))
+                BEGIN
+                    CREATE INDEX [IX_CardFollowups_AuthorUserId] ON [CardFollowups] ([AuthorUserId]);
+                END
+            ");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_CardFollowups_CardId",
-                table: "CardFollowups",
-                column: "CardId");
+            migrationBuilder.Sql(@"
+                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = N'IX_CardFollowups_CardId' AND object_id = OBJECT_ID(N'[dbo].[CardFollowups]'))
+                BEGIN
+                    CREATE INDEX [IX_CardFollowups_CardId] ON [CardFollowups] ([CardId]);
+                END
+            ");
         }
 
         /// <inheritdoc />

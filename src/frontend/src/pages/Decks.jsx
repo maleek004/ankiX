@@ -5,11 +5,16 @@ export default function Decks(){
   const [decks, setDecks] = useState([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  const [newDescription, setNewDescription] = useState('')
+  const [canCreate, setCanCreate] = useState(false)
   const [activeDropdown, setActiveDropdown] = useState(null)
 
   useEffect(()=>{
     let mounted = true
-    import('../api.js').then(m=>m.getDecks()).then(data=>{
+    import('../api.js').then(m=>{
+      setCanCreate(m.canCreateContent())
+      return m.getDecks()
+    }).then(data=>{
       if(!mounted) return
       setDecks(data || [])
     }).catch(err=>{
@@ -23,9 +28,10 @@ export default function Decks(){
     e.preventDefault()
     if(!newTitle.trim()) return
     try{
-      const d = await import('../api.js').then(m=>m.createDeck(newTitle))
+      const d = await import('../api.js').then(m=>m.createDeck(newTitle, newDescription))
       setDecks(prev=>[...prev, d])
       setNewTitle('')
+      setNewDescription('')
       setShowAddForm(false)
     }catch(err){
       alert('Create deck failed: ' + (err.message || err))
@@ -46,25 +52,43 @@ export default function Decks(){
     <div>
       <div className="decks-header-bar">
         <h2 style={{ margin: 0, fontWeight: 500, fontSize: '1.5rem' }}>Decks</h2>
-        <button 
-          className="btn-primary" 
-          onClick={() => setShowAddForm(!showAddForm)}
-        >
-          {showAddForm ? 'Cancel' : '+ Add Deck'}
-        </button>
+        {canCreate && (
+          <button 
+            className="btn-primary" 
+            onClick={() => setShowAddForm(!showAddForm)}
+          >
+            {showAddForm ? 'Cancel' : '+ Add Deck'}
+          </button>
+        )}
       </div>
 
-      {showAddForm && (
-        <div className="form-card">
-          <form onSubmit={create} style={{ display: 'flex', gap: 12 }}>
-            <input 
-              className="form-control"
-              placeholder="Deck title" 
-              value={newTitle} 
-              onChange={e=>setNewTitle(e.target.value)} 
-              autoFocus
-            />
-            <button type="submit" className="btn-primary">Save Deck</button>
+      {showAddForm && canCreate && (
+        <div className="form-card" style={{ marginBottom: 20 }}>
+          <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Deck Title</label>
+              <input 
+                className="form-control"
+                placeholder="Deck title" 
+                value={newTitle} 
+                onChange={e=>setNewTitle(e.target.value)} 
+                autoFocus
+                required
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Description</label>
+              <input 
+                className="form-control"
+                placeholder="Deck description (optional)" 
+                value={newDescription} 
+                onChange={e=>setNewDescription(e.target.value)} 
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" className="btn-study-tool" onClick={() => setShowAddForm(false)}>Cancel</button>
+              <button type="submit" className="btn-primary">Save Deck</button>
+            </div>
           </form>
         </div>
       )}

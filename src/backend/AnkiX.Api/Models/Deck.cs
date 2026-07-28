@@ -13,6 +13,8 @@ public sealed class Deck
     [MaxLength(1000)]
     public string? Description { get; set; }
 
+    public int? CreatedByUserId { get; set; }
+
     [Column(TypeName = "datetime2")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

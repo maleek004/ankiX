@@ -24,6 +24,9 @@ export async function login(email, password){
   // Backend returns { accessToken, expiresInSeconds, user }
   if(data?.accessToken){
     localStorage.setItem('ankix_token', data.accessToken)
+    if(data?.user){
+      localStorage.setItem('ankix_user', JSON.stringify(data.user))
+    }
   }
   return data
 }
@@ -32,8 +35,36 @@ export function getToken(){
   return localStorage.getItem('ankix_token')
 }
 
+export function getUser(){
+  const storedUser = localStorage.getItem('ankix_user')
+  if(storedUser){
+    try { return JSON.parse(storedUser) } catch {}
+  }
+  const token = getToken()
+  if(token){
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const role = payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || payload['role'] || payload['Role']
+      const email = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'] || payload['email']
+      const id = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || payload['sub'] || payload['id']
+      return { id, email, role }
+    } catch {}
+  }
+  return null
+}
+
+export function canCreateContent(){
+  const user = getUser()
+  if(!user) return false
+  const role = user.role || user.Role
+  if(!role) return false
+  const lowerRole = role.toLowerCase()
+  return lowerRole === 'admin' || lowerRole === 'contributor'
+}
+
 export function logout(){
   localStorage.removeItem('ankix_token')
+  localStorage.removeItem('ankix_user')
 }
 
 /**
@@ -56,13 +87,16 @@ export async function getDecks(){
   return res.json()
 }
 
-export async function createDeck(title){
-  const res = await fetch(`${API_BASE}/decks`,{
+export async function createDeck(title, description = ''){
+  const res = await fetch(`${API_BASE}/content/decks`,{
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ title })
+    body: JSON.stringify({ title, description })
   })
-  if(!res.ok) throw new Error('Failed to create deck')
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to create deck')
+  }
   return res.json()
 }
 
@@ -78,31 +112,46 @@ export async function getCards(deckId){
   return res.json()
 }
 
-export async function createCard(deckId, front, back, code){
-  const res = await fetch(`${API_BASE}/decks/${deckId}/cards`,{
+export async function createCard(deckId, prompt, validationSpec, type = 'basic'){
+  const cardType = type || 'basic'
+  const res = await fetch(`${API_BASE}/content/cards`,{
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ front, back, code })
+    body: JSON.stringify({
+      deckId: Number(deckId),
+      type: cardType === 'micro-coding' ? 'micro-coding' : 'concept',
+      prompt,
+      validationSpec: validationSpec || null
+    })
   })
-  if(!res.ok) throw new Error('Failed to create card')
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to create card')
+  }
   return res.json()
 }
 
 export async function deleteDeck(id){
-  const res = await fetch(`${API_BASE}/decks/${id}`,{
+  const res = await fetch(`${API_BASE}/content/decks/${id}`,{
     method: 'DELETE',
     headers: authHeaders()
   })
-  if(!res.ok) throw new Error('Failed to delete deck')
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to delete deck')
+  }
   return true
 }
 
 export async function deleteCard(deckId, cardId){
-  const res = await fetch(`${API_BASE}/decks/${deckId}/cards/${cardId}`,{
+  const res = await fetch(`${API_BASE}/content/cards/${cardId}`,{
     method: 'DELETE',
     headers: authHeaders()
   })
-  if(!res.ok) throw new Error('Failed to delete card')
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to delete card')
+  }
   return true
 }
 

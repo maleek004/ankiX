@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using AnkiX.Api.Contracts.Content;
 using AnkiX.Api.Data;
 using AnkiX.Api.Models;
@@ -20,13 +21,22 @@ public sealed class ContentController : ControllerBase
     }
 
     [HttpPost("decks")]
+    [HttpPost("/api/decks")]
     [Authorize(Roles = $"{Roles.Contributor},{Roles.Admin}")]
     public async Task<ActionResult<DeckResponse>> CreateDeck([FromBody] CreateDeckRequest request)
     {
+        int? userId = null;
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(userIdClaim, out int parsedId))
+        {
+            userId = parsedId;
+        }
+
         Deck deck = new Deck
         {
             Title = request.Title.Trim(),
             Description = request.Description?.Trim(),
+            CreatedByUserId = userId,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -37,13 +47,15 @@ public sealed class ContentController : ControllerBase
         {
             Id = deck.Id,
             Title = deck.Title,
-            Description = deck.Description
+            Description = deck.Description,
+            CreatedByUserId = deck.CreatedByUserId
         };
 
         return CreatedAtAction(nameof(DecksController.GetDecks), "Decks", new { id = deck.Id }, response);
     }
 
     [HttpPut("decks/{deckId:int}")]
+    [HttpPut("/api/decks/{deckId:int}")]
     [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> UpdateDeck([FromRoute] int deckId, [FromBody] UpdateDeckRequest request)
     {
@@ -60,6 +72,7 @@ public sealed class ContentController : ControllerBase
     }
 
     [HttpDelete("decks/{deckId:int}")]
+    [HttpDelete("/api/decks/{deckId:int}")]
     [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> DeleteDeck([FromRoute] int deckId)
     {
@@ -81,24 +94,26 @@ public sealed class ContentController : ControllerBase
     }
 
     [HttpPost("cards")]
+    [HttpPost("/api/decks/{deckId:int}/cards")]
     [Authorize(Roles = $"{Roles.Contributor},{Roles.Admin}")]
-    public async Task<ActionResult<CardResponse>> CreateCard([FromBody] CreateCardRequest request)
+    public async Task<ActionResult<CardResponse>> CreateCard([FromBody] CreateCardRequest request, [FromRoute] int? deckId = null)
     {
-        bool deckExists = await dbContext.Decks.AnyAsync(deck => deck.Id == request.DeckId);
+        int targetDeckId = request.DeckId > 0 ? request.DeckId : (deckId ?? 0);
+        bool deckExists = await dbContext.Decks.AnyAsync(deck => deck.Id == targetDeckId);
         if (!deckExists)
         {
             return NotFound(new { message = "Deck not found." });
         }
 
         string cardType = request.Type.Trim().ToLowerInvariant();
-        if (cardType is not "micro-coding" and not "concept")
+        if (cardType is not "micro-coding" and not "concept" and not "basic")
         {
-            return BadRequest(new { message = "Card type must be 'micro-coding' or 'concept'." });
+            return BadRequest(new { message = "Card type must be 'micro-coding', 'concept', or 'basic'." });
         }
 
         Card card = new Card
         {
-            DeckId = request.DeckId,
+            DeckId = targetDeckId,
             Type = cardType,
             Prompt = request.Prompt.Trim(),
             ValidationSpec = request.ValidationSpec,
@@ -121,7 +136,8 @@ public sealed class ContentController : ControllerBase
     }
 
     [HttpPut("cards/{cardId:int}")]
-    [Authorize(Roles = Roles.Admin)]
+    [HttpPut("/api/decks/{deckId:int}/cards/{cardId:int}")]
+    [Authorize]
     public async Task<IActionResult> UpdateCard([FromRoute] int cardId, [FromBody] UpdateCardRequest request)
     {
         Card? card = await dbContext.Cards.FirstOrDefaultAsync(entity => entity.Id == cardId);
@@ -131,9 +147,9 @@ public sealed class ContentController : ControllerBase
         }
 
         string cardType = request.Type.Trim().ToLowerInvariant();
-        if (cardType is not "micro-coding" and not "concept")
+        if (cardType is not "micro-coding" and not "concept" and not "basic")
         {
-            return BadRequest(new { message = "Card type must be 'micro-coding' or 'concept'." });
+            return BadRequest(new { message = "Card type must be 'micro-coding', 'concept', or 'basic'." });
         }
 
         card.Type = cardType;
@@ -144,7 +160,8 @@ public sealed class ContentController : ControllerBase
     }
 
     [HttpDelete("cards/{cardId:int}")]
-    [Authorize(Roles = Roles.Admin)]
+    [HttpDelete("/api/decks/{deckId:int}/cards/{cardId:int}")]
+    [Authorize]
     public async Task<IActionResult> DeleteCard([FromRoute] int cardId)
     {
         Card? card = await dbContext.Cards.FirstOrDefaultAsync(entity => entity.Id == cardId);

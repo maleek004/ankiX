@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AnkiX.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9983646883559317ed8cc5a50f61ab7e2710cfd5")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e5eac4826b74007607b3c39424cd141be8cb52d7")]
 [assembly: System.Reflection.AssemblyProductAttribute("AnkiX.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AnkiX.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

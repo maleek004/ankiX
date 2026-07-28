@@ -9,6 +9,8 @@ public sealed class DeckResponse
     public string Title { get; set; } = string.Empty;
 
     public string? Description { get; set; }
+
+    public int? CreatedByUserId { get; set; }
 }
 
 public sealed class CreateDeckRequest
