@@ -16,13 +16,14 @@ export default function Deck(){
   const [validationSpec, setValidationSpec] = useState('')
   const [type, setType]                     = useState('basic')
 
-  // Followups
+  // Followups & Linked Exercises
   const [showFollowups, setShowFollowups]       = useState(false)
   const [followups, setFollowups]               = useState([])
   const [followupsLoading, setFollowupsLoading] = useState(false)
   const [newQuestion, setNewQuestion]           = useState('')
   const [submittingFollowup, setSubmittingFollowup] = useState(false)
 
+  const [linkedExercises, setLinkedExercises] = useState([])
   const [canCreate, setCanCreate] = useState(false)
 
   // ── Load deck info + study queue ──────────────────────────────────────────
@@ -40,6 +41,7 @@ export default function Deck(){
     setShowAnswer(false)
     setShowFollowups(false)
     setFollowups([])
+    setLinkedExercises([])
   }, [id])
 
   useEffect(() => {
@@ -51,12 +53,20 @@ export default function Deck(){
     return () => { mounted = false }
   }, [id, loadQueue])
 
-  // Reset followup panel whenever the card changes
+  // Reset followup panel and fetch linked exercises whenever the card changes
   useEffect(() => {
     setShowFollowups(false)
     setFollowups([])
     setNewQuestion('')
-  }, [currentIndex])
+    setLinkedExercises([])
+
+    const currentCardId = queue?.dueCards?.[currentIndex]?.id
+    if (currentCardId) {
+      import('../api.js').then(m => m.getCardExercises(currentCardId))
+        .then(exs => setLinkedExercises(exs || []))
+        .catch(() => setLinkedExercises([]))
+    }
+  }, [currentIndex, queue])
 
   const dueCards   = queue.dueCards || []
   const currentCard = dueCards[currentIndex]
@@ -162,6 +172,15 @@ export default function Deck(){
   const reviewCount   = queue.reviewCount   ?? 0
   const remaining     = Math.max(0, dueCards.length - currentIndex)
 
+  const handleResetProgress = async () => {
+    if(!confirm('Are you sure you want to reset your study progress for this deck? All cards will be returned to your New Queue.')) return
+    try{
+      await import('../api.js').then(m => m.resetDeckProgress(id))
+      await loadQueue()
+      alert('Deck progress reset successfully! All cards are now back in your New Queue.')
+    }catch(err){ alert('Reset progress failed: ' + (err.message || err)) }
+  }
+
   return (
     <div className="study-container">
       {/* Top Toolbar */}
@@ -240,8 +259,17 @@ export default function Deck(){
           <p style={{ fontSize: '1.1rem', color: '#495057' }}>
             No cards due right now. Check back soon — learning cards reappear in minutes!
           </p>
-          <div style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'center' }}>
-            <button className="btn-primary" onClick={loadQueue}>Refresh Queue</button>
+          <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button className="btn-primary" onClick={loadQueue}>🔄 Sync & Check Due Cards</button>
+              <button 
+                className="btn-study-tool" 
+                style={{ color: '#dc3545', borderColor: '#dc3545' }} 
+                onClick={handleResetProgress}
+              >
+                ⚠️ Reset Progress (Move Cards to New)
+              </button>
+            </div>
             <Link to="/decks" className="btn-study-tool" style={{ textDecoration: 'none' }}>Return to Decks</Link>
           </div>
         </div>
@@ -325,12 +353,43 @@ export default function Deck(){
                       )}
                     </div>
                   )}
+
+                  {/* Linked Exercises Section */}
+                  {linkedExercises.length > 0 && (
+                    <div style={{ marginTop: 16, padding: 12, background: '#f8f9fa', borderRadius: 8, border: '1px solid #e9ecef' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>⚡ Linked Coding Exercises ({linkedExercises.length})</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {linkedExercises.map(ex => (
+                          <Link
+                            key={ex.id}
+                            to="/exercises"
+                            style={{
+                              textDecoration: 'none',
+                              padding: '6px 12px',
+                              background: '#fff',
+                              border: '1px solid #0d6efd',
+                              borderRadius: 6,
+                              color: '#0d6efd',
+                              fontSize: '0.85rem',
+                              fontWeight: 500,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6
+                            }}
+                          >
+                            <span>▶ {ex.title}</span>
+                            <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>({ex.language})</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}
           </div>
-
-          {/* Bottom Action Bar */}
           <div className="study-bottom-bar">
             {!showAnswer ? (
               <button className="btn-show-answer" onClick={() => setShowAnswer(true)}>

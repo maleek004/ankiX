@@ -11,6 +11,10 @@ public sealed class DeckResponse
     public string? Description { get; set; }
 
     public int? CreatedByUserId { get; set; }
+
+    public int DueCount { get; set; }
+
+    public int LearnCount { get; set; }
 }
 
 public sealed class CreateDeckRequest

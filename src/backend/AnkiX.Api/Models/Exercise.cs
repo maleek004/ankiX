@@ -14,6 +14,20 @@ public sealed class Exercise
     [MaxLength(200)]
     public string Title { get; set; } = string.Empty;
 
+    [MaxLength(4000)]
+    public string? Description { get; set; }
+
+    [MaxLength(50)]
+    public string Language { get; set; } = "csharp";
+
+    public string? StarterCode { get; set; }
+
+    public string? SolutionCode { get; set; }
+
+    public string? TestCasesSpec { get; set; }
+
+    public int? CreatedByUserId { get; set; }
+
     [Column(TypeName = "datetime2")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

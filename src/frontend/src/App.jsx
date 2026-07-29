@@ -8,6 +8,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Decks from './pages/Decks'
 import Deck from './pages/Deck'
+import Exercises from './pages/Exercises'
 
 export default function App(){
   return (
@@ -22,6 +23,7 @@ export default function App(){
               <Route path="/register" element={<Register/>} />
               <Route path="/decks" element={<RequireAuth><Decks/></RequireAuth>} />
               <Route path="/decks/:id" element={<RequireAuth><Deck/></RequireAuth>} />
+              <Route path="/exercises" element={<RequireAuth><Exercises/></RequireAuth>} />
             </Routes>
           </main>
         </div>

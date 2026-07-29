@@ -15,7 +15,7 @@ export default function NavBar(){
         <nav>
           <ul className="navbar-nav">
             <li><Link to="/decks" className="nav-link">Decks</Link></li>
-            <li><Link to="/decks" className="nav-link">Add</Link></li>
+            <li><Link to="/exercises" className="nav-link">Exercises</Link></li>
             <li><span className="nav-link" onClick={() => alert('Search feature coming soon')}>Search</span></li>
           </ul>
         </nav>

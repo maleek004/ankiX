@@ -31,7 +31,13 @@ if (string.IsNullOrWhiteSpace(defaultConnectionString))
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    options.UseSqlServer(defaultConnectionString);
+    options.UseSqlServer(defaultConnectionString, sqlOptions =>
+    {
+        sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorNumbersToAdd: null);
+    });
 });
 
 JwtOptions jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
@@ -130,17 +136,93 @@ if (shouldSeed)
     {
         var deck = new Deck
         {
-            Title = "Sample Deck",
-            Description = "Automated seed deck",
+            Title = "Algorithms & Data Structures",
+            Description = "Micro-coding cards and hands-on algorithm challenges",
             CreatedAt = DateTime.UtcNow
         };
         db.Decks.Add(deck);
         db.SaveChanges();
 
         db.Cards.AddRange(new[] {
-            new Card { DeckId = deck.Id, Type = "basic", Prompt = "What is 2+2?", ValidationSpec = "{\"answer\":\"4\"}", CreatedAt = DateTime.UtcNow },
-            new Card { DeckId = deck.Id, Type = "basic", Prompt = "What is the capital of France?", ValidationSpec = "{\"answer\":\"Paris\"}", CreatedAt = DateTime.UtcNow }
+            new Card { DeckId = deck.Id, Type = "basic", Prompt = "What is the time complexity of Binary Search?", ValidationSpec = "{\"answer\":\"O(log n)\"}", CreatedAt = DateTime.UtcNow },
+            new Card { DeckId = deck.Id, Type = "micro-coding", Prompt = "Write a C# method that reverses a string in-place.", ValidationSpec = "{\"answer\":\"Reverse\"}", CreatedAt = DateTime.UtcNow },
+            new Card { DeckId = deck.Id, Type = "micro-coding", Prompt = "Write a Python function for Two Sum problem.", ValidationSpec = "{\"answer\":\"seen\"}", CreatedAt = DateTime.UtcNow }
         });
+        db.SaveChanges();
+    }
+
+    // Always re-seed exercises when seed argument is passed to ensure clean basic coding challenges
+    if (db.CardExercises.Any()) db.CardExercises.RemoveRange(db.CardExercises);
+    if (db.ExerciseReviewRecords.Any()) db.ExerciseReviewRecords.RemoveRange(db.ExerciseReviewRecords);
+    if (db.Exercises.Any()) db.Exercises.RemoveRange(db.Exercises);
+    db.SaveChanges();
+
+    {
+        var ex1 = new Exercise
+        {
+            Title = "Check Even Number in Python",
+            Language = "python",
+            Description = "Write a function is_even(n) that returns True if integer n is even, and False if n is odd.",
+            StarterCode = "def is_even(n):\n    # Write your solution here\n    pass",
+            SolutionCode = "def is_even(n):\n    return n % 2 == 0",
+            TestCasesSpec = "# Unit Tests\nif __name__ == '__main__':\n    assert is_even(4) is True, f'Expected True for 4, got {is_even(4)!r}'\n    assert is_even(7) is False, f'Expected False for 7, got {is_even(7)!r}'\n    assert is_even(0) is True, f'Expected True for 0, got {is_even(0)!r}'\n    print('✓ All Unit Tests Passed!')",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var ex2 = new Exercise
+        {
+            Title = "Reverse String in Python",
+            Language = "python",
+            Description = "Write a function reverse_string(s) that takes a string s and returns the reversed string.",
+            StarterCode = "def reverse_string(s):\n    # Write your solution here\n    pass",
+            SolutionCode = "def reverse_string(s):\n    return s[::-1]",
+            TestCasesSpec = "# Unit Tests\nif __name__ == '__main__':\n    assert reverse_string('hello') == 'olleh', f'Expected olleh, got {reverse_string(\"hello\")!r}'\n    assert reverse_string('Python') == 'nohtyP', f'Expected nohtyP, got {reverse_string(\"Python\")!r}'\n    print('✓ All Unit Tests Passed!')",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var ex3 = new Exercise
+        {
+            Title = "Add Two Numbers in JavaScript",
+            Language = "javascript",
+            Description = "Write a function addNumbers(a, b) that takes two numbers and returns their sum.",
+            StarterCode = "function addNumbers(a, b) {\n  // Write your solution here\n}",
+            SolutionCode = "function addNumbers(a, b) {\n  return a + b;\n}",
+            TestCasesSpec = "// Unit Tests\ntry {\n  if (addNumbers(2, 3) !== 5) throw new Error(`Expected 5, got ${addNumbers(2, 3)}`);\n  if (addNumbers(-1, 1) !== 0) throw new Error(`Expected 0, got ${addNumbers(-1, 1)}`);\n  console.log('✓ All Unit Tests Passed!');\n} catch(e) { console.error('Assertion Error:', e.message); process.exit(1); }",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var ex4 = new Exercise
+        {
+            Title = "Find Maximum in Array (JavaScript)",
+            Language = "javascript",
+            Description = "Write a function getMax(numbers) that returns the maximum number in an array of numbers.",
+            StarterCode = "function getMax(numbers) {\n  // Write your solution here\n}",
+            SolutionCode = "function getMax(numbers) {\n  return Math.max(...numbers);\n}",
+            TestCasesSpec = "// Unit Tests\ntry {\n  if (getMax([1, 5, 3, 9, 2]) !== 9) throw new Error(`Expected 9, got ${getMax([1, 5, 3, 9, 2])}`);\n  if (getMax([-10, -3, -5]) !== -3) throw new Error(`Expected -3, got ${getMax([-10, -3, -5])}`);\n  console.log('✓ All Unit Tests Passed!');\n} catch(e) { console.error('Assertion Error:', e.message); process.exit(1); }",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var ex5 = new Exercise
+        {
+            Title = "Calculate Square in Go",
+            Language = "go",
+            Description = "Write a Go function Square(n int) int that returns the square of an integer n.",
+            StarterCode = "package main\n\nfunc Square(n int) int {\n    // Write your solution here\n    return 0\n}",
+            SolutionCode = "package main\n\nfunc Square(n int) int {\n    return n * n\n}",
+            TestCasesSpec = "import \"fmt\"\n\nfunc main() {\n    if Square(4) != 16 { panic(fmt.Sprintf(\"Expected 16, got %d\", Square(4))) }\n    if Square(-3) != 9 { panic(fmt.Sprintf(\"Expected 9, got %d\", Square(-3))) }\n    fmt.Println(\"✓ All Unit Tests Passed!\")\n}",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        db.Exercises.AddRange(ex1, ex2, ex3, ex4, ex5);
+        db.SaveChanges();
+
+        // Link seeded cards to exercises
+        var microCard1 = db.Cards.FirstOrDefault(c => c.Type == "micro-coding" && c.Prompt.Contains("C#"));
+        var microCard2 = db.Cards.FirstOrDefault(c => c.Type == "micro-coding" && c.Prompt.Contains("Python"));
+
+        if (microCard1 != null) db.CardExercises.Add(new CardExercise { CardId = microCard1.Id, ExerciseId = ex2.Id });
+        if (microCard2 != null) db.CardExercises.Add(new CardExercise { CardId = microCard2.Id, ExerciseId = ex1.Id });
+        db.SaveChanges();
     }
 
     db.SaveChanges();

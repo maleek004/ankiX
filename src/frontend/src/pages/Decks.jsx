@@ -106,8 +106,8 @@ export default function Decks(){
                   </Link>
                 </td>
                 <td className="deck-counts" style={{ width: 100 }}>
-                  <div className="count-green">{d.dueCount ?? 1}</div>
-                  <div className="count-blue">{d.learnCount ?? 2}</div>
+                  <div className="count-green">{d.dueCount ?? 0}</div>
+                  <div className="count-blue">{d.learnCount ?? 0}</div>
                 </td>
                 <td style={{ width: 110, textAlign: 'right' }}>
                   <div className="actions-dropdown">

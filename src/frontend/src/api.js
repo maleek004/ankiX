@@ -187,8 +187,118 @@ export async function addFollowup(cardId, questionText){
   return res.json()
 }
 
+export async function resetDeckProgress(deckId){
+  const res = await fetch(`${API_BASE}/decks/${deckId}/reset`,{
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to reset deck progress')
+  }
+  return res.json()
+}
+
 export async function getStudyQueue(deckId){
   const res = await fetch(`${API_BASE}/decks/${deckId}/study-queue`, { headers: authHeaders() })
   if(!res.ok) throw new Error('Failed to fetch study queue')
+  return res.json()
+}
+
+export async function getExercises(language = ''){
+  const query = language ? `?language=${encodeURIComponent(language)}` : ''
+  const res = await fetch(`${API_BASE}/exercises${query}`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch exercises')
+  return res.json()
+}
+
+export async function getExercise(id){
+  const res = await fetch(`${API_BASE}/exercises/${id}`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch exercise details')
+  return res.json()
+}
+
+export async function createExercise(exerciseData){
+  const res = await fetch(`${API_BASE}/exercises`,{
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(exerciseData)
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to create exercise')
+  }
+  return res.json()
+}
+
+export async function getCardExercises(cardId){
+  const res = await fetch(`${API_BASE}/cards/${cardId}/exercises`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch card exercises')
+  return res.json()
+}
+
+export async function linkCardExercise(cardId, exerciseId){
+  const res = await fetch(`${API_BASE}/cards/${cardId}/exercises/${exerciseId}`,{
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to link exercise to card')
+  }
+  return res.json()
+}
+
+export async function runCardCode(cardId, submittedCode, language = 'csharp'){
+  const res = await fetch(`${API_BASE}/cards/${cardId}/run`,{
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ submittedCode, language })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to run code')
+  }
+  return res.json()
+}
+
+export async function runExerciseCode(exerciseId, submittedCode, language = 'csharp'){
+  const res = await fetch(`${API_BASE}/exercises/${exerciseId}/run`,{
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ submittedCode, language })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to run exercise code')
+  }
+  return res.json()
+}
+
+export async function submitExerciseReview(exerciseId, outcome){
+  const res = await fetch(`${API_BASE}/exercises/${exerciseId}/reviews`,{
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ outcome })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to submit exercise review')
+  }
+  return res.json()
+}
+
+export async function getDueExercises(){
+  const res = await fetch(`${API_BASE}/exercises/due`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch due exercises')
+  return res.json()
+}
+
+export async function reseedExercises(){
+  const res = await fetch(`${API_BASE}/exercises/reseed`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok) throw new Error('Failed to reseed exercises')
   return res.json()
 }
