@@ -3,56 +3,65 @@ import { useParams, Link } from 'react-router-dom'
 
 export default function Deck(){
   const { id } = useParams()
-  const [deck, setDeck] = useState(null)
-  const [cards, setCards] = useState([])
+  const [deck, setDeck]           = useState(null)
+  const [queue, setQueue]         = useState({ newCount:0, learningCount:0, reviewCount:0, dueCards:[] })
+  const [allCards, setAllCards]   = useState([])  // for the edit drawer
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [showAnswer, setShowAnswer] = useState(false)
-  const [userCode, setUserCode] = useState('')
-  const [codeResult, setCodeResult] = useState(null)
+  const [showAnswer, setShowAnswer]     = useState(false)
+  const [userCode, setUserCode]         = useState('')
 
   // Edit / Admin mode toggle
-  const [isEditing, setIsEditing] = useState(false)
-  const [prompt, setPrompt] = useState('')
+  const [isEditing, setIsEditing]           = useState(false)
+  const [prompt, setPrompt]                 = useState('')
   const [validationSpec, setValidationSpec] = useState('')
-  const [type, setType] = useState('basic')
+  const [type, setType]                     = useState('basic')
 
   // Followups
-  const [showFollowups, setShowFollowups] = useState(false)
-  const [followups, setFollowups] = useState([])
+  const [showFollowups, setShowFollowups]       = useState(false)
+  const [followups, setFollowups]               = useState([])
   const [followupsLoading, setFollowupsLoading] = useState(false)
-  const [newQuestion, setNewQuestion] = useState('')
+  const [newQuestion, setNewQuestion]           = useState('')
   const [submittingFollowup, setSubmittingFollowup] = useState(false)
 
   const [canCreate, setCanCreate] = useState(false)
 
-  useEffect(()=>{
+  // ── Load deck info + study queue ──────────────────────────────────────────
+  const loadQueue = useCallback(async () => {
+    const m = await import('../api.js')
+    const [d, q, cs] = await Promise.all([
+      m.getDeck(id).catch(() => null),
+      m.getStudyQueue(id).catch(() => ({ newCount:0, learningCount:0, reviewCount:0, dueCards:[] })),
+      m.getCards(id).catch(() => [])
+    ])
+    setDeck(d)
+    setQueue(q)
+    setAllCards(cs || [])
+    setCurrentIndex(0)
+    setShowAnswer(false)
+    setShowFollowups(false)
+    setFollowups([])
+  }, [id])
+
+  useEffect(() => {
     let mounted = true
     import('../api.js').then(m => {
       setCanCreate(m.canCreateContent())
-      return Promise.all([m.getDeck(id).catch(()=>null), m.getCards(id).catch(()=>[])])
     })
-      .then(([d,cs])=>{
-        if(!mounted) return
-        setDeck(d)
-        setCards(cs || [])
-        setCurrentIndex(0)
-        setShowAnswer(false)
-        setShowFollowups(false)
-        setFollowups([])
-      })
-      .catch(err=>{ console.warn('deck load',err); setDeck(null); setCards([]) })
-    return ()=>{ mounted = false }
-  },[id])
+    if (mounted) loadQueue()
+    return () => { mounted = false }
+  }, [id, loadQueue])
 
   // Reset followup panel whenever the card changes
-  useEffect(()=>{
+  useEffect(() => {
     setShowFollowups(false)
     setFollowups([])
     setNewQuestion('')
-  },[currentIndex])
+  }, [currentIndex])
 
-  const currentCard = cards[currentIndex]
+  const dueCards   = queue.dueCards || []
+  const currentCard = dueCards[currentIndex]
 
+  // ── Followups ─────────────────────────────────────────────────────────────
   const loadFollowups = useCallback(async (cardId) => {
     setFollowupsLoading(true)
     try {
@@ -88,49 +97,70 @@ export default function Deck(){
     }
   }
 
-  const handleNextCard = () => {
-    setShowAnswer(false)
-    setUserCode('')
-    setCodeResult(null)
-    setCurrentIndex(prev => prev + 1)
-  }
-
-  // Submit review to the backend then advance to the next card.
-  // Advancement is optimistic — a network failure is logged but doesn't block study.
+  // ── Rating ────────────────────────────────────────────────────────────────
+  // After rating: advance to next card. If we finish the queue, reload it —
+  // learning cards may have come back due (1-min or 10-min intervals elapsed).
   const rateCard = async (outcome) => {
     try {
       await import('../api.js').then(m => m.submitReview(currentCard.id, outcome))
     } catch(err) {
       console.warn('Review submission failed (continuing study):', err.message || err)
     }
-    handleNextCard()
+
+    const nextIndex = currentIndex + 1
+    if (nextIndex >= dueCards.length) {
+      // End of current queue — reload to pick up any learning cards now due
+      await loadQueue()
+    } else {
+      setCurrentIndex(nextIndex)
+      setShowAnswer(false)
+      setUserCode('')
+    }
   }
 
+  // ── Edit Drawer ───────────────────────────────────────────────────────────
   const addCard = async (e) => {
     e.preventDefault()
     if(!prompt.trim()) return
     try{
-      const c = await import('../api.js').then(m=>m.createCard(id, prompt, validationSpec, type))
-      setCards(prev=>[...prev, c])
+      const c = await import('../api.js').then(m => m.createCard(id, prompt, validationSpec, type))
+      setAllCards(prev => [...prev, c])
       setPrompt(''); setValidationSpec(''); setType('basic')
-      alert('Card added successfully!')
+      alert('Card added!')
+      await loadQueue() // refresh queue counts
     }catch(err){ alert('Create card failed: ' + (err.message || err)) }
   }
 
   const removeCard = async (cardId) => {
     if(!confirm('Delete card?')) return
     try{
-      await import('../api.js').then(m=>m.deleteCard(id, cardId))
-      setCards(prev=>prev.filter(c=>c.id !== cardId))
+      await import('../api.js').then(m => m.deleteCard(id, cardId))
+      setAllCards(prev => prev.filter(c => c.id !== cardId))
+      await loadQueue()
     }catch(err){ alert('Delete failed: ' + (err.message || err)) }
   }
 
-  const restartStudy = () => {
-    setCurrentIndex(0)
-    setShowAnswer(false)
-    setUserCode('')
-    setCodeResult(null)
+  // Compute display label for each rating button's next-interval hint
+  const getIntervalLabel = (outcome) => {
+    if (!currentCard) return ''
+    // These are approximate labels. The actual interval is phase-dependent.
+    // New/Learning cards: Again=1m, Hard=1m, Good=10m, Easy=Graduate
+    // Review cards: shows SM-2 days
+    const phase = currentCard._phase  // we don't have server phase in card, show sensible defaults
+    switch(outcome){
+      case 'Again': return '<1m'
+      case 'Hard':  return '<1m'
+      case 'Good':  return '<10m'
+      case 'Easy':  return '1d+'
+      default:      return ''
+    }
   }
+
+  // ── Counters (live from queue response) ───────────────────────────────────
+  const newCount      = queue.newCount      ?? 0
+  const learningCount = queue.learningCount ?? 0
+  const reviewCount   = queue.reviewCount   ?? 0
+  const remaining     = Math.max(0, dueCards.length - currentIndex)
 
   return (
     <div className="study-container">
@@ -148,15 +178,16 @@ export default function Deck(){
           <button className="btn-study-tool" onClick={() => alert('Deck limits option')}>Limits</button>
         </div>
         <div className="study-counts-right">
-          <span className="count-blue">{cards.length - currentIndex > 0 ? cards.length - currentIndex : 0}</span>
+          {/* Blue = new, Red = learning, Green = review — live from backend */}
+          <span className="count-blue">{newCount}</span>
           {' + '}
-          <span className="count-red">0</span>
+          <span className="count-red">{learningCount}</span>
           {' + '}
-          <span className="count-green">0</span>
+          <span className="count-green">{reviewCount}</span>
         </div>
       </div>
 
-      {/* Edit Drawer for Management */}
+      {/* Edit Drawer */}
       {isEditing && (
         <div className="form-card" style={{ marginBottom: 24 }}>
           <h3 style={{ marginTop: 0 }}>Add New Card to Deck</h3>
@@ -179,9 +210,9 @@ export default function Deck(){
             <button type="submit" className="btn-primary">Add Card</button>
           </form>
 
-          <h4 style={{ marginTop: 24, marginBottom: 12 }}>Existing Cards ({cards.length})</h4>
+          <h4 style={{ marginTop: 24, marginBottom: 12 }}>Existing Cards ({allCards.length})</h4>
           <ul style={{ paddingLeft: 20 }}>
-            {cards.map(c => (
+            {allCards.map(c => (
               <li key={c.id} style={{ marginBottom: 6 }}>
                 <strong>{c.prompt}</strong> ({c.type})
                 {' '}
@@ -198,17 +229,19 @@ export default function Deck(){
       )}
 
       {/* Card Viewer Area */}
-      {cards.length === 0 ? (
+      {allCards.length === 0 ? (
         <div className="empty-state">
           <h3>No cards in this deck yet.</h3>
-          <p>Click <strong>Edit</strong> above or the <strong>+</strong> button to add cards to this deck!</p>
+          <p>Click <strong>Edit</strong> above or the <strong>+</strong> button to add cards!</p>
         </div>
-      ) : currentIndex >= cards.length ? (
+      ) : dueCards.length === 0 || currentIndex >= dueCards.length ? (
         <div className="empty-state">
-          <h2>Congratulations!</h2>
-          <p style={{ fontSize: '1.1rem', color: '#495057' }}>You have finished reviewing this deck for now.</p>
+          <h2>🎉 All done!</h2>
+          <p style={{ fontSize: '1.1rem', color: '#495057' }}>
+            No cards due right now. Check back soon — learning cards reappear in minutes!
+          </p>
           <div style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'center' }}>
-            <button className="btn-primary" onClick={restartStudy}>Study Again</button>
+            <button className="btn-primary" onClick={loadQueue}>Refresh Queue</button>
             <Link to="/decks" className="btn-study-tool" style={{ textDecoration: 'none' }}>Return to Decks</Link>
           </div>
         </div>
@@ -240,10 +273,7 @@ export default function Deck(){
 
                 {/* ── Followups Toggle ── only visible once answer is shown ── */}
                 <div className="followups-wrapper">
-                  <button
-                    className="btn-followups-toggle"
-                    onClick={handleToggleFollowups}
-                  >
+                  <button className="btn-followups-toggle" onClick={handleToggleFollowups}>
                     {showFollowups ? '▲ Hide Follow-ups' : '▼ Follow-ups'}
                     {followups.length > 0 && !showFollowups && (
                       <span className="followups-badge">{followups.length}</span>
@@ -252,7 +282,6 @@ export default function Deck(){
 
                   {showFollowups && (
                     <div className="followups-panel">
-                      {/* Add a new follow-up */}
                       <form className="followup-form" onSubmit={handleSubmitFollowup}>
                         <input
                           className="form-control followup-input"
@@ -270,7 +299,6 @@ export default function Deck(){
                         </button>
                       </form>
 
-                      {/* List of follow-ups */}
                       {followupsLoading ? (
                         <p className="followups-loading">Loading follow-ups...</p>
                       ) : followups.length === 0 ? (
@@ -315,7 +343,7 @@ export default function Deck(){
                   <button className="btn-rating again" onClick={() => rateCard('Again')}>Again</button>
                 </div>
                 <div className="rating-col">
-                  <span className="rating-interval">&lt;6m</span>
+                  <span className="rating-interval">&lt;1m</span>
                   <button className="btn-rating" onClick={() => rateCard('Hard')}>Hard</button>
                 </div>
                 <div className="rating-col">
@@ -323,7 +351,7 @@ export default function Deck(){
                   <button className="btn-rating" onClick={() => rateCard('Good')}>Good</button>
                 </div>
                 <div className="rating-col">
-                  <span className="rating-interval">4d</span>
+                  <span className="rating-interval">1d+</span>
                   <button className="btn-rating" onClick={() => rateCard('Easy')}>Easy</button>
                 </div>
               </div>

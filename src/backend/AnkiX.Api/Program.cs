@@ -9,13 +9,24 @@ using Microsoft.IdentityModel.Tokens;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+// appsettings.Local.json is gitignored — use it for local DB credentials
+// without touching the committed appsettings files.
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<ExecutionApiOptions>(builder.Configuration.GetSection(ExecutionApiOptions.SectionName));
 
-string? defaultConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+// Connection string: prefer ANKIX_DB_CONN env var (for CI/CD and Azure App Service),
+// fall back to appsettings ConnectionStrings:DefaultConnection.
+string? defaultConnectionString =
+    Environment.GetEnvironmentVariable("ANKIX_DB_CONN")
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
+
 if (string.IsNullOrWhiteSpace(defaultConnectionString))
 {
-    throw new InvalidOperationException("Connection string 'DefaultConnection' is required.");
+    throw new InvalidOperationException(
+        "Database connection string is required. " +
+        "Set the ANKIX_DB_CONN environment variable or configure ConnectionStrings:DefaultConnection in appsettings.");
 }
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>

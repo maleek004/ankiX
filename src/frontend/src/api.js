@@ -186,3 +186,9 @@ export async function addFollowup(cardId, questionText){
   }
   return res.json()
 }
+
+export async function getStudyQueue(deckId){
+  const res = await fetch(`${API_BASE}/decks/${deckId}/study-queue`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch study queue')
+  return res.json()
+}

@@ -24,4 +24,11 @@ public sealed class ReviewRecord
 
     [Column(TypeName = "datetime2")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>"learning" or "review"</summary>
+    [MaxLength(10)]
+    public string Phase { get; set; } = "learning";
+
+    /// <summary>0 = 1-minute step, 1 = 10-minute step. Only meaningful in learning phase.</summary>
+    public int LearningStep { get; set; }
 }

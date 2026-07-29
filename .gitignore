@@ -1,0 +1,43 @@
+# ── .NET ──────────────────────────────────────────────────────────────────────
+**/bin/
+**/obj/
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+.vs/
+*.ncrunch*
+
+# Local secrets — NEVER commit these
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+
+# EF Core migrations bundle
+*.efbundle
+
+# Build output
+publish/
+artifacts/
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+**/node_modules/
+**/dist/
+.env
+.env.local
+.env.*.local
+
+# Vite cache
+**/.vite/
+
+# ── OS / Editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/settings.json
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+

@@ -48,13 +48,15 @@ public sealed class ReviewsController : ControllerBase
 
         ReviewRecord newRecord = new ReviewRecord
         {
-            CardId = request.CardId,
-            UserId = userId,
-            Outcome = request.Outcome,
-            EaseFactor = schedule.EaseFactor,
+            CardId       = request.CardId,
+            UserId       = userId,
+            Outcome      = request.Outcome,
+            EaseFactor   = schedule.EaseFactor,
             IntervalDays = schedule.IntervalDays,
             NextReviewAt = schedule.NextReviewAt,
-            CreatedAt = DateTime.UtcNow
+            Phase        = schedule.Phase,
+            LearningStep = schedule.LearningStep,
+            CreatedAt    = DateTime.UtcNow
         };
 
         dbContext.ReviewRecords.Add(newRecord);
@@ -62,10 +64,11 @@ public sealed class ReviewsController : ControllerBase
 
         return Ok(new ReviewResponse
         {
-            CardId = request.CardId,
+            CardId       = request.CardId,
             NextReviewAt = schedule.NextReviewAt,
-            EaseFactor = schedule.EaseFactor,
-            IntervalDays = schedule.IntervalDays
+            EaseFactor   = schedule.EaseFactor,
+            IntervalDays = schedule.IntervalDays,
+            Phase        = schedule.Phase
         });
     }
 }

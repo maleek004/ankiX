@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+
+jobs:
+  backend:
+    name: Backend — Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore src/backend/AnkiX.Api/AnkiX.Api.csproj
+
+      - name: Restore test dependencies
+        run: dotnet restore src/backend/AnkiX.Api.Tests/AnkiX.Api.Tests.csproj
+
+      - name: Build API
+        run: dotnet build src/backend/AnkiX.Api/AnkiX.Api.csproj --no-restore --configuration Release
+
+      - name: Run unit tests
+        # Pass a placeholder connection string so the app module loads without a DB.
+        # Tests themselves don't hit the database.
+        env:
+          ANKIX_DB_CONN: "Server=localhost;Database=ankix_ci;User Id=sa;Password=CI_placeholder!;TrustServerCertificate=True;"
+        run: |
+          dotnet test src/backend/AnkiX.Api.Tests/AnkiX.Api.Tests.csproj \
+            --no-restore \
+            --configuration Release \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory ./test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./test-results/*.trx
+          retention-days: 14
+
+  frontend:
+    name: Frontend — Install & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: src/frontend
+
+      - name: Build frontend bundle
+        run: npm run build
+        working-directory: src/frontend

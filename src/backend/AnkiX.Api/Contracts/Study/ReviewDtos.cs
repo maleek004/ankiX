@@ -21,4 +21,7 @@ public sealed class ReviewResponse
     public decimal EaseFactor { get; set; }
 
     public int IntervalDays { get; set; }
+
+    /// <summary>"learning" or "review"</summary>
+    public string Phase { get; set; } = string.Empty;
 }
