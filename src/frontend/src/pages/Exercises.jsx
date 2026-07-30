@@ -210,100 +210,162 @@ export default function Exercises(){
         </div>
       )}
 
-      {/* Main Content Layout */}
-      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-        {/* Exercises List Column */}
-        <div style={{ flex: '1 1 400px' }}>
-          {exercises.length === 0 ? (
-            <div className="empty-state">No exercises found. Add one or select another language filter!</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {exercises.map(ex => {
-                const badge = langBadges[ex.language] || { label: ex.language, color: '#333', bg: '#eee' }
-                const isSelected = activeExercise?.id === ex.id
-                return (
-                  <div
-                    key={ex.id}
-                    className="form-card"
-                    style={{
-                      padding: 16,
-                      borderLeft: `4px solid ${badge.color}`,
-                      background: isSelected ? '#f8f9fa' : '#fff',
-                      boxShadow: isSelected ? '0 0 0 2px #0d6efd' : 'none'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <h4 style={{ margin: '0 0 6px 0', fontSize: '1.05rem' }}>{ex.title}</h4>
+      {/* Main Exercises Grid */}
+      <div>
+        {exercises.length === 0 ? (
+          <div className="empty-state">No exercises found. Add one or select another language filter!</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+            {exercises.map(ex => {
+              const badge = langBadges[ex.language] || { label: ex.language, color: '#333', bg: '#eee' }
+              const isSelected = activeExercise?.id === ex.id
+              return (
+                <div
+                  key={ex.id}
+                  className="form-card"
+                  style={{
+                    padding: 18,
+                    borderLeft: `4px solid ${badge.color}`,
+                    background: isSelected ? '#f8f9fa' : '#fff',
+                    boxShadow: isSelected ? '0 0 0 2px #0d6efd' : '0 2px 8px rgba(0,0,0,0.05)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justify: 'space-between'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600 }}>{ex.title}</h4>
                       <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
                         {badge.label}
                       </span>
                     </div>
 
                     {ex.description && (
-                      <p style={{ fontSize: '0.85rem', color: '#495057', margin: '4px 0 12px 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      <p style={{ fontSize: '0.85rem', color: '#495057', margin: '4px 0 16px 0', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                         {ex.description}
                       </p>
                     )}
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#6c757d' }}>
-                        🔗 {ex.linkedCardsCount ?? 0} linked cards
-                      </span>
-                      <button className="btn-primary" style={{ padding: '4px 12px', fontSize: '0.85rem' }} onClick={() => openPractice(ex)}>
-                        Practice ⚡
-                      </button>
-                    </div>
                   </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
 
-        {/* Practice Workspace Column */}
-        {activeExercise && (
-          <div style={{ flex: '1 1 450px' }}>
-            <div className="form-card" style={{ padding: 20, position: 'sticky', top: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: '1.2rem' }}>⚡ {activeExercise.title}</h3>
-                <button style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.2rem' }} onClick={() => setActiveExercise(null)}>✕</button>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: 8, borderTop: '1px solid #f1f3f5' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+                      🔗 {ex.linkedCardsCount ?? 0} linked cards
+                    </span>
+                    <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => openPractice(ex)}>
+                      Practice ⚡
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Floating Practice Modal Overlay */}
+      {activeExercise && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1050,
+            background: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justify: 'center',
+            padding: 16
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setActiveExercise(null) }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 820,
+              maxHeight: '90vh',
+              background: '#fff',
+              borderRadius: 12,
+              boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ padding: '16px 24px', background: '#f8f9fa', borderBottom: '1px solid #dee2e6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600 }}>⚡ {activeExercise.title}</h3>
+                <span style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  background: langBadges[activeExercise.language]?.bg || '#eee',
+                  color: langBadges[activeExercise.language]?.color || '#333'
+                }}>
+                  {langBadges[activeExercise.language]?.label || activeExercise.language}
+                </span>
               </div>
+              <button
+                style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.4rem', color: '#6c757d', padding: '0 4px' }}
+                onClick={() => setActiveExercise(null)}
+              >
+                ✕
+              </button>
+            </div>
 
+            {/* Modal Body */}
+            <div style={{ padding: 24, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
               {activeExercise.description && (
-                <div style={{ padding: 12, background: '#f8f9fa', borderRadius: 6, fontSize: '0.9rem', marginBottom: 16, border: '1px solid #e9ecef' }}>
+                <div style={{ padding: 12, background: '#f8f9fa', borderRadius: 8, fontSize: '0.9rem', border: '1px solid #e9ecef' }}>
                   <strong>Instructions:</strong>
-                  <p style={{ margin: '4px 0 0 0', whiteSpace: 'pre-wrap' }}>{activeExercise.description}</p>
+                  <p style={{ margin: '4px 0 0 0', whiteSpace: 'pre-wrap', color: '#333' }}>{activeExercise.description}</p>
                 </div>
               )}
 
-              <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Code Solution</label>
-                <select className="form-control" style={{ width: 'auto', padding: '2px 8px', fontSize: '0.85rem' }} value={practiceLang} onChange={e=>setPracticeLang(e.target.value)}>
-                  <option value="csharp">C#</option>
-                  <option value="python">Python</option>
-                  <option value="javascript">JavaScript</option>
-                  <option value="go">Go</option>
-                </select>
+              <div>
+                <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Code Solution</label>
+                  <select
+                    className="form-control"
+                    style={{ width: 'auto', padding: '2px 8px', fontSize: '0.85rem' }}
+                    value={practiceLang}
+                    onChange={e => setPracticeLang(e.target.value)}
+                  >
+                    <option value="csharp">C#</option>
+                    <option value="python">Python</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="go">Go</option>
+                  </select>
+                </div>
+
+                <textarea
+                  className="form-control"
+                  rows={9}
+                  style={{
+                    fontFamily: 'Consolas, Monaco, monospace',
+                    fontSize: '0.9rem',
+                    background: '#1e1e1e',
+                    color: '#d4d4d4',
+                    resize: 'vertical'
+                  }}
+                  value={practiceCode}
+                  onChange={e => setPracticeCode(e.target.value)}
+                />
               </div>
 
-              <textarea
-                className="form-control"
-                rows={8}
-                style={{ fontFamily: 'Consolas, Monaco, monospace', fontSize: '0.9rem', marginBottom: 16, background: '#1e1e1e', color: '#d4d4d4' }}
-                value={practiceCode}
-                onChange={e => setPracticeCode(e.target.value)}
-              />
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <button className="btn-primary" onClick={handleRunCode} disabled={running}>
-                  {running ? 'Running...' : '▶ Run Solution'}
+              {/* Action & Status Bar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
+                <button className="btn-primary" onClick={handleRunCode} disabled={running} style={{ padding: '8px 20px', fontSize: '0.9rem' }}>
+                  {running ? 'Running Solution...' : '▶ Run Solution'}
                 </button>
 
                 {runResult && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{
-                      padding: '4px 10px',
-                      borderRadius: 4,
+                      padding: '5px 12px',
+                      borderRadius: 6,
                       fontWeight: 700,
                       fontSize: '0.85rem',
                       background: runResult.passed ? '#d4edda' : '#f8d7da',
@@ -311,37 +373,50 @@ export default function Exercises(){
                     }}>
                       {runResult.passed ? '✓ PASS' : '✗ FAIL'}
                     </span>
-                    <span style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
                       ({runResult.durationMs}ms)
                     </span>
                   </div>
                 )}
               </div>
 
+              {/* Output Details Box (Scrollable max-height) */}
               {runResult?.details && (
-                <div style={{ marginTop: 12, padding: 10, borderRadius: 6, background: '#f8f9fa', fontSize: '0.85rem', fontFamily: 'monospace', border: '1px solid #e9ecef' }}>
+                <div style={{
+                  padding: 14,
+                  borderRadius: 8,
+                  background: runResult.passed ? '#f8f9fa' : '#fff5f5',
+                  color: runResult.passed ? '#212529' : '#c92a2a',
+                  fontSize: '0.85rem',
+                  fontFamily: 'Consolas, Monaco, monospace',
+                  border: runResult.passed ? '1px solid #e9ecef' : '1px solid #ffc9c9',
+                  maxHeight: 200,
+                  overflowY: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word'
+                }}>
                   {runResult.details}
                 </div>
               )}
 
               {/* SM-2 Retention Rating Section */}
               {runResult?.passed && (
-                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', marginBottom: 8, textAlign: 'center' }}>
+                <div style={{ marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', marginBottom: 10, textAlign: 'center' }}>
                     Rate your recall performance for SRS schedule:
                   </div>
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                    <button className="btn-rating again" style={{ padding: '6px 12px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Again')}>Again (&lt;1m)</button>
-                    <button className="btn-rating" style={{ padding: '6px 12px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Hard')}>Hard (&lt;1m)</button>
-                    <button className="btn-rating" style={{ padding: '6px 12px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Good')}>Good (&lt;10m)</button>
-                    <button className="btn-rating" style={{ padding: '6px 12px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Easy')}>Easy (1d+)</button>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button className="btn-rating again" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Again')}>Again (&lt;1m)</button>
+                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Hard')}>Hard (&lt;1m)</button>
+                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Good')}>Good (&lt;10m)</button>
+                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Easy')}>Easy (1d+)</button>
                   </div>
                 </div>
               )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
