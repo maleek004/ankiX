@@ -10,6 +10,7 @@ import Decks from './pages/Decks'
 import Deck from './pages/Deck'
 import Exercises from './pages/Exercises'
 import AdminUsers from './pages/AdminUsers'
+import Search from './pages/Search'
 
 export default function App(){
   return (
@@ -22,6 +23,7 @@ export default function App(){
               <Route path="/" element={<Home/>} />
               <Route path="/login" element={<Login/>} />
               <Route path="/register" element={<Register/>} />
+              <Route path="/search" element={<RequireAuth><Search/></RequireAuth>} />
               <Route path="/decks" element={<RequireAuth><Decks/></RequireAuth>} />
               <Route path="/decks/:id" element={<RequireAuth><Deck/></RequireAuth>} />
               <Route path="/exercises" element={<RequireAuth><Exercises/></RequireAuth>} />
