@@ -369,3 +369,15 @@ export async function reseedExercises(){
   if(!res.ok) throw new Error('Failed to reseed exercises')
   return res.json()
 }
+
+export async function unlinkFollowupCard(cardId, followupId, linkedCardId){
+  const res = await fetch(`${API_BASE}/cards/${cardId}/followups/${followupId}/link/${linkedCardId}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Unlink failed')
+  }
+  return res.json()
+}

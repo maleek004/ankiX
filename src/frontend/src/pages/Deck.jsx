@@ -30,13 +30,27 @@ export default function Deck(){
   const [previewCardModal, setPreviewCardModal] = useState(null)
   const [canCreate, setCanCreate] = useState(false)
 
-  const handleOpenLinkedCard = async (linkedCardId) => {
+  const handleOpenLinkedCards = async (followup) => {
     try {
       const m = await import('../api.js')
-      const cardData = await m.getCard(linkedCardId)
-      setPreviewCardModal(cardData)
+      const cardIds = followup.linkedCardIds && followup.linkedCardIds.length > 0
+        ? followup.linkedCardIds
+        : (followup.linkedCardId ? [followup.linkedCardId] : [])
+      if (cardIds.length === 0) return
+      const cards = await Promise.all(cardIds.map(id => m.getCard(id).catch(() => null)))
+      const validCards = cards.filter(Boolean)
+      if (validCards.length === 0) {
+        alert('Could not load linked answer cards.')
+        return
+      }
+      setPreviewCardModal({
+        cards: validCards,
+        initialIndex: 0,
+        followup,
+        parentCard: currentCard
+      })
     } catch (err) {
-      alert('Could not load derived card: ' + (err.message || err))
+      alert('Could not load derived cards: ' + (err.message || err))
     }
   }
 
@@ -373,8 +387,8 @@ export default function Deck(){
                                 </span>
                               </div>
                               <p className="followup-text">{f.questionText}</p>
-                              <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
-                                {f.linkedCardId ? (
+                              <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                {(f.linkedCardIds?.length > 0 || f.linkedCardId) && (
                                   <button
                                     className="btn-study-tool"
                                     style={{
@@ -386,20 +400,20 @@ export default function Deck(){
                                       cursor: 'pointer',
                                       padding: '2px 8px'
                                     }}
-                                    onClick={() => handleOpenLinkedCard(f.linkedCardId)}
+                                    onClick={() => handleOpenLinkedCards(f)}
                                   >
-                                    ✓ Answered by a card ➔
+                                    ✓ Answered by {(f.linkedCardIds?.length || 1)} card{(f.linkedCardIds?.length > 1) ? 's' : ''} ➔
                                   </button>
-                                ) : (
-                                  canCreate && (
-                                    <button
-                                      className="btn-study-tool"
-                                      style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#0d6efd', color: '#0d6efd' }}
-                                      onClick={() => setConvertingFollowup(f)}
-                                    >
-                                      + Convert to Card 🎴
-                                    </button>
-                                  )
+                                )}
+
+                                {canCreate && (
+                                  <button
+                                    className="btn-study-tool"
+                                    style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#0d6efd', color: '#0d6efd' }}
+                                    onClick={() => setConvertingFollowup(f)}
+                                  >
+                                    + Answer with Card 🎴
+                                  </button>
                                 )}
                               </div>
                             </li>
@@ -503,11 +517,12 @@ export default function Deck(){
         />
       )}
 
-      {/* Derived Standalone Card Preview Modal */}
+      {/* Derived Standalone Card Preview / Multi-Card Carousel Modal */}
       {previewCardModal && (
         <CardPreviewModal
-          card={previewCardModal}
+          modalData={previewCardModal}
           onClose={() => setPreviewCardModal(null)}
+          onUnlinked={() => loadFollowups(currentCard?.id)}
         />
       )}
     </div>
@@ -1323,7 +1338,34 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
   )
 }
 
-function CardPreviewModal({ card, onClose }) {
+function CardPreviewModal({ modalData, onClose, onUnlinked }) {
+  // Normalize modalData: could be single card or { cards, initialIndex, followup, parentCard }
+  const cardsList = modalData.cards ? modalData.cards : [modalData]
+  const followup = modalData.followup
+  const parentCard = modalData.parentCard
+
+  const [currentIndex, setCurrentIndex] = useState(modalData.initialIndex || 0)
+  const [unlinking, setUnlinking] = useState(false)
+
+  const currentCard = cardsList[currentIndex] || cardsList[0]
+
+  const handleUnlink = async () => {
+    if (!followup || !parentCard || !currentCard) return
+    if (!window.confirm(`Unlink this card ("${currentCard.prompt}") from the follow-up question?`)) return
+    setUnlinking(true)
+    try {
+      const m = await import('../api.js')
+      await m.unlinkFollowupCard(parentCard.id, followup.id, currentCard.id)
+      alert('Card unlinked successfully!')
+      if (onUnlinked) onUnlinked()
+      onClose()
+    } catch (err) {
+      alert('Failed to unlink card: ' + (err.message || err))
+    } finally {
+      setUnlinking(false)
+    }
+  }
+
   return (
     <div
       style={{
@@ -1346,7 +1388,7 @@ function CardPreviewModal({ card, onClose }) {
         style={{
           margin: 'auto',
           width: '90%',
-          maxWidth: 650,
+          maxWidth: 680,
           maxHeight: '85vh',
           background: '#fff',
           borderRadius: 12,
@@ -1359,32 +1401,75 @@ function CardPreviewModal({ card, onClose }) {
         {/* Header Bar */}
         <div style={{ padding: '16px 24px', background: '#f8f9fa', borderBottom: '1px solid #dee2e6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>🎴 Derived Standalone Answer Card</h3>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>🎴 Linked Answer Card</h3>
             <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: '#0d6efd', color: '#fff' }}>
-              {card.type}
+              {currentCard?.type || 'basic'}
             </span>
           </div>
           <button style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.4rem', color: '#6c757d' }} onClick={onClose}>✕</button>
         </div>
 
+        {/* Carousel Stepper Bar (if multiple cards) */}
+        {cardsList.length > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 24px', background: '#e7f5ff', borderBottom: '1px solid #a5d8ff' }}>
+            <button
+              className="btn-study-tool"
+              style={{ fontSize: '0.85rem', padding: '4px 12px' }}
+              disabled={currentIndex === 0}
+              onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
+            >
+              ‹ Prev Answer Card
+            </button>
+            <span style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1864ab' }}>
+              Card {currentIndex + 1} of {cardsList.length}
+            </span>
+            <button
+              className="btn-study-tool"
+              style={{ fontSize: '0.85rem', padding: '4px 12px' }}
+              disabled={currentIndex === cardsList.length - 1}
+              onClick={() => setCurrentIndex(prev => Math.min(cardsList.length - 1, prev + 1))}
+            >
+              Next Answer Card ›
+            </button>
+          </div>
+        )}
+
         {/* Modal Body */}
         <div style={{ padding: 24, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {followup && (
+            <div style={{ padding: '8px 12px', background: '#f8f9fa', borderRadius: 6, borderLeft: '4px solid #0d6efd', fontSize: '0.85rem', color: '#495057' }}>
+              <strong>Follow-up Question:</strong> "{followup.questionText}"
+            </div>
+          )}
+
           <div>
             <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 6 }}>Card Question / Prompt</label>
             <div style={{ padding: 14, background: '#f8f9fa', borderRadius: 8, border: '1px solid #dee2e6', fontSize: '1rem', fontWeight: 500, color: '#212529' }}>
-              {card.prompt}
+              {currentCard?.prompt}
             </div>
           </div>
 
           <div>
             <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 6 }}>Card Validation Spec / Answer</label>
             <div style={{ padding: 14, background: '#e7f5ff', borderRadius: 8, border: '1px solid #a5d8ff', fontFamily: 'Consolas, Monaco, monospace', fontSize: '0.95rem', color: '#1864ab', whiteSpace: 'pre-wrap' }}>
-              {card.validationSpec || 'No specific answer text configured.'}
+              {currentCard?.validationSpec || 'No specific answer text configured.'}
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
-            <Link to={`/decks/${card.deckId}`} style={{ textDecoration: 'none' }} onClick={onClose}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
+            {followup ? (
+              <button
+                type="button"
+                className="btn-study-tool"
+                style={{ borderColor: '#dc3545', color: '#dc3545', fontSize: '0.85rem' }}
+                disabled={unlinking}
+                onClick={handleUnlink}
+              >
+                {unlinking ? 'Unlinking...' : 'Unlink this Card 🗑'}
+              </button>
+            ) : <div />}
+
+            <Link to={`/decks/${currentCard?.deckId}`} style={{ textDecoration: 'none' }} onClick={onClose}>
               <button className="btn-primary" style={{ padding: '8px 18px', fontSize: '0.9rem' }}>
                 Open Target Deck ➔
               </button>

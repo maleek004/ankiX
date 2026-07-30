@@ -54,6 +54,7 @@ public sealed class FollowupsController : ControllerBase
             AuthorDisplayName = authorNames.GetValueOrDefault(f.AuthorUserId, "Unknown"),
             QuestionText = f.QuestionText,
             LinkedCardId = f.LinkedCardId,
+            LinkedCardIds = f.GetLinkedCardIdList(),
             CreatedAt = f.CreatedAt
         }).ToList();
 
@@ -78,32 +79,31 @@ public sealed class FollowupsController : ControllerBase
             return NotFound(new { message = "Card not found." });
         }
 
-        User? author = await dbContext.Users.FindAsync(userId);
-        if (author is null)
-        {
-            return Unauthorized(new { message = "User not found." });
-        }
-
         CardFollowup followup = new CardFollowup
         {
             CardId = cardId,
             AuthorUserId = userId,
             QuestionText = request.QuestionText.Trim(),
-            LinkedCardId = null,
             CreatedAt = DateTime.UtcNow
         };
 
         dbContext.CardFollowups.Add(followup);
         await dbContext.SaveChangesAsync();
 
+        string authorDisplayName = await dbContext.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.DisplayName ?? u.Email)
+            .FirstOrDefaultAsync() ?? "Unknown";
+
         return CreatedAtAction(nameof(GetFollowups), new { cardId }, new FollowupResponse
         {
             Id = followup.Id,
             CardId = followup.CardId,
             AuthorUserId = followup.AuthorUserId,
-            AuthorDisplayName = author.DisplayName ?? author.Email,
+            AuthorDisplayName = authorDisplayName,
             QuestionText = followup.QuestionText,
-            LinkedCardId = null,
+            LinkedCardId = followup.LinkedCardId,
+            LinkedCardIds = followup.GetLinkedCardIdList(),
             CreatedAt = followup.CreatedAt
         });
     }
@@ -133,9 +133,34 @@ public sealed class FollowupsController : ControllerBase
             return BadRequest(new { message = "Linked answer card not found." });
         }
 
-        followup.LinkedCardId = request.LinkedCardId;
+        followup.AddLinkedCardId(request.LinkedCardId);
         await dbContext.SaveChangesAsync();
 
-        return Ok(new { message = "Follow-up linked to answer card.", linkedCardId = request.LinkedCardId });
+        return Ok(new { message = "Follow-up linked to answer card.", linkedCardId = request.LinkedCardId, linkedCardIds = followup.GetLinkedCardIdList() });
+    }
+
+    /// <summary>
+    /// Unlinks an answer card from a follow-up. Contributor/Admin only.
+    /// Call DELETE /api/cards/{cardId}/followups/{followupId}/link/{linkedCardId}.
+    /// </summary>
+    [HttpDelete("{followupId:long}/link/{linkedCardId:int}")]
+    [Authorize(Roles = $"{Roles.Contributor},{Roles.Admin}")]
+    public async Task<IActionResult> UnlinkAnswerCard(
+        [FromRoute] int cardId,
+        [FromRoute] long followupId,
+        [FromRoute] int linkedCardId)
+    {
+        CardFollowup? followup = await dbContext.CardFollowups
+            .FirstOrDefaultAsync(f => f.Id == followupId && f.CardId == cardId);
+
+        if (followup is null)
+        {
+            return NotFound(new { message = "Follow-up not found." });
+        }
+
+        followup.RemoveLinkedCardId(linkedCardId);
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new { message = "Follow-up unlinked from answer card.", linkedCardIds = followup.GetLinkedCardIdList() });
     }
 }

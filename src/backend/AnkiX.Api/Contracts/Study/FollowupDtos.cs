@@ -27,8 +27,11 @@ public sealed class FollowupResponse
 
     public string QuestionText { get; set; } = string.Empty;
 
-    /// <summary>Id of the card that was created to answer this follow-up. Null until linked.</summary>
+    /// <summary>Id of the primary card that was created to answer this follow-up. Null until linked.</summary>
     public int? LinkedCardId { get; set; }
+
+    /// <summary>List of all card IDs linked to answer this follow-up question.</summary>
+    public List<int> LinkedCardIds { get; set; } = new();
 
     public DateTime CreatedAt { get; set; }
 }

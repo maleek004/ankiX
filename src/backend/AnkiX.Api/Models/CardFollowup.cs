@@ -26,6 +26,57 @@ public sealed class CardFollowup
     /// </summary>
     public int? LinkedCardId { get; set; }
 
+    /// <summary>Comma-separated IDs of all cards linked to answer this follow-up.</summary>
+    [MaxLength(500)]
+    public string? LinkedCardIds { get; set; }
+
     [Column(TypeName = "datetime2")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public List<int> GetLinkedCardIdList()
+    {
+        HashSet<int> ids = new HashSet<int>();
+        if (LinkedCardId.HasValue)
+        {
+            ids.Add(LinkedCardId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(LinkedCardIds))
+        {
+            string[] raw = LinkedCardIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (string item in raw)
+            {
+                if (int.TryParse(item, out int parsed))
+                {
+                    ids.Add(parsed);
+                }
+            }
+        }
+
+        return ids.ToList();
+    }
+
+    public void AddLinkedCardId(int cardId)
+    {
+        List<int> current = GetLinkedCardIdList();
+        if (!current.Contains(cardId))
+        {
+            current.Add(cardId);
+        }
+
+        if (!LinkedCardId.HasValue)
+        {
+            LinkedCardId = cardId;
+        }
+
+        LinkedCardIds = string.Join(",", current);
+    }
+
+    public void RemoveLinkedCardId(int cardId)
+    {
+        List<int> current = GetLinkedCardIdList();
+        current.Remove(cardId);
+        LinkedCardIds = current.Count > 0 ? string.Join(",", current) : null;
+        LinkedCardId = current.Count > 0 ? current[0] : null;
+    }
 }
