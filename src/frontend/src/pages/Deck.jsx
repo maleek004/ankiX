@@ -27,7 +27,18 @@ export default function Deck(){
   const [linkerModalCard, setLinkerModalCard] = useState(null)
   const [activePracticeModal, setActivePracticeModal] = useState(null)
   const [convertingFollowup, setConvertingFollowup] = useState(null)
+  const [previewCardModal, setPreviewCardModal] = useState(null)
   const [canCreate, setCanCreate] = useState(false)
+
+  const handleOpenLinkedCard = async (linkedCardId) => {
+    try {
+      const m = await import('../api.js')
+      const cardData = await m.getCard(linkedCardId)
+      setPreviewCardModal(cardData)
+    } catch (err) {
+      alert('Could not load derived card: ' + (err.message || err))
+    }
+  }
 
   // ── Load deck info + study queue ──────────────────────────────────────────
   const loadQueue = useCallback(async () => {
@@ -364,9 +375,21 @@ export default function Deck(){
                               <p className="followup-text">{f.questionText}</p>
                               <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
                                 {f.linkedCardId ? (
-                                  <span className="followup-answer-link" style={{ fontSize: '0.8rem', color: '#198754', fontWeight: 600 }}>
-                                    ✓ Answered by a card
-                                  </span>
+                                  <button
+                                    className="btn-study-tool"
+                                    style={{
+                                      fontSize: '0.8rem',
+                                      fontWeight: 600,
+                                      color: '#198754',
+                                      borderColor: '#198754',
+                                      background: '#f8fff9',
+                                      cursor: 'pointer',
+                                      padding: '2px 8px'
+                                    }}
+                                    onClick={() => handleOpenLinkedCard(f.linkedCardId)}
+                                  >
+                                    ✓ Answered by a card ➔
+                                  </button>
                                 ) : (
                                   canCreate && (
                                     <button
@@ -477,6 +500,14 @@ export default function Deck(){
           currentDeckId={id}
           onClose={() => setConvertingFollowup(null)}
           onConverted={() => loadFollowups(currentCard?.id)}
+        />
+      )}
+
+      {/* Derived Standalone Card Preview Modal */}
+      {previewCardModal && (
+        <CardPreviewModal
+          card={previewCardModal}
+          onClose={() => setPreviewCardModal(null)}
         />
       )}
     </div>
@@ -1165,6 +1196,79 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+function CardPreviewModal({ card, onClose }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 9999,
+        background: 'rgba(0, 0, 0, 0.65)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div
+        style={{
+          margin: 'auto',
+          width: '90%',
+          maxWidth: 650,
+          maxHeight: '85vh',
+          background: '#fff',
+          borderRadius: 12,
+          boxShadow: '0 20px 40px rgba(0,0,0,0.35)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
+        {/* Header Bar */}
+        <div style={{ padding: '16px 24px', background: '#f8f9fa', borderBottom: '1px solid #dee2e6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>🎴 Derived Standalone Answer Card</h3>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: '#0d6efd', color: '#fff' }}>
+              {card.type}
+            </span>
+          </div>
+          <button style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.4rem', color: '#6c757d' }} onClick={onClose}>✕</button>
+        </div>
+
+        {/* Modal Body */}
+        <div style={{ padding: 24, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 6 }}>Card Question / Prompt</label>
+            <div style={{ padding: 14, background: '#f8f9fa', borderRadius: 8, border: '1px solid #dee2e6', fontSize: '1rem', fontWeight: 500, color: '#212529' }}>
+              {card.prompt}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 6 }}>Card Validation Spec / Answer</label>
+            <div style={{ padding: 14, background: '#e7f5ff', borderRadius: 8, border: '1px solid #a5d8ff', fontFamily: 'Consolas, Monaco, monospace', fontSize: '0.95rem', color: '#1864ab', whiteSpace: 'pre-wrap' }}>
+              {card.validationSpec || 'No specific answer text configured.'}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
+            <Link to={`/decks/${card.deckId}`} style={{ textDecoration: 'none' }} onClick={onClose}>
+              <button className="btn-primary" style={{ padding: '8px 18px', fontSize: '0.9rem' }}>
+                Open Target Deck ➔
+              </button>
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   )

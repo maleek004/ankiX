@@ -159,6 +159,26 @@ public sealed class ContentController : ControllerBase
         return Ok();
     }
 
+    [HttpGet("cards/{cardId:int}")]
+    [HttpGet("/api/cards/{cardId:int}")]
+    public async Task<ActionResult<CardResponse>> GetCard([FromRoute] int cardId)
+    {
+        Card? card = await dbContext.Cards.FirstOrDefaultAsync(entity => entity.Id == cardId);
+        if (card is null)
+        {
+            return NotFound(new { message = "Card not found." });
+        }
+
+        return Ok(new CardResponse
+        {
+            Id = card.Id,
+            DeckId = card.DeckId,
+            Type = card.Type,
+            Prompt = card.Prompt,
+            ValidationSpec = card.ValidationSpec
+        });
+    }
+
     [HttpDelete("cards/{cardId:int}")]
     [HttpDelete("/api/decks/{deckId:int}/cards/{cardId:int}")]
     [Authorize]
