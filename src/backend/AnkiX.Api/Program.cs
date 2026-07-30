@@ -105,6 +105,16 @@ using (var startupScope = app.Services.CreateScope())
 {
     var startupDb = startupScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     startupDb.Database.Migrate();
+    startupDb.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (
+            SELECT * FROM sys.columns 
+            WHERE object_id = OBJECT_ID(N'[dbo].[CardFollowups]') 
+            AND name = N'LinkedCardIds'
+        )
+        BEGIN
+            ALTER TABLE [CardFollowups] ADD [LinkedCardIds] NVARCHAR(500) NULL;
+        END
+    ");
 }
 
 // Seed data when invoked with the 'seed' argument: dotnet run -- seed
