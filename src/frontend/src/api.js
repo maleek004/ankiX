@@ -113,15 +113,23 @@ export async function getCards(deckId){
 }
 
 export async function createCard(deckId, prompt, validationSpec, type = 'basic'){
-  const cardType = type || 'basic'
+  let p = prompt
+  let v = validationSpec
+  let t = type
+  if (typeof prompt === 'object' && prompt !== null) {
+    p = prompt.prompt
+    v = prompt.validationSpec
+    t = prompt.type
+  }
+  const cardType = t || 'basic'
   const res = await fetch(`${API_BASE}/content/cards`,{
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({
       deckId: Number(deckId),
       type: cardType === 'micro-coding' ? 'micro-coding' : 'concept',
-      prompt,
-      validationSpec: validationSpec || null
+      prompt: p,
+      validationSpec: v || null
     })
   })
   if(!res.ok){

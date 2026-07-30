@@ -1037,11 +1037,7 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
     try {
       const m = await import('../api.js')
       // 1. Create card in selected target deck with locked followup question as prompt
-      const newCard = await m.createCard(targetDeckId, {
-        prompt: followup.questionText,
-        validationSpec,
-        type
-      })
+      const newCard = await m.createCard(targetDeckId, followup.questionText, validationSpec, type)
 
       // 2. Link followup question to new card
       await m.linkFollowupToCard(parentCard.id, followup.id, newCard.id)
