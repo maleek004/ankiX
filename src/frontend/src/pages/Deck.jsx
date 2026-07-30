@@ -744,14 +744,21 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
   const currentEx = exercises[activeIdx]
 
   const [practiceLang, setPracticeLang] = useState(currentEx?.language || 'python')
-  const [practiceCode, setPracticeCode] = useState(currentEx?.starterCode || '')
+  const [practiceCode, setPracticeCode] = useState(currentEx?.starterCode || currentEx?.solutionCode || '')
   const [running, setRunning] = useState(false)
   const [runResult, setRunResult] = useState(null)
+
+  const langBadges = {
+    csharp: { label: 'C#', color: '#68217a', bg: '#f2e6f7' },
+    python: { label: 'Python', color: '#3572A5', bg: '#e8f2fc' },
+    javascript: { label: 'JavaScript', color: '#f1e05a', bg: '#fffde6' },
+    go: { label: 'Go', color: '#00ADD8', bg: '#e6f9fc' }
+  }
 
   useEffect(() => {
     if (currentEx) {
       setPracticeLang(currentEx.language || 'python')
-      setPracticeCode(currentEx.starterCode || '')
+      setPracticeCode(currentEx.starterCode || currentEx.solutionCode || '')
       setRunResult(null)
     }
   }, [currentEx])
@@ -761,7 +768,7 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
     setRunning(true)
     try {
       const m = await import('../api.js')
-      const res = await m.runExercise(currentEx.id, practiceCode, practiceLang)
+      const res = await m.runExerciseCode(currentEx.id, practiceCode, practiceLang)
       setRunResult(res)
     } catch (err) {
       alert('Run failed: ' + (err.message || err))
@@ -786,6 +793,8 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
   }
 
   if (!currentEx) return null
+
+  const badge = langBadges[currentEx.language] || { label: currentEx.language, color: '#333', bg: '#eee' }
 
   return (
     <div
@@ -823,8 +832,8 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
         <div style={{ padding: '16px 24px', background: '#f8f9fa', borderBottom: '1px solid #dee2e6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600 }}>⚡ {currentEx.title}</h3>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: '#eee', color: '#333' }}>
-              {currentEx.language}
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
+              {badge.label}
             </span>
           </div>
 

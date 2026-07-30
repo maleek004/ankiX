@@ -194,18 +194,20 @@ public sealed class ExercisesController : ControllerBase
             .Select(ce => ce.ExerciseId)
             .ToListAsync();
 
-        List<ExerciseResponse> exercises = await dbContext.Exercises
+        List<ExerciseDetailResponse> exercises = await dbContext.Exercises
             .Where(e => exerciseIds.Contains(e.Id))
             .OrderBy(e => e.Title)
-            .Select(e => new ExerciseResponse
+            .Select(e => new ExerciseDetailResponse
             {
                 Id = e.Id,
                 Title = e.Title,
                 Description = e.Description,
                 Language = e.Language,
+                StarterCode = e.StarterCode,
+                SolutionCode = e.SolutionCode,
+                TestCasesSpec = e.TestCasesSpec,
                 CreatedByUserId = e.CreatedByUserId,
-                CreatedAt = e.CreatedAt,
-                LinkedCardsCount = dbContext.CardExercises.Count(ce => ce.ExerciseId == e.Id)
+                CreatedAt = e.CreatedAt
             })
             .ToListAsync();
 
