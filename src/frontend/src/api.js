@@ -249,6 +249,18 @@ export async function linkCardExercise(cardId, exerciseId){
   return res.json()
 }
 
+export async function unlinkCardExercise(cardId, exerciseId){
+  const res = await fetch(`${API_BASE}/cards/${cardId}/exercises/${exerciseId}`,{
+    method: 'DELETE',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to unlink exercise from card')
+  }
+  return true
+}
+
 export async function runCardCode(cardId, submittedCode, language = 'csharp'){
   const res = await fetch(`${API_BASE}/cards/${cardId}/run`,{
     method: 'POST',

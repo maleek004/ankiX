@@ -24,6 +24,7 @@ export default function Deck(){
   const [submittingFollowup, setSubmittingFollowup] = useState(false)
 
   const [linkedExercises, setLinkedExercises] = useState([])
+  const [linkerModalCard, setLinkerModalCard] = useState(null)
   const [canCreate, setCanCreate] = useState(false)
 
   // ── Load deck info + study queue ──────────────────────────────────────────
@@ -232,9 +233,15 @@ export default function Deck(){
           <h4 style={{ marginTop: 24, marginBottom: 12 }}>Existing Cards ({allCards.length})</h4>
           <ul style={{ paddingLeft: 20 }}>
             {allCards.map(c => (
-              <li key={c.id} style={{ marginBottom: 6 }}>
-                <strong>{c.prompt}</strong> ({c.type})
-                {' '}
+              <li key={c.id} style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span><strong>{c.prompt}</strong> ({c.type})</span>
+                <button
+                  className="btn-study-tool"
+                  style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#0d6efd', color: '#0d6efd' }}
+                  onClick={() => setLinkerModalCard(c)}
+                >
+                  🔗 Link Exercises
+                </button>
                 <button
                   style={{ color: '#dc3545', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem' }}
                   onClick={() => removeCard(c.id)}
@@ -277,7 +284,18 @@ export default function Deck(){
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
           <div className="card-viewer-area">
             {/* Front Prompt */}
-            <div className="card-prompt">{currentCard.prompt}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+              <div className="card-prompt" style={{ flex: 1 }}>{currentCard.prompt}</div>
+              {canCreate && (
+                <button
+                  className="btn-study-tool"
+                  style={{ fontSize: '0.8rem', padding: '4px 10px', whiteSpace: 'nowrap', borderColor: '#0d6efd', color: '#0d6efd' }}
+                  onClick={() => setLinkerModalCard(currentCard)}
+                >
+                  🔗 Link Exercises
+                </button>
+              )}
+            </div>
 
             {/* Micro-coding Editor */}
             {currentCard.type === 'micro-coding' && (
@@ -418,6 +436,295 @@ export default function Deck(){
           </div>
         </div>
       )}
+
+      {/* Card Exercise Linker Modal */}
+      {linkerModalCard && (
+        <CardExerciseLinkerModal
+          card={linkerModalCard}
+          onClose={() => setLinkerModalCard(null)}
+          onUpdated={loadQueue}
+        />
+      )}
+    </div>
+  )
+}
+
+function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
+  const [activeTab, setActiveTab] = useState('search') // 'search' | 'create'
+  const [exercises, setExercises] = useState([])
+  const [linkedIds, setLinkedIds] = useState(new Set())
+  const [searchQuery, setSearchQuery] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  // Inline creation form state
+  const [title, setTitle] = useState('')
+  const [language, setLanguage] = useState('python')
+  const [description, setDescription] = useState('')
+  const [starterCode, setStarterCode] = useState('')
+  const [solutionCode, setSolutionCode] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const m = await import('../api.js')
+      const [allExs, cardExs] = await Promise.all([
+        m.getExercises().catch(() => []),
+        m.getCardExercises(card.id).catch(() => [])
+      ])
+      setExercises(allExs || [])
+      setLinkedIds(new Set((cardExs || []).map(e => e.id)))
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }, [card.id])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  const handleToggleLink = async (exerciseId) => {
+    const isLinked = linkedIds.has(exerciseId)
+    try {
+      const m = await import('../api.js')
+      if (isLinked) {
+        await m.unlinkCardExercise(card.id, exerciseId)
+        setLinkedIds(prev => { const next = new Set(prev); next.delete(exerciseId); return next })
+      } else {
+        await m.linkCardExercise(card.id, exerciseId)
+        setLinkedIds(prev => new Set(prev).add(exerciseId))
+      }
+      if (onUpdated) onUpdated()
+    } catch (err) {
+      alert('Link action failed: ' + (err.message || err))
+    }
+  }
+
+  const handleCreateAndLink = async (e) => {
+    e.preventDefault()
+    if (!title.trim()) return
+    setCreating(true)
+    try {
+      const m = await import('../api.js')
+      const newEx = await m.createExercise({
+        title,
+        language,
+        description,
+        starterCode,
+        solutionCode
+      })
+      await m.linkCardExercise(card.id, newEx.id)
+      alert(`Created and linked "${title}" to card!`)
+      setTitle('')
+      setDescription('')
+      setStarterCode('')
+      setSolutionCode('')
+      setActiveTab('search')
+      await loadData()
+      if (onUpdated) onUpdated()
+    } catch (err) {
+      alert('Create exercise failed: ' + (err.message || err))
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const filteredExercises = exercises.filter(ex => {
+    if (!searchQuery.trim()) return true
+    const q = searchQuery.toLowerCase()
+    return ex.title.toLowerCase().includes(q) ||
+           ex.language.toLowerCase().includes(q) ||
+           (ex.description && ex.description.toLowerCase().includes(q))
+  })
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 9999,
+        background: 'rgba(0, 0, 0, 0.65)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div
+        style={{
+          margin: 'auto',
+          width: '90%',
+          maxWidth: 750,
+          maxHeight: '85vh',
+          background: '#fff',
+          borderRadius: 12,
+          boxShadow: '0 20px 40px rgba(0,0,0,0.35)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: '16px 24px', background: '#f8f9fa', borderBottom: '1px solid #dee2e6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>🔗 Link Coding Exercises</h3>
+            <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>Card: "{card.prompt.length > 45 ? card.prompt.substring(0, 45) + '...' : card.prompt}"</span>
+          </div>
+          <button style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.4rem', color: '#6c757d' }} onClick={onClose}>✕</button>
+        </div>
+
+        {/* Tab Buttons */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #dee2e6', background: '#fff' }}>
+          <button
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              border: 'none',
+              borderBottom: activeTab === 'search' ? '3px solid #0d6efd' : 'none',
+              background: activeTab === 'search' ? '#fff' : '#f8f9fa',
+              fontWeight: activeTab === 'search' ? 600 : 400,
+              color: activeTab === 'search' ? '#0d6efd' : '#495057',
+              cursor: 'pointer'
+            }}
+            onClick={() => setActiveTab('search')}
+          >
+            🔍 Search & Link ({linkedIds.size} Linked)
+          </button>
+          <button
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              border: 'none',
+              borderBottom: activeTab === 'create' ? '3px solid #0d6efd' : 'none',
+              background: activeTab === 'create' ? '#fff' : '#f8f9fa',
+              fontWeight: activeTab === 'create' ? 600 : 400,
+              color: activeTab === 'create' ? '#0d6efd' : '#495057',
+              cursor: 'pointer'
+            }}
+            onClick={() => setActiveTab('create')}
+          >
+            + Create & Link New Exercise
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
+          {activeTab === 'search' ? (
+            <div>
+              <div style={{ marginBottom: 16 }}>
+                <input
+                  className="form-control"
+                  placeholder="Type keyword to filter exercises (e.g. 'Python', 'Reverse', 'Even')..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              {loading ? (
+                <div style={{ textAlign: 'center', padding: 20, color: '#6c757d' }}>Loading exercises catalog...</div>
+              ) : filteredExercises.length === 0 ? (
+                <div className="empty-state">No matching exercises found. Try another search or create a new exercise in the tab above!</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {filteredExercises.map(ex => {
+                    const isLinked = linkedIds.has(ex.id)
+                    return (
+                      <div
+                        key={ex.id}
+                        style={{
+                          padding: 12,
+                          border: isLinked ? '1px solid #198754' : '1px solid #dee2e6',
+                          borderRadius: 8,
+                          background: isLinked ? '#f8fff9' : '#fff',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <strong style={{ fontSize: '0.95rem' }}>{ex.title}</strong>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#eee' }}>
+                              {ex.language}
+                            </span>
+                          </div>
+                          {ex.description && (
+                            <p style={{ margin: 0, fontSize: '0.8rem', color: '#6c757d', maxWidth: 450, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {ex.description}
+                            </p>
+                          )}
+                        </div>
+
+                        <button
+                          style={{
+                            padding: '6px 14px',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            borderRadius: 6,
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: isLinked ? '#198754' : '#0d6efd',
+                            color: '#fff'
+                          }}
+                          onClick={() => handleToggleLink(ex.id)}
+                        >
+                          {isLinked ? '✓ Linked' : '+ Link'}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <form onSubmit={handleCreateAndLink} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 2 }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Exercise Title</label>
+                  <input className="form-control" value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Check Prime Number" required />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Language</label>
+                  <select className="form-control" value={language} onChange={e=>setLanguage(e.target.value)}>
+                    <option value="python">Python</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="csharp">C#</option>
+                    <option value="go">Go</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Instructions / Description</label>
+                <textarea className="form-control" rows={3} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Describe the problem..." />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Starter Code Template</label>
+                <textarea className="form-control" rows={3} style={{ fontFamily: 'monospace' }} value={starterCode} onChange={e=>setStarterCode(e.target.value)} placeholder="initial function signature..." />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Solution Code (or Assertion Test Suite)</label>
+                <textarea className="form-control" rows={3} style={{ fontFamily: 'monospace' }} value={solutionCode} onChange={e=>setSolutionCode(e.target.value)} placeholder="reference solution code..." />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button type="submit" className="btn-primary" disabled={creating}>
+                  {creating ? 'Creating & Linking...' : 'Save & Link to Card 🔗'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
