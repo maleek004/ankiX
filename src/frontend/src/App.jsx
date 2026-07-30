@@ -9,6 +9,7 @@ import Register from './pages/Register'
 import Decks from './pages/Decks'
 import Deck from './pages/Deck'
 import Exercises from './pages/Exercises'
+import AdminUsers from './pages/AdminUsers'
 
 export default function App(){
   return (
@@ -24,6 +25,7 @@ export default function App(){
               <Route path="/decks" element={<RequireAuth><Decks/></RequireAuth>} />
               <Route path="/decks/:id" element={<RequireAuth><Deck/></RequireAuth>} />
               <Route path="/exercises" element={<RequireAuth><Exercises/></RequireAuth>} />
+              <Route path="/admin/users" element={<RequireAuth><AdminUsers/></RequireAuth>} />
             </Routes>
           </main>
         </div>

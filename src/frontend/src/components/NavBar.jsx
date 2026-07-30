@@ -16,6 +16,9 @@ export default function NavBar(){
           <ul className="navbar-nav">
             <li><Link to="/decks" className="nav-link">Decks</Link></li>
             <li><Link to="/exercises" className="nav-link">Exercises</Link></li>
+            {auth?.user?.role === 'Admin' && (
+              <li><Link to="/admin/users" className="nav-link">👥 Users</Link></li>
+            )}
             <li><span className="nav-link" onClick={() => alert('Search feature coming soon')}>Search</span></li>
           </ul>
         </nav>

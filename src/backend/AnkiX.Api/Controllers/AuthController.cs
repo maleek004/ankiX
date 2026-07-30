@@ -32,11 +32,15 @@ public sealed class AuthController : ControllerBase
             return Conflict(new { message = "Email already exists." });
         }
 
+        string displayName = string.IsNullOrWhiteSpace(request.DisplayName)
+            ? normalizedEmail.Split('@')[0]
+            : request.DisplayName.Trim();
+
         User user = new User
         {
             Email = normalizedEmail,
             PasswordHash = passwordService.HashPassword(request.Password),
-            DisplayName = request.DisplayName,
+            DisplayName = displayName,
             Role = Roles.User,
             CreatedAt = DateTime.UtcNow
         };

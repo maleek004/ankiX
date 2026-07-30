@@ -1,12 +1,34 @@
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
-export async function register(email, password){
+export async function register(email, password, displayName){
   const res = await fetch(`${API_BASE}/auth/register`,{
     method:'POST',
     headers:{ 'Content-Type':'application/json'},
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email, password, displayName: displayName || null })
   })
-  if(!res.ok) throw new Error('Register failed')
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Register failed')
+  }
+  return res.json()
+}
+
+export async function getAdminUsers(){
+  const res = await fetch(`${API_BASE}/admin/users`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch admin users')
+  return res.json()
+}
+
+export async function updateUserRole(userId, role){
+  const res = await fetch(`${API_BASE}/admin/users/${userId}/role`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ role })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to update user role')
+  }
   return res.json()
 }
 

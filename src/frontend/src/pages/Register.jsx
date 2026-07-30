@@ -3,14 +3,15 @@ import { useAuth } from '../auth/AuthProvider'
 
 export default function Register(){
   const [email, setEmail] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
 
   const auth = useAuth()
   const submit = async (e) => {
     e.preventDefault()
     try{
-      await auth.register(email, password)
-      alert('Registered — please login')
+      await auth.register(email, password, displayName)
+      alert('Registered successfully — please login')
       window.location.href = '/login'
     }catch(err){
       alert('Register failed: ' + (err.message || err))
@@ -22,6 +23,10 @@ export default function Register(){
       <div className="form-card">
         <h2 style={{ marginTop: 0, marginBottom: 20 }}>Create an Account on AnkiX</h2>
         <form onSubmit={submit}>
+          <div className="form-group">
+            <label>Display Name</label>
+            <input className="form-control" type="text" placeholder="e.g. Alex Smith" value={displayName} onChange={e=>setDisplayName(e.target.value)} />
+          </div>
           <div className="form-group">
             <label>Email</label>
             <input className="form-control" type="email" value={email} onChange={e=>setEmail(e.target.value)} required />
