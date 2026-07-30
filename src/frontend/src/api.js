@@ -388,3 +388,18 @@ export async function globalSearch(query){
   if(!res.ok) throw new Error('Global search failed')
   return res.json()
 }
+
+export async function uploadImage(file){
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await fetch(`${API_BASE}/content/images`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+    body: formData
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Image upload failed')
+  }
+  return res.json()
+}

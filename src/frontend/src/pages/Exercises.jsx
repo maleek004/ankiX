@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import MarkdownRenderer from '../components/MarkdownRenderer'
+import MarkdownEditor from '../components/MarkdownEditor'
 
 export default function Exercises(){
   const [exercises, setExercises] = useState([])
@@ -189,7 +191,7 @@ export default function Exercises(){
 
             <div>
               <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Description / Instructions</label>
-              <textarea className="form-control" rows={3} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Markdown or plain text instructions..." />
+              <MarkdownEditor value={description} onChange={setDescription} placeholder="Instructions in markdown, code blocks, or embedded images..." rows={3} />
             </div>
 
             <div>
@@ -324,7 +326,7 @@ export default function Exercises(){
               {activeExercise.description && (
                 <div style={{ padding: 12, background: '#f8f9fa', borderRadius: 8, fontSize: '0.9rem', border: '1px solid #e9ecef' }}>
                   <strong>Instructions:</strong>
-                  <p style={{ margin: '4px 0 0 0', whiteSpace: 'pre-wrap', color: '#333' }}>{activeExercise.description}</p>
+                  <MarkdownRenderer content={activeExercise.description} />
                 </div>
               )}
 

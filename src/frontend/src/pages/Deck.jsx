@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import MarkdownRenderer from '../components/MarkdownRenderer'
+import MarkdownEditor from '../components/MarkdownEditor'
 
 export default function Deck(){
   const { id } = useParams()
@@ -312,7 +314,9 @@ export default function Deck(){
           <div className="card-viewer-area">
             {/* Front Prompt */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-              <div className="card-prompt" style={{ flex: 1 }}>{currentCard.prompt}</div>
+              <div className="card-prompt" style={{ flex: 1 }}>
+                <MarkdownRenderer content={currentCard.prompt} />
+              </div>
               {canCreate && (
                 <button
                   className="btn-study-tool"
@@ -341,7 +345,7 @@ export default function Deck(){
               <>
                 <hr className="card-divider" />
                 <div className="card-answer">
-                  {currentCard.validationSpec || 'Correct answer verified.'}
+                  <MarkdownRenderer content={currentCard.validationSpec || 'Correct answer verified.'} />
                 </div>
 
                 {/* ── Followups Toggle ── only visible once answer is shown ── */}
@@ -386,7 +390,9 @@ export default function Deck(){
                                   {new Date(f.createdAt).toLocaleDateString()}
                                 </span>
                               </div>
-                              <p className="followup-text">{f.questionText}</p>
+                              <div className="followup-text">
+                                <MarkdownRenderer content={f.questionText} />
+                              </div>
                               <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                                 {(f.linkedCardIds?.length > 0 || f.linkedCardId) && (
                                   <button
@@ -1312,14 +1318,12 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
 
               {/* Validation Spec / Answer Field */}
               <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Validation Spec / Answer</label>
-                <textarea
-                  className="form-control"
-                  rows={4}
-                  placeholder='Answer or JSON spec (e.g. {"answer":"4"})'
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 6 }}>Validation Spec / Answer</label>
+                <MarkdownEditor
                   value={validationSpec}
-                  onChange={e => setValidationSpec(e.target.value)}
-                  style={{ fontFamily: 'Consolas, Monaco, monospace', fontSize: '0.9rem' }}
+                  onChange={setValidationSpec}
+                  placeholder='Answer or markdown spec (e.g. **Answer:** 4, code blocks, or embedded images)...'
+                  rows={4}
                 />
               </div>
 
@@ -1445,14 +1449,14 @@ function CardPreviewModal({ modalData, onClose, onUnlinked }) {
           <div>
             <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 6 }}>Card Question / Prompt</label>
             <div style={{ padding: 14, background: '#f8f9fa', borderRadius: 8, border: '1px solid #dee2e6', fontSize: '1rem', fontWeight: 500, color: '#212529' }}>
-              {currentCard?.prompt}
+              <MarkdownRenderer content={currentCard?.prompt} />
             </div>
           </div>
 
           <div>
             <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 6 }}>Card Validation Spec / Answer</label>
-            <div style={{ padding: 14, background: '#e7f5ff', borderRadius: 8, border: '1px solid #a5d8ff', fontFamily: 'Consolas, Monaco, monospace', fontSize: '0.95rem', color: '#1864ab', whiteSpace: 'pre-wrap' }}>
-              {currentCard?.validationSpec || 'No specific answer text configured.'}
+            <div style={{ padding: 14, background: '#e7f5ff', borderRadius: 8, border: '1px solid #a5d8ff', color: '#1864ab' }}>
+              <MarkdownRenderer content={currentCard?.validationSpec || 'No specific answer text configured.'} />
             </div>
           </div>
 
