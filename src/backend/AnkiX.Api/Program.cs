@@ -96,7 +96,6 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 app.UseCors("FrontendPolicy");
-app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
@@ -114,6 +113,16 @@ using (var startupScope = app.Services.CreateScope())
         )
         BEGIN
             ALTER TABLE [CardFollowups] ADD [LinkedCardIds] NVARCHAR(500) NULL;
+        END
+
+        IF OBJECT_ID(N'[dbo].[UserExercises]', N'U') IS NULL
+        BEGIN
+            CREATE TABLE [dbo].[UserExercises] (
+                [UserId] INT NOT NULL,
+                [ExerciseId] INT NOT NULL,
+                [EnrolledAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                CONSTRAINT [PK_UserExercises] PRIMARY KEY CLUSTERED ([UserId] ASC, [ExerciseId] ASC)
+            );
         END
     ");
 }

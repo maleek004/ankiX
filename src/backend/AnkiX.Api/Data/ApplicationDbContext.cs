@@ -29,6 +29,8 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<ExerciseReviewRecord> ExerciseReviewRecords => Set<ExerciseReviewRecord>();
 
+    public DbSet<UserExercise> UserExercises => Set<UserExercise>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>()
@@ -46,6 +48,9 @@ public sealed class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<ExerciseReviewRecord>()
             .HasIndex(record => new { record.UserId, record.NextReviewAt });
+
+        modelBuilder.Entity<UserExercise>()
+            .HasKey(ue => new { ue.UserId, ue.ExerciseId });
 
         // CardExercise: composite PK is the join key — no surrogate Id needed
         modelBuilder.Entity<CardExercise>()

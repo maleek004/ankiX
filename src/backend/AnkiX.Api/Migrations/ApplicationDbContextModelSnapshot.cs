@@ -344,6 +344,22 @@ namespace AnkiX.Api.Migrations
 
                     b.ToTable("ExerciseReviewRecords");
                 });
+
+            modelBuilder.Entity("AnkiX.Api.Models.UserExercise", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ExerciseId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EnrolledAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("UserId", "ExerciseId");
+
+                    b.ToTable("UserExercises");
+                });
 #pragma warning restore 612, 618
         }
     }

@@ -346,6 +346,13 @@ public sealed class ExercisesController : ControllerBase
         };
 
         dbContext.ExerciseReviewRecords.Add(newRecord);
+
+        bool alreadyEnrolled = await dbContext.UserExercises.AnyAsync(ue => ue.UserId == userId && ue.ExerciseId == id);
+        if (!alreadyEnrolled)
+        {
+            dbContext.UserExercises.Add(new UserExercise { UserId = userId, ExerciseId = id, EnrolledAt = DateTime.UtcNow });
+        }
+
         await dbContext.SaveChangesAsync();
 
         return Ok(new ReviewResponse
@@ -356,6 +363,157 @@ public sealed class ExercisesController : ControllerBase
             IntervalDays = schedule.IntervalDays,
             Phase = schedule.Phase
         });
+    }
+
+    /// <summary>
+    /// Gets the list of exercise IDs in the current user's personal collection.
+    /// </summary>
+    [HttpGet("my-collection")]
+    public async Task<ActionResult<List<int>>> GetMyCollectionExerciseIds()
+    {
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            return Unauthorized(new { message = "Invalid user identity in token." });
+        }
+
+        List<int> enrolledIds = await dbContext.UserExercises
+            .AsNoTracking()
+            .Where(ue => ue.UserId == userId)
+            .Select(ue => ue.ExerciseId)
+            .ToListAsync();
+
+        return Ok(enrolledIds);
+    }
+
+    /// <summary>
+    /// Adds an exercise to the current user's personal collection.
+    /// </summary>
+    [HttpPost("{id:int}/enroll")]
+    public async Task<IActionResult> EnrollExercise([FromRoute] int id)
+    {
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            return Unauthorized(new { message = "Invalid user identity in token." });
+        }
+
+        bool exerciseExists = await dbContext.Exercises.AnyAsync(e => e.Id == id);
+        if (!exerciseExists)
+        {
+            return NotFound(new { message = "Exercise not found." });
+        }
+
+        bool alreadyEnrolled = await dbContext.UserExercises.AnyAsync(ue => ue.UserId == userId && ue.ExerciseId == id);
+        if (!alreadyEnrolled)
+        {
+            dbContext.UserExercises.Add(new UserExercise { UserId = userId, ExerciseId = id, EnrolledAt = DateTime.UtcNow });
+        }
+
+        bool hasReviewRecord = await dbContext.ExerciseReviewRecords.AnyAsync(r => r.UserId == userId && r.ExerciseId == id);
+        if (!hasReviewRecord)
+        {
+            dbContext.ExerciseReviewRecords.Add(new ExerciseReviewRecord
+            {
+                ExerciseId = id,
+                UserId = userId,
+                Outcome = "Good",
+                EaseFactor = 2.50m,
+                IntervalDays = 0,
+                NextReviewAt = DateTime.UtcNow,
+                Phase = "learning",
+                LearningStep = 0,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        await dbContext.SaveChangesAsync();
+        return Ok(new { message = "Exercise added to your personal collection.", isEnrolled = true });
+    }
+
+    /// <summary>
+    /// Removes an exercise from the current user's personal collection.
+    /// </summary>
+    [HttpDelete("{id:int}/enroll")]
+    public async Task<IActionResult> UnenrollExercise([FromRoute] int id)
+    {
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            return Unauthorized(new { message = "Invalid user identity in token." });
+        }
+
+        UserExercise? enrollment = await dbContext.UserExercises
+            .FirstOrDefaultAsync(ue => ue.UserId == userId && ue.ExerciseId == id);
+
+        if (enrollment != null)
+        {
+            dbContext.UserExercises.Remove(enrollment);
+            await dbContext.SaveChangesAsync();
+        }
+
+        return Ok(new { message = "Exercise removed from your personal collection.", isEnrolled = false });
+    }
+
+    /// <summary>
+    /// Gets all exercises in the current user's personal collection that are due for review.
+    /// </summary>
+    [HttpGet("my-due")]
+    public async Task<ActionResult<IEnumerable<ExerciseResponse>>> GetMyDueExercises()
+    {
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            return Unauthorized(new { message = "Invalid user identity in token." });
+        }
+
+        DateTime now = DateTime.UtcNow;
+
+        List<int> enrolledIds = await dbContext.UserExercises
+            .AsNoTracking()
+            .Where(ue => ue.UserId == userId)
+            .Select(ue => ue.ExerciseId)
+            .ToListAsync();
+
+        if (enrolledIds.Count == 0)
+        {
+            return Ok(new List<ExerciseResponse>());
+        }
+
+        var rawExercises = await dbContext.Exercises
+            .AsNoTracking()
+            .Where(e => enrolledIds.Contains(e.Id))
+            .Select(e => new
+            {
+                e.Id,
+                e.Title,
+                e.Description,
+                e.Language,
+                e.CreatedByUserId,
+                e.CreatedAt,
+                LatestReview = dbContext.ExerciseReviewRecords
+                    .Where(r => r.ExerciseId == e.Id && r.UserId == userId)
+                    .OrderByDescending(r => r.CreatedAt)
+                    .Select(r => new { r.NextReviewAt })
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+
+        var dueList = rawExercises
+            .Where(e => e.LatestReview == null || e.LatestReview.NextReviewAt <= now)
+            .Select(e => new ExerciseResponse
+            {
+                Id = e.Id,
+                Title = e.Title,
+                Description = e.Description,
+                Language = e.Language,
+                CreatedByUserId = e.CreatedByUserId,
+                CreatedAt = e.CreatedAt,
+                LinkedCardsCount = dbContext.CardExercises.Count(ce => ce.ExerciseId == e.Id)
+            })
+            .ToList();
+
+        return Ok(dueList);
     }
 
     [HttpGet("due")]

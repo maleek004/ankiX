@@ -389,17 +389,32 @@ export async function globalSearch(query){
   return res.json()
 }
 
-export async function uploadImage(file){
-  const formData = new FormData()
-  formData.append('file', file)
-  const res = await fetch(`${API_BASE}/content/images`, {
+export async function getMyCollectionExerciseIds(){
+  const res = await fetch(`${API_BASE}/exercises/my-collection`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch collection')
+  return res.json()
+}
+
+export async function enrollExercise(id){
+  const res = await fetch(`${API_BASE}/exercises/${id}/enroll`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-    body: formData
+    headers: authHeaders()
   })
-  if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Image upload failed')
-  }
+  if(!res.ok) throw new Error('Failed to add exercise to collection')
+  return res.json()
+}
+
+export async function unenrollExercise(id){
+  const res = await fetch(`${API_BASE}/exercises/${id}/enroll`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  })
+  if(!res.ok) throw new Error('Failed to remove exercise from collection')
+  return res.json()
+}
+
+export async function getMyDueExercises(){
+  const res = await fetch(`${API_BASE}/exercises/my-due`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch my due exercises')
   return res.json()
 }
