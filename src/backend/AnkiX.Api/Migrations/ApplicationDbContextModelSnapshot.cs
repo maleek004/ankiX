@@ -90,6 +90,10 @@ namespace AnkiX.Api.Migrations
                     b.Property<int?>("LinkedCardId")
                         .HasColumnType("int");
 
+                    b.Property<string>("LinkedCardIds")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("QuestionText")
                         .IsRequired()
                         .HasMaxLength(1000)
