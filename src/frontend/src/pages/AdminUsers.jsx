@@ -125,46 +125,55 @@ export default function AdminUsers() {
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map(u => (
-                <tr key={u.id} style={{ borderBottom: '1px solid #f1f3f5' }}>
-                  <td style={{ padding: '14px 16px', fontWeight: 600, color: '#212529' }}>
-                    {u.email}
-                  </td>
-                  <td style={{ padding: '14px 16px', color: '#495057' }}>
-                    {u.displayName || <em style={{ color: '#adb5bd' }}>None</em>}
-                  </td>
-                  <td style={{ padding: '14px 16px' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '3px 10px', borderRadius: 12, ...getRoleBadgeStyle(u.role) }}>
-                      {u.role}
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px 16px', color: '#6c757d', fontSize: '0.85rem' }}>
-                    {new Date(u.createdAt).toLocaleDateString()}
-                  </td>
-                  <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-                      <select
-                        className="form-control"
-                        value={selectedRoles[u.id] || u.role}
-                        onChange={e => handleRoleChange(u.id, e.target.value)}
-                        style={{ padding: '4px 8px', fontSize: '0.85rem', width: 'auto' }}
-                      >
-                        <option value="User">User</option>
-                        <option value="Contributor">Contributor</option>
-                        <option value="Admin">Admin</option>
-                      </select>
-                      <button
-                        className="btn-primary"
-                        style={{ padding: '5px 12px', fontSize: '0.8rem' }}
-                        disabled={updatingUserId === u.id || selectedRoles[u.id] === u.role}
-                        onClick={() => handleSaveRole(u.id)}
-                      >
-                        {updatingUserId === u.id ? 'Saving...' : 'Update Role'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {filteredUsers.map(u => {
+                const isSelf = (u.id === user?.id) || (u.email && user?.email && u.email.toLowerCase() === user.email.toLowerCase())
+                return (
+                  <tr key={u.id} style={{ borderBottom: '1px solid #f1f3f5', background: isSelf ? '#f8fff9' : 'transparent' }}>
+                    <td style={{ padding: '14px 16px', fontWeight: 600, color: '#212529' }}>
+                      {u.email} {isSelf && <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#198754', marginLeft: 4 }}>(You)</span>}
+                    </td>
+                    <td style={{ padding: '14px 16px', color: '#495057' }}>
+                      {u.displayName || <em style={{ color: '#adb5bd' }}>None</em>}
+                    </td>
+                    <td style={{ padding: '14px 16px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '3px 10px', borderRadius: 12, ...getRoleBadgeStyle(u.role) }}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td style={{ padding: '14px 16px', color: '#6c757d', fontSize: '0.85rem' }}>
+                      {new Date(u.createdAt).toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                      {isSelf ? (
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6c757d', background: '#e9ecef', padding: '4px 12px', borderRadius: 6 }}>
+                          🔒 Current Account
+                        </span>
+                      ) : (
+                        <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                          <select
+                            className="form-control"
+                            value={selectedRoles[u.id] || u.role}
+                            onChange={e => handleRoleChange(u.id, e.target.value)}
+                            style={{ padding: '4px 8px', fontSize: '0.85rem', width: 'auto' }}
+                          >
+                            <option value="User">User</option>
+                            <option value="Contributor">Contributor</option>
+                            <option value="Admin">Admin</option>
+                          </select>
+                          <button
+                            className="btn-primary"
+                            style={{ padding: '5px 12px', fontSize: '0.8rem' }}
+                            disabled={updatingUserId === u.id || selectedRoles[u.id] === u.role}
+                            onClick={() => handleSaveRole(u.id)}
+                          >
+                            {updatingUserId === u.id ? 'Saving...' : 'Update Role'}
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}

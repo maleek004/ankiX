@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using AnkiX.Api.Data;
 using AnkiX.Api.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -67,6 +68,12 @@ public sealed class AdminUsersController : ControllerBase
         if (requestedRole is not Roles.User and not Roles.Contributor and not Roles.Admin)
         {
             return BadRequest(new { message = $"Role must be one of: {Roles.User}, {Roles.Contributor}, {Roles.Admin}." });
+        }
+
+        string? currentUserIdClaim = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (int.TryParse(currentUserIdClaim, out int currentUserId) && currentUserId == userId)
+        {
+            return BadRequest(new { message = "You cannot modify your own role." });
         }
 
         User? user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
