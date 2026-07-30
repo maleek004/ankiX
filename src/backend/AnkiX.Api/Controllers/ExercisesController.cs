@@ -41,8 +41,28 @@ public sealed class ExercisesController : ControllerBase
             query = query.Where(e => e.Language.ToLower() == normLang);
         }
 
-        List<ExerciseResponse> exercises = await query
-            .OrderByDescending(e => e.CreatedAt)
+        var rawExercises = await query
+            .Select(e => new
+            {
+                e.Id,
+                e.Title,
+                e.Description,
+                e.Language,
+                e.CreatedByUserId,
+                e.CreatedAt,
+                LinkedCardsCount = dbContext.CardExercises.Count(ce => ce.ExerciseId == e.Id),
+                AverageEaseFactor = dbContext.ExerciseReviewRecords
+                    .Where(r => r.ExerciseId == e.Id)
+                    .Select(r => (double?)r.EaseFactor)
+                    .Average() ?? 2.50,
+                TotalReviewsCount = dbContext.ExerciseReviewRecords
+                    .Count(r => r.ExerciseId == e.Id)
+            })
+            .ToListAsync();
+
+        var exercises = rawExercises
+            .OrderByDescending(e => e.AverageEaseFactor) // Easiest first (highest EaseFactor), up until hardest (lowest EaseFactor)
+            .ThenByDescending(e => e.CreatedAt)
             .Select(e => new ExerciseResponse
             {
                 Id = e.Id,
@@ -51,9 +71,11 @@ public sealed class ExercisesController : ControllerBase
                 Language = e.Language,
                 CreatedByUserId = e.CreatedByUserId,
                 CreatedAt = e.CreatedAt,
-                LinkedCardsCount = dbContext.CardExercises.Count(ce => ce.ExerciseId == e.Id)
+                LinkedCardsCount = e.LinkedCardsCount,
+                AverageEaseFactor = Math.Round(e.AverageEaseFactor, 2),
+                TotalReviewsCount = e.TotalReviewsCount
             })
-            .ToListAsync();
+            .ToList();
 
         return Ok(exercises);
     }

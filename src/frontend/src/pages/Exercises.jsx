@@ -305,25 +305,31 @@ export default function Exercises() {
       {/* Tab 2: All Platform Exercises */}
       {activeTab === 'all' && (
         <div>
-          {/* Language Filter */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
-            <button
-              className="btn-study-tool"
-              style={{ background: activeLang === '' ? '#0d6efd' : '#fff', color: activeLang === '' ? '#fff' : '#495057', borderColor: '#0d6efd' }}
-              onClick={() => setActiveLang('')}
-            >
-              All Languages
-            </button>
-            {Object.keys(langBadges).map(l => (
+          {/* Language & Difficulty Ordering Info */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
-                key={l}
                 className="btn-study-tool"
-                style={{ background: activeLang === l ? '#0d6efd' : '#fff', color: activeLang === l ? '#fff' : '#495057', borderColor: '#0d6efd' }}
-                onClick={() => setActiveLang(l)}
+                style={{ background: activeLang === '' ? '#0d6efd' : '#fff', color: activeLang === '' ? '#fff' : '#495057', borderColor: '#0d6efd' }}
+                onClick={() => setActiveLang('')}
               >
-                {langBadges[l].label}
+                All Languages
               </button>
-            ))}
+              {Object.keys(langBadges).map(l => (
+                <button
+                  key={l}
+                  className="btn-study-tool"
+                  style={{ background: activeLang === l ? '#0d6efd' : '#fff', color: activeLang === l ? '#fff' : '#495057', borderColor: '#0d6efd' }}
+                  onClick={() => setActiveLang(l)}
+                >
+                  {langBadges[l].label}
+                </button>
+              ))}
+            </div>
+
+            <span style={{ fontSize: '0.8rem', color: '#6c757d', fontStyle: 'italic' }}>
+              ⚡ Sorted by community difficulty: Easiest ➔ Hardest
+            </span>
           </div>
 
           {exercises.length === 0 ? (
@@ -333,6 +339,13 @@ export default function Exercises() {
               {exercises.map(ex => {
                 const badge = langBadges[ex.language] || { label: ex.language, color: '#333', bg: '#eee' }
                 const isEnrolled = enrolledIds.has(ex.id)
+                const ease = ex.averageEaseFactor ?? 2.50
+                const reviews = ex.totalReviewsCount || 0
+                const diff = !reviews ? { label: '🌱 New', bg: '#f1f3f5', color: '#495057' }
+                  : ease >= 2.55 ? { label: '🟢 Easy', bg: '#d3f9d8', color: '#2b8a3e' }
+                  : ease >= 2.35 ? { label: '🟡 Medium', bg: '#fff3bf', color: '#f59f00' }
+                  : { label: '🔴 Hard', bg: '#ffe3e3', color: '#e03131' }
+
                 return (
                   <div
                     key={ex.id}
@@ -348,11 +361,16 @@ export default function Exercises() {
                     }}
                   >
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
                         <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600 }}>{ex.title}</h4>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
-                          {badge.label}
-                        </span>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: diff.bg, color: diff.color }} title={`Average Ease Factor: ${ease}`}>
+                            {diff.label} {reviews ? `(${ease})` : ''}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
+                            {badge.label}
+                          </span>
+                        </div>
                       </div>
 
                       {ex.description && (

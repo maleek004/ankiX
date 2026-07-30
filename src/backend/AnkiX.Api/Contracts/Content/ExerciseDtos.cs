@@ -17,6 +17,10 @@ public sealed class ExerciseResponse
     public DateTime CreatedAt { get; set; }
 
     public int LinkedCardsCount { get; set; }
+
+    public double AverageEaseFactor { get; set; } = 2.50;
+
+    public int TotalReviewsCount { get; set; }
 }
 
 public sealed class ExerciseDetailResponse
