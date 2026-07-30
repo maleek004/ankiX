@@ -25,6 +25,7 @@ export default function Deck(){
 
   const [linkedExercises, setLinkedExercises] = useState([])
   const [linkerModalCard, setLinkerModalCard] = useState(null)
+  const [activePracticeModal, setActivePracticeModal] = useState(null)
   const [canCreate, setCanCreate] = useState(false)
 
   // ── Load deck info + study queue ──────────────────────────────────────────
@@ -379,27 +380,27 @@ export default function Deck(){
                         <span>⚡ Linked Coding Exercises ({linkedExercises.length})</span>
                       </div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {linkedExercises.map(ex => (
-                          <Link
+                        {linkedExercises.map((ex, idx) => (
+                          <button
                             key={ex.id}
-                            to="/exercises"
                             style={{
-                              textDecoration: 'none',
-                              padding: '6px 12px',
-                              background: '#fff',
                               border: '1px solid #0d6efd',
+                              background: '#fff',
                               borderRadius: 6,
                               color: '#0d6efd',
+                              padding: '6px 12px',
                               fontSize: '0.85rem',
                               fontWeight: 500,
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: 6
+                              gap: 6,
+                              cursor: 'pointer'
                             }}
+                            onClick={() => setActivePracticeModal({ exercises: linkedExercises, initialIndex: idx })}
                           >
                             <span>▶ {ex.title}</span>
                             <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>({ex.language})</span>
-                          </Link>
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -443,6 +444,15 @@ export default function Deck(){
           card={linkerModalCard}
           onClose={() => setLinkerModalCard(null)}
           onUpdated={loadQueue}
+        />
+      )}
+
+      {/* Immersive Exercise Practice Modal */}
+      {activePracticeModal && (
+        <ExercisePracticeModal
+          exercises={activePracticeModal.exercises}
+          initialIndex={activePracticeModal.initialIndex}
+          onClose={() => setActivePracticeModal(null)}
         />
       )}
     </div>
@@ -722,6 +732,226 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
                 </button>
               </div>
             </form>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
+  const [activeIdx, setActiveIdx] = useState(initialIndex)
+  const currentEx = exercises[activeIdx]
+
+  const [practiceLang, setPracticeLang] = useState(currentEx?.language || 'python')
+  const [practiceCode, setPracticeCode] = useState(currentEx?.starterCode || '')
+  const [running, setRunning] = useState(false)
+  const [runResult, setRunResult] = useState(null)
+
+  useEffect(() => {
+    if (currentEx) {
+      setPracticeLang(currentEx.language || 'python')
+      setPracticeCode(currentEx.starterCode || '')
+      setRunResult(null)
+    }
+  }, [currentEx])
+
+  const handleRunCode = async () => {
+    if (!currentEx) return
+    setRunning(true)
+    try {
+      const m = await import('../api.js')
+      const res = await m.runExercise(currentEx.id, practiceCode, practiceLang)
+      setRunResult(res)
+    } catch (err) {
+      alert('Run failed: ' + (err.message || err))
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  const handleRateExercise = async (outcome) => {
+    if (!currentEx) return
+    try {
+      const m = await import('../api.js')
+      const res = await m.submitExerciseReview(currentEx.id, outcome)
+      alert(`Exercise rating submitted (${outcome})! Next review: ${new Date(res.nextReviewAt).toLocaleDateString()}`)
+      setRunResult(null)
+      if (activeIdx < exercises.length - 1) {
+        setActiveIdx(prev => prev + 1)
+      }
+    } catch (err) {
+      alert('Submit review failed: ' + (err.message || err))
+    }
+  }
+
+  if (!currentEx) return null
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 9999,
+        background: 'rgba(0, 0, 0, 0.65)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div
+        style={{
+          margin: 'auto',
+          width: '90%',
+          maxWidth: 820,
+          maxHeight: '90vh',
+          background: '#fff',
+          borderRadius: 12,
+          boxShadow: '0 20px 40px rgba(0,0,0,0.35)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
+        {/* Header Bar */}
+        <div style={{ padding: '16px 24px', background: '#f8f9fa', borderBottom: '1px solid #dee2e6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600 }}>⚡ {currentEx.title}</h3>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: '#eee', color: '#333' }}>
+              {currentEx.language}
+            </span>
+          </div>
+
+          {/* Carousel Stepper Navigation */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {exercises.length > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#e9ecef', padding: '4px 10px', borderRadius: 6 }}>
+                <button
+                  style={{ border: 'none', background: 'none', cursor: activeIdx > 0 ? 'pointer' : 'default', fontWeight: 700, opacity: activeIdx > 0 ? 1 : 0.4 }}
+                  onClick={() => activeIdx > 0 && setActiveIdx(activeIdx - 1)}
+                  disabled={activeIdx === 0}
+                >
+                  ‹ Prev
+                </button>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#495057' }}>
+                  Exercise {activeIdx + 1} of {exercises.length}
+                </span>
+                <button
+                  style={{ border: 'none', background: 'none', cursor: activeIdx < exercises.length - 1 ? 'pointer' : 'default', fontWeight: 700, opacity: activeIdx < exercises.length - 1 ? 1 : 0.4 }}
+                  onClick={() => activeIdx < exercises.length - 1 && setActiveIdx(activeIdx + 1)}
+                  disabled={activeIdx === exercises.length - 1}
+                >
+                  Next ›
+                </button>
+              </div>
+            )}
+            <button style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.4rem', color: '#6c757d', padding: '0 4px' }} onClick={onClose}>✕</button>
+          </div>
+        </div>
+
+        {/* Modal Body */}
+        <div style={{ padding: 24, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {currentEx.description && (
+            <div style={{ padding: 12, background: '#f8f9fa', borderRadius: 8, fontSize: '0.9rem', border: '1px solid #e9ecef' }}>
+              <strong>Instructions:</strong>
+              <p style={{ margin: '4px 0 0 0', whiteSpace: 'pre-wrap', color: '#333' }}>{currentEx.description}</p>
+            </div>
+          )}
+
+          <div>
+            <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Code Solution</label>
+              <select
+                className="form-control"
+                style={{ width: 'auto', padding: '2px 8px', fontSize: '0.85rem' }}
+                value={practiceLang}
+                onChange={e => setPracticeLang(e.target.value)}
+              >
+                <option value="csharp">C#</option>
+                <option value="python">Python</option>
+                <option value="javascript">JavaScript</option>
+                <option value="go">Go</option>
+              </select>
+            </div>
+
+            <textarea
+              className="form-control"
+              rows={9}
+              style={{
+                fontFamily: 'Consolas, Monaco, monospace',
+                fontSize: '0.9rem',
+                background: '#1e1e1e',
+                color: '#d4d4d4',
+                resize: 'vertical'
+              }}
+              value={practiceCode}
+              onChange={e => setPracticeCode(e.target.value)}
+            />
+          </div>
+
+          {/* Action & Status Bar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
+            <button className="btn-primary" onClick={handleRunCode} disabled={running} style={{ padding: '8px 20px', fontSize: '0.9rem' }}>
+              {running ? 'Running Solution...' : '▶ Run Solution'}
+            </button>
+
+            {runResult && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{
+                  padding: '5px 12px',
+                  borderRadius: 6,
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  background: runResult.passed ? '#d4edda' : '#f8d7da',
+                  color: runResult.passed ? '#155724' : '#721c24'
+                }}>
+                  {runResult.passed ? '✓ PASS' : '✗ FAIL'}
+                </span>
+                <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
+                  ({runResult.durationMs}ms)
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Output Details Box (Scrollable max-height) */}
+          {runResult?.details && (
+            <div style={{
+              padding: 14,
+              borderRadius: 8,
+              background: runResult.passed ? '#f8f9fa' : '#fff5f5',
+              color: runResult.passed ? '#212529' : '#c92a2a',
+              fontSize: '0.85rem',
+              fontFamily: 'Consolas, Monaco, monospace',
+              border: runResult.passed ? '1px solid #e9ecef' : '1px solid #ffc9c9',
+              maxHeight: 200,
+              overflowY: 'auto',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word'
+            }}>
+              {runResult.details}
+            </div>
+          )}
+
+          {/* SM-2 Retention Rating Section */}
+          {runResult?.passed && (
+            <div style={{ marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', marginBottom: 10, textAlign: 'center' }}>
+                Rate your recall performance for SRS schedule:
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button className="btn-rating again" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Again')}>Again (&lt;1m)</button>
+                <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Hard')}>Hard (&lt;1m)</button>
+                <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Good')}>Good (&lt;10m)</button>
+                <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Easy')}>Easy (1d+)</button>
+              </div>
+            </div>
           )}
         </div>
       </div>
