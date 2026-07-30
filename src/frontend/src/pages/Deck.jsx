@@ -756,11 +756,27 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
   }
 
   useEffect(() => {
+    let mounted = true
     if (currentEx) {
-      setPracticeLang(currentEx.language || 'python')
-      setPracticeCode(currentEx.starterCode || currentEx.solutionCode || '')
+      if (!currentEx.starterCode && !currentEx.solutionCode) {
+        import('../api.js').then(m => m.getExercise(currentEx.id))
+          .then(fullEx => {
+            if (!mounted) return
+            setPracticeLang(fullEx.language || 'python')
+            setPracticeCode(fullEx.starterCode || fullEx.solutionCode || '')
+          })
+          .catch(() => {
+            if (!mounted) return
+            setPracticeLang(currentEx.language || 'python')
+            setPracticeCode(currentEx.starterCode || currentEx.solutionCode || '')
+          })
+      } else {
+        setPracticeLang(currentEx.language || 'python')
+        setPracticeCode(currentEx.starterCode || currentEx.solutionCode || '')
+      }
       setRunResult(null)
     }
+    return () => { mounted = false }
   }, [currentEx])
 
   const handleRunCode = async () => {
