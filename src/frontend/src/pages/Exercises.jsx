@@ -268,25 +268,29 @@ export default function Exercises(){
         <div
           style={{
             position: 'fixed',
-            inset: 0,
-            zIndex: 1050,
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: 9999,
             background: 'rgba(0, 0, 0, 0.65)',
             backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
-            justify: 'center',
+            justifyContent: 'center',
             padding: 16
           }}
           onClick={e => { if (e.target === e.currentTarget) setActiveExercise(null) }}
         >
           <div
             style={{
-              width: '100%',
+              margin: 'auto',
+              width: '90%',
               maxWidth: 820,
               maxHeight: '90vh',
               background: '#fff',
               borderRadius: 12,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.35)',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden'
