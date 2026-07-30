@@ -187,6 +187,19 @@ export async function addFollowup(cardId, questionText){
   return res.json()
 }
 
+export async function linkFollowupToCard(cardId, followupId, linkedCardId){
+  const res = await fetch(`${API_BASE}/cards/${cardId}/followups/${followupId}/link`,{
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ linkedCardId })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to link followup to card')
+  }
+  return res.json()
+}
+
 export async function resetDeckProgress(deckId){
   const res = await fetch(`${API_BASE}/decks/${deckId}/reset`,{
     method: 'POST',
