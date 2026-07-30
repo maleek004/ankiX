@@ -1040,6 +1040,11 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
 }
 
 function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, onConverted }) {
+  const [activeTab, setActiveTab] = useState('link') // 'link' | 'create'
+  const [existingCards, setExistingCards] = useState([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [loadingCards, setLoadingCards] = useState(true)
+
   const [decks, setDecks] = useState([])
   const [targetDeckId, setTargetDeckId] = useState(currentDeckId || '')
   const [validationSpec, setValidationSpec] = useState('')
@@ -1048,20 +1053,35 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
 
   useEffect(() => {
     let mounted = true
-    import('../api.js').then(m => m.getDecks())
-      .then(data => {
-        if (mounted && data) {
-          setDecks(data)
-          if (!targetDeckId && data.length > 0) {
-            setTargetDeckId(data[0].id)
-          }
-        }
-      })
-      .catch(err => console.error(err))
+    import('../api.js').then(m => Promise.all([
+      m.getDecks().catch(() => []),
+      m.getAllCards().catch(() => [])
+    ])).then(([dData, cData]) => {
+      if (!mounted) return
+      setDecks(dData || [])
+      if (!targetDeckId && dData && dData.length > 0) setTargetDeckId(dData[0].id)
+      setExistingCards(cData || [])
+      setLoadingCards(false)
+    })
     return () => { mounted = false }
   }, [targetDeckId])
 
-  const handleConvert = async (e) => {
+  const handleLinkExistingCard = async (existingCardId) => {
+    setSaving(true)
+    try {
+      const m = await import('../api.js')
+      await m.linkFollowupToCard(parentCard.id, followup.id, existingCardId)
+      alert('Follow-up question successfully linked to existing card!')
+      if (onConverted) onConverted()
+      onClose()
+    } catch (err) {
+      alert('Link to card failed: ' + (err.message || err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCreateAndLink = async (e) => {
     e.preventDefault()
     if (!targetDeckId) return
     setSaving(true)
@@ -1072,7 +1092,7 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
 
       // 2. Link followup question to new card
       await m.linkFollowupToCard(parentCard.id, followup.id, newCard.id)
-      alert('Follow-up question converted to a standalone card and linked!')
+      alert('Follow-up question converted to a new standalone card and linked!')
       if (onConverted) onConverted()
       onClose()
     } catch (err) {
@@ -1081,6 +1101,13 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
       setSaving(false)
     }
   }
+
+  const filteredCards = existingCards.filter(c => {
+    if (!searchQuery.trim()) return true
+    const q = searchQuery.toLowerCase()
+    return c.prompt.toLowerCase().includes(q) ||
+           (c.validationSpec && c.validationSpec.toLowerCase().includes(q))
+  })
 
   return (
     <div
@@ -1104,7 +1131,7 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
         style={{
           margin: 'auto',
           width: '90%',
-          maxWidth: 650,
+          maxWidth: 750,
           maxHeight: '85vh',
           background: '#fff',
           borderRadius: 12,
@@ -1117,85 +1144,180 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
         {/* Header Bar */}
         <div style={{ padding: '16px 24px', background: '#f8f9fa', borderBottom: '1px solid #dee2e6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>🎴 Convert Follow-up to Standalone Card</h3>
-            <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>Turn learner question into a reusable flashcard</span>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>🎴 Resolve Follow-up Question</h3>
+            <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>Question: "{followup.questionText.length > 50 ? followup.questionText.substring(0, 50) + '...' : followup.questionText}"</span>
           </div>
           <button style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.4rem', color: '#6c757d' }} onClick={onClose}>✕</button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleConvert} style={{ padding: 24, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Read-Only Question Prompt Field */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Question / Prompt</label>
-              <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: '#6c757d', color: '#fff' }}>
-                🔒 Read-Only Question Prompt
-              </span>
-            </div>
-            <input
-              className="form-control"
-              value={followup.questionText}
-              disabled
-              readOnly
-              style={{
-                background: '#e9ecef',
-                color: '#495057',
-                fontWeight: 500,
-                cursor: 'not-allowed',
-                border: '1px solid #ced4da'
-              }}
-            />
-            <span style={{ fontSize: '0.75rem', color: '#6c757d', marginTop: 4, display: 'block' }}>
-              The original followup question prompt is locked and cannot be modified.
-            </span>
-          </div>
+        {/* Tab Buttons */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #dee2e6', background: '#fff' }}>
+          <button
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              border: 'none',
+              borderBottom: activeTab === 'link' ? '3px solid #0d6efd' : 'none',
+              background: activeTab === 'link' ? '#fff' : '#f8f9fa',
+              fontWeight: activeTab === 'link' ? 600 : 400,
+              color: activeTab === 'link' ? '#0d6efd' : '#495057',
+              cursor: 'pointer'
+            }}
+            onClick={() => setActiveTab('link')}
+          >
+            🔗 Link to Existing Card ({existingCards.length})
+          </button>
+          <button
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              border: 'none',
+              borderBottom: activeTab === 'create' ? '3px solid #0d6efd' : 'none',
+              background: activeTab === 'create' ? '#fff' : '#f8f9fa',
+              fontWeight: activeTab === 'create' ? 600 : 400,
+              color: activeTab === 'create' ? '#0d6efd' : '#495057',
+              cursor: 'pointer'
+            }}
+            onClick={() => setActiveTab('create')}
+          >
+            + Create New Standalone Card
+          </button>
+        </div>
 
-          {/* Target Deck & Card Type */}
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div style={{ flex: 2 }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Target Deck</label>
-              <select
-                className="form-control"
-                value={targetDeckId}
-                onChange={e => setTargetDeckId(e.target.value)}
-                required
-              >
-                {decks.map(d => (
-                  <option key={d.id} value={d.id}>{d.title}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Card Type</label>
-              <select className="form-control" value={type} onChange={e => setType(e.target.value)}>
-                <option value="basic">basic</option>
-                <option value="micro-coding">micro-coding</option>
-              </select>
-            </div>
-          </div>
+        {/* Modal Body */}
+        <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
+          {activeTab === 'link' ? (
+            <div>
+              <div style={{ marginBottom: 16 }}>
+                <input
+                  className="form-control"
+                  placeholder="Type keyword to search existing cards by prompt or answer..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+              </div>
 
-          {/* Validation Spec / Answer Field */}
-          <div>
-            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Validation Spec / Answer</label>
-            <textarea
-              className="form-control"
-              rows={4}
-              placeholder='Answer or JSON spec (e.g. {"answer":"4"})'
-              value={validationSpec}
-              onChange={e => setValidationSpec(e.target.value)}
-              style={{ fontFamily: 'Consolas, Monaco, monospace', fontSize: '0.9rem' }}
-            />
-          </div>
+              {loadingCards ? (
+                <div style={{ textAlign: 'center', padding: 20, color: '#6c757d' }}>Loading cards catalog...</div>
+              ) : filteredCards.length === 0 ? (
+                <div className="empty-state">No matching cards found. Try another search or create a new card in the tab above!</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {filteredCards.map(c => (
+                    <div
+                      key={c.id}
+                      style={{
+                        padding: 12,
+                        border: '1px solid #dee2e6',
+                        borderRadius: 8,
+                        background: '#fff',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <strong style={{ fontSize: '0.95rem' }}>{c.prompt}</strong>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#e7f5ff', color: '#1864ab' }}>
+                            {c.type}
+                          </span>
+                        </div>
+                        {c.validationSpec && (
+                          <p style={{ margin: 0, fontSize: '0.8rem', color: '#6c757d', maxWidth: 480, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            Answer: {c.validationSpec}
+                          </p>
+                        )}
+                      </div>
 
-          {/* Submit Button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
-            <button type="button" className="btn-study-tool" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Converting Card...' : 'Save & Link Standalone Card 🎴'}
-            </button>
-          </div>
-        </form>
+                      <button
+                        className="btn-primary"
+                        disabled={saving}
+                        style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+                        onClick={() => handleLinkExistingCard(c.id)}
+                      >
+                        Link to this Card 🔗
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <form onSubmit={handleCreateAndLink} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Read-Only Question Prompt Field */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Question / Prompt</label>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: '#6c757d', color: '#fff' }}>
+                    🔒 Read-Only Question Prompt
+                  </span>
+                </div>
+                <input
+                  className="form-control"
+                  value={followup.questionText}
+                  disabled
+                  readOnly
+                  style={{
+                    background: '#e9ecef',
+                    color: '#495057',
+                    fontWeight: 500,
+                    cursor: 'not-allowed',
+                    border: '1px solid #ced4da'
+                  }}
+                />
+                <span style={{ fontSize: '0.75rem', color: '#6c757d', marginTop: 4, display: 'block' }}>
+                  The original followup question prompt is locked and cannot be modified.
+                </span>
+              </div>
+
+              {/* Target Deck & Card Type */}
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 2 }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Target Deck</label>
+                  <select
+                    className="form-control"
+                    value={targetDeckId}
+                    onChange={e => setTargetDeckId(e.target.value)}
+                    required
+                  >
+                    {decks.map(d => (
+                      <option key={d.id} value={d.id}>{d.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Card Type</label>
+                  <select className="form-control" value={type} onChange={e => setType(e.target.value)}>
+                    <option value="basic">basic</option>
+                    <option value="micro-coding">micro-coding</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Validation Spec / Answer Field */}
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Validation Spec / Answer</label>
+                <textarea
+                  className="form-control"
+                  rows={4}
+                  placeholder='Answer or JSON spec (e.g. {"answer":"4"})'
+                  value={validationSpec}
+                  onChange={e => setValidationSpec(e.target.value)}
+                  style={{ fontFamily: 'Consolas, Monaco, monospace', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              {/* Submit Button */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
+                <button type="button" className="btn-study-tool" onClick={onClose}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={saving}>
+                  {saving ? 'Converting Card...' : 'Save & Link Standalone Card 🎴'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   )

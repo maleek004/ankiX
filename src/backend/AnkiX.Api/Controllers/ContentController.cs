@@ -179,6 +179,25 @@ public sealed class ContentController : ControllerBase
         });
     }
 
+    [HttpGet("cards")]
+    [HttpGet("/api/cards")]
+    public async Task<ActionResult<IEnumerable<CardResponse>>> GetAllCards()
+    {
+        List<CardResponse> cards = await dbContext.Cards
+            .OrderByDescending(c => c.Id)
+            .Select(c => new CardResponse
+            {
+                Id = c.Id,
+                DeckId = c.DeckId,
+                Type = c.Type,
+                Prompt = c.Prompt,
+                ValidationSpec = c.ValidationSpec
+            })
+            .ToListAsync();
+
+        return Ok(cards);
+    }
+
     [HttpDelete("cards/{cardId:int}")]
     [HttpDelete("/api/decks/{deckId:int}/cards/{cardId:int}")]
     [Authorize]

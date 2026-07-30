@@ -118,6 +118,12 @@ export async function getCard(cardId){
   return res.json()
 }
 
+export async function getAllCards(){
+  const res = await fetch(`${API_BASE}/cards`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch all cards')
+  return res.json()
+}
+
 export async function createCard(deckId, prompt, validationSpec, type = 'basic'){
   let p = prompt
   let v = validationSpec
