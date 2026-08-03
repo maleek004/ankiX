@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: ankix-code-runner
+    env: docker
+    dockerfilePath: ./docker-runner/Dockerfile
+    dockerContext: ./docker-runner
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 3000
