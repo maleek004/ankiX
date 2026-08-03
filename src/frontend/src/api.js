@@ -418,3 +418,36 @@ export async function getMyDueExercises(){
   if(!res.ok) throw new Error('Failed to fetch my due exercises')
   return res.json()
 }
+
+export async function importCardsFile(deckId, file){
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const token = localStorage.getItem('token')
+  const headers = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(`${API_BASE}/decks/${deckId}/import-cards`, {
+    method: 'POST',
+    headers,
+    body: formData
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'File import failed')
+  }
+  return res.json()
+}
+
+export async function importCardsText(deckId, content, format = 'csv'){
+  const res = await fetch(`${API_BASE}/decks/${deckId}/import-cards-text`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ content, format })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Text import failed')
+  }
+  return res.json()
+}
