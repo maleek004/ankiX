@@ -26,6 +26,7 @@ async function executeCode({ language, code, validationSpec }) {
   if (normLang.includes('python') || normLang === 'py') ext = 'py'
   else if (normLang.includes('javascript') || normLang === 'js' || normLang === 'node') ext = 'js'
   else if (normLang.includes('go')) ext = 'go'
+  else if (normLang.includes('csharp') || normLang === 'cs' || normLang === 'c#') ext = 'cs'
 
   const tempFilePath = path.join(os.tmpdir(), `ankix_exec_${randomId}.${ext}`)
 
@@ -37,6 +38,13 @@ async function executeCode({ language, code, validationSpec }) {
       ? specCode.replace('import "fmt"', '').trim()
       : 'func main() {\n    fmt.Println("✓ Code Executed Successfully")\n}'
     fullCode = `package main\n\nimport (\n    "fmt"\n)\n\n${cleanUserCode}\n\n${mainFunc}`
+  } else if (normLang.includes('csharp') || normLang === 'cs' || normLang === 'c#') {
+    if (!code.includes('class ') && !code.includes('static void Main')) {
+      fullCode = `using System;\n\npublic class Program {\n    public static void Main() {\n        ${code}\n    }\n}`
+    }
+    if (validationSpec && !fullCode.includes(validationSpec)) {
+      fullCode += '\n\n' + validationSpec
+    }
   } else if (validationSpec && (validationSpec.includes('assert') || validationSpec.includes('expect') || validationSpec.includes('test'))) {
     fullCode += '\n\n' + validationSpec
   }
@@ -55,6 +63,10 @@ async function executeCode({ language, code, validationSpec }) {
   } else if (normLang.includes('go')) {
     cmd = 'go'
     args = ['run', tempFilePath]
+  } else if (normLang.includes('csharp') || normLang === 'cs' || normLang === 'c#') {
+    const exePath = path.join(os.tmpdir(), `ankix_exec_${randomId}.exe`)
+    cmd = 'sh'
+    args = ['-c', `mcs -out:"${exePath}" "${tempFilePath}" && mono "${exePath}" ; rm -f "${exePath}"`]
   } else {
     // Syntax verification fallback
     await fs.promises.unlink(tempFilePath).catch(() => {})
