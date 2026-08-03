@@ -243,7 +243,68 @@ if (shouldSeed)
             CreatedAt = DateTime.UtcNow
         };
 
-        db.Exercises.AddRange(ex1, ex2, ex3, ex4, ex5);
+        // Multi-Modal Sample Exercises (OOP, Interfaces, Polymorphism, Paradigms)
+        var ex6 = new Exercise
+        {
+            Title = "Polymorphism Concept Check in C#",
+            Language = "csharp",
+            ExerciseType = "MultipleChoice",
+            Description = "Which C# keyword is required on a base class method to allow a derived class to override its implementation polymorphically?",
+            ExerciseSpec = "{\"options\":[\"override\",\"virtual\",\"abstract\",\"static\"],\"correctIndex\":1}",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var ex7 = new Exercise
+        {
+            Title = "Interface vs Abstract Class Principle",
+            Language = "csharp",
+            ExerciseType = "MultipleChoice",
+            Description = "In Object-Oriented software architecture, what key capability does an Interface provide that a single C# base class does NOT?",
+            ExerciseSpec = "{\"options\":[\"Multiple inheritance of contracts / capabilities\",\"Private state encapsulation\",\"Constructors with parameters\",\"Static property storage\"],\"correctIndex\":0}",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var ex8 = new Exercise
+        {
+            Title = "Encapsulation & Data Hiding in OOP",
+            Language = "python",
+            ExerciseType = "MultipleChoice",
+            Description = "What is the primary objective of Encapsulation in Object-Oriented Programming?",
+            ExerciseSpec = "{\"options\":[\"Allowing child classes to inherit parent methods\",\"Bundling data with methods and restricting direct access to internal state\",\"Executing different code paths based on dynamic method signatures\",\"Ensuring functions have no side effects\"],\"correctIndex\":1}",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var ex9 = new Exercise
+        {
+            Title = "OOP Pillar: Hiding Complexity",
+            Language = "csharp",
+            ExerciseType = "ExactString",
+            Description = "Which pillar of Object-Oriented Programming refers to hiding internal implementation complexity and exposing only essential interfaces?",
+            ExerciseSpec = "{\"acceptedAnswers\":[\"Abstraction\",\"abstraction\"],\"caseSensitive\":false}",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var ex10 = new Exercise
+        {
+            Title = "SOLID Principles: 'L' Acronym",
+            Language = "python",
+            ExerciseType = "ExactString",
+            Description = "In the SOLID principles of Object-Oriented Design, what principle does the letter 'L' represent?",
+            ExerciseSpec = "{\"acceptedAnswers\":[\"Liskov\",\"Liskov Substitution\",\"Liskov substitution\"],\"caseSensitive\":false}",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var ex11 = new Exercise
+        {
+            Title = "Programming Paradigm: Immutable State",
+            Language = "javascript",
+            ExerciseType = "ExactString",
+            Description = "What programming term describes data structures or objects whose state CANNOT be modified after creation?",
+            ExerciseSpec = "{\"acceptedAnswers\":[\"Immutable\",\"immutability\",\"immutable\"],\"caseSensitive\":false}",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        db.Exercises.AddRange(ex1, ex2, ex3, ex4, ex5, ex6, ex7, ex8, ex9, ex10, ex11);
         db.SaveChanges();
 
         // Link seeded cards to exercises
