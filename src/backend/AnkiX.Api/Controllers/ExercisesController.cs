@@ -48,6 +48,8 @@ public sealed class ExercisesController : ControllerBase
                 e.Title,
                 e.Description,
                 e.Language,
+                e.ExerciseType,
+                e.ExerciseSpec,
                 e.CreatedByUserId,
                 e.CreatedAt,
                 LinkedCardsCount = dbContext.CardExercises.Count(ce => ce.ExerciseId == e.Id),
@@ -69,6 +71,8 @@ public sealed class ExercisesController : ControllerBase
                 Title = e.Title,
                 Description = e.Description,
                 Language = e.Language,
+                ExerciseType = e.ExerciseType ?? "CodeExecution",
+                ExerciseSpec = e.ExerciseSpec,
                 CreatedByUserId = e.CreatedByUserId,
                 CreatedAt = e.CreatedAt,
                 LinkedCardsCount = e.LinkedCardsCount,
@@ -98,6 +102,8 @@ public sealed class ExercisesController : ControllerBase
             Title = exercise.Title,
             Description = exercise.Description,
             Language = exercise.Language,
+            ExerciseType = exercise.ExerciseType ?? "CodeExecution",
+            ExerciseSpec = exercise.ExerciseSpec,
             StarterCode = exercise.StarterCode,
             SolutionCode = exercise.SolutionCode,
             TestCasesSpec = exercise.TestCasesSpec,
@@ -117,17 +123,13 @@ public sealed class ExercisesController : ControllerBase
             userId = parsedId;
         }
 
-        string language = request.Language.Trim().ToLowerInvariant();
-        if (language is not "csharp" and not "python" and not "javascript" and not "go")
-        {
-            return BadRequest(new { message = "Language must be one of: csharp, python, javascript, go." });
-        }
-
         Exercise exercise = new Exercise
         {
             Title = request.Title.Trim(),
-            Description = request.Description?.Trim(),
-            Language = language,
+            Description = request.Description,
+            Language = request.Language.Trim().ToLowerInvariant(),
+            ExerciseType = !string.IsNullOrWhiteSpace(request.ExerciseType) ? request.ExerciseType.Trim() : "CodeExecution",
+            ExerciseSpec = request.ExerciseSpec,
             StarterCode = request.StarterCode,
             SolutionCode = request.SolutionCode,
             TestCasesSpec = request.TestCasesSpec,
@@ -298,6 +300,83 @@ public sealed class ExercisesController : ControllerBase
         if (exercise is null)
         {
             return NotFound(new { message = "Exercise not found." });
+        }
+
+        string type = exercise.ExerciseType ?? "CodeExecution";
+        if (type.Equals("MultipleChoice", StringComparison.OrdinalIgnoreCase))
+        {
+            bool passed = false;
+            string details = "";
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(exercise.ExerciseSpec ?? "{}");
+                int correctIdx = doc.RootElement.GetProperty("correctIndex").GetInt32();
+                if (int.TryParse(request.SubmittedCode.Trim(), out int submittedIdx) && submittedIdx == correctIdx)
+                {
+                    passed = true;
+                    details = "Correct choice selected!";
+                }
+                else
+                {
+                    details = "Incorrect choice. Try again!";
+                }
+            }
+            catch
+            {
+                details = "Evaluation error parsing question specification.";
+            }
+
+            return Ok(new CodeRunResponse
+            {
+                RunId = 0,
+                Result = passed ? "PASS" : "FAIL",
+                Passed = passed,
+                DurationMs = 1,
+                Details = details
+            });
+        }
+        else if (type.Equals("ExactString", StringComparison.OrdinalIgnoreCase))
+        {
+            bool passed = false;
+            string details = "";
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(exercise.ExerciseSpec ?? "{}");
+                var root = doc.RootElement;
+                bool caseSensitive = root.TryGetProperty("caseSensitive", out var csProp) && csProp.GetBoolean();
+                var answers = new List<string>();
+                if (root.TryGetProperty("acceptedAnswers", out var ansProp) && ansProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var item in ansProp.EnumerateArray())
+                    {
+                        answers.Add(item.GetString() ?? "");
+                    }
+                }
+
+                string submitted = request.SubmittedCode?.Trim() ?? "";
+                if (answers.Any(a => string.Equals(a.Trim(), submitted, caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)))
+                {
+                    passed = true;
+                    details = "Correct answer!";
+                }
+                else
+                {
+                    details = "Incorrect answer. Check spelling/syntax and try again.";
+                }
+            }
+            catch
+            {
+                details = "Evaluation error parsing question specification.";
+            }
+
+            return Ok(new CodeRunResponse
+            {
+                RunId = 0,
+                Result = passed ? "PASS" : "FAIL",
+                Passed = passed,
+                DurationMs = 1,
+                Details = details
+            });
         }
 
         string lang = !string.IsNullOrWhiteSpace(request.Language) ? request.Language : exercise.Language;

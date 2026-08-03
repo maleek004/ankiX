@@ -20,6 +20,11 @@ public sealed class Exercise
     [MaxLength(50)]
     public string Language { get; set; } = "csharp";
 
+    [MaxLength(50)]
+    public string ExerciseType { get; set; } = "CodeExecution";
+
+    public string? ExerciseSpec { get; set; }
+
     public string? StarterCode { get; set; }
 
     public string? SolutionCode { get; set; }

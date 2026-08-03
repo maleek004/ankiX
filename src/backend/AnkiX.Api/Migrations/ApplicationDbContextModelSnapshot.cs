@@ -191,6 +191,14 @@ namespace AnkiX.Api.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
+                    b.Property<string>("ExerciseSpec")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ExerciseType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<string>("Language")
                         .IsRequired()
                         .HasMaxLength(50)

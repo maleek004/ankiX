@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import ExerciseRenderer from '../components/ExerciseComponents'
 
 export default function Deck(){
   const { id } = useParams()
@@ -871,12 +872,13 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
     }
   }
 
-  const handleRunCode = async () => {
+  const handleRunCode = async (submittedPayload) => {
     if (!currentEx) return
     setRunning(true)
     try {
+      const codeToSubmit = typeof submittedPayload === 'string' ? submittedPayload : practiceCode
       const m = await import('../api.js')
-      const res = await m.runExerciseCode(currentEx.id, practiceCode, practiceLang)
+      const res = await m.runExerciseCode(currentEx.id, codeToSubmit, practiceLang)
       setRunResult(res)
     } catch (err) {
       alert('Run failed: ' + (err.message || err))
@@ -996,36 +998,16 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
             </div>
           )}
 
-          <div>
-            <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Code Solution</label>
-              <select
-                className="form-control"
-                style={{ width: 'auto', padding: '2px 8px', fontSize: '0.85rem' }}
-                value={practiceLang}
-                onChange={e => setPracticeLang(e.target.value)}
-              >
-                <option value="csharp">C#</option>
-                <option value="python">Python</option>
-                <option value="javascript">JavaScript</option>
-                <option value="go">Go</option>
-              </select>
-            </div>
-
-            <textarea
-              className="form-control"
-              rows={9}
-              style={{
-                fontFamily: 'Consolas, Monaco, monospace',
-                fontSize: '0.9rem',
-                background: '#1e1e1e',
-                color: '#d4d4d4',
-                resize: 'vertical'
-              }}
-              value={practiceCode}
-              onChange={e => setPracticeCode(e.target.value)}
-            />
-          </div>
+          <ExerciseRenderer
+            exercise={currentEx}
+            practiceCode={practiceCode}
+            setPracticeCode={setPracticeCode}
+            practiceLang={practiceLang}
+            setPracticeLang={setPracticeLang}
+            onRunCode={handleRunCode}
+            running={running}
+            runResult={runResult}
+          />
 
           {/* Action & Status Bar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>

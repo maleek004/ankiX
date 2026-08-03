@@ -12,6 +12,10 @@ public sealed class ExerciseResponse
 
     public string Language { get; set; } = "csharp";
 
+    public string ExerciseType { get; set; } = "CodeExecution";
+
+    public string? ExerciseSpec { get; set; }
+
     public int? CreatedByUserId { get; set; }
 
     public DateTime CreatedAt { get; set; }
@@ -32,6 +36,10 @@ public sealed class ExerciseDetailResponse
     public string? Description { get; set; }
 
     public string Language { get; set; } = "csharp";
+
+    public string ExerciseType { get; set; } = "CodeExecution";
+
+    public string? ExerciseSpec { get; set; }
 
     public string? StarterCode { get; set; }
 
@@ -57,6 +65,11 @@ public sealed class CreateExerciseRequest
     [MaxLength(50)]
     public string Language { get; set; } = "csharp";
 
+    [MaxLength(50)]
+    public string ExerciseType { get; set; } = "CodeExecution";
+
+    public string? ExerciseSpec { get; set; }
+
     public string? StarterCode { get; set; }
 
     public string? SolutionCode { get; set; }
@@ -76,6 +89,11 @@ public sealed class UpdateExerciseRequest
     [Required]
     [MaxLength(50)]
     public string Language { get; set; } = "csharp";
+
+    [MaxLength(50)]
+    public string ExerciseType { get; set; } = "CodeExecution";
+
+    public string? ExerciseSpec { get; set; }
 
     public string? StarterCode { get; set; }
 

@@ -124,6 +124,16 @@ using (var startupScope = app.Services.CreateScope())
                 CONSTRAINT [PK_UserExercises] PRIMARY KEY CLUSTERED ([UserId] ASC, [ExerciseId] ASC)
             );
         END
+
+        IF NOT EXISTS (
+            SELECT * FROM sys.columns 
+            WHERE object_id = OBJECT_ID(N'[dbo].[Exercises]') 
+            AND name = N'ExerciseType'
+        )
+        BEGIN
+            ALTER TABLE [Exercises] ADD [ExerciseType] NVARCHAR(50) NOT NULL DEFAULT 'CodeExecution';
+            ALTER TABLE [Exercises] ADD [ExerciseSpec] NVARCHAR(MAX) NULL;
+        END
     ");
 }
 

@@ -11,6 +11,7 @@ import {
   unenrollExercise,
   getMyDueExercises
 } from '../api.js'
+import ExerciseRenderer from '../components/ExerciseComponents'
 
 export default function Exercises() {
   const [activeTab, setActiveTab] = useState('queue') // 'queue' | 'all'
@@ -24,10 +25,22 @@ export default function Exercises() {
   // Add Exercise state
   const [title, setTitle] = useState('')
   const [language, setLanguage] = useState('csharp')
+  const [exerciseType, setExerciseType] = useState('CodeExecution') // 'CodeExecution' | 'MultipleChoice' | 'ExactString'
   const [description, setDescription] = useState('')
   const [starterCode, setStarterCode] = useState('')
   const [solutionCode, setSolutionCode] = useState('')
   const [testCasesSpec, setTestCasesSpec] = useState('')
+
+  // MCQ state
+  const [mcqOpt1, setMcqOpt1] = useState('')
+  const [mcqOpt2, setMcqOpt2] = useState('')
+  const [mcqOpt3, setMcqOpt3] = useState('')
+  const [mcqOpt4, setMcqOpt4] = useState('')
+  const [mcqCorrect, setMcqCorrect] = useState(0)
+
+  // Exact String state
+  const [exactAnswer, setExactAnswer] = useState('')
+  const [exactCaseSensitive, setExactCaseSensitive] = useState(false)
 
   // Active practice workspace state
   const [activeExercise, setActiveExercise] = useState(null)
@@ -83,10 +96,29 @@ export default function Exercises() {
   const handleCreate = async (e) => {
     e.preventDefault()
     if (!title.trim()) return
+
+    let exerciseSpec = null
+    if (exerciseType === 'MultipleChoice') {
+      const opts = [mcqOpt1, mcqOpt2, mcqOpt3, mcqOpt4].map(s => s.trim()).filter(Boolean)
+      if (opts.length < 2) {
+        alert('Please provide at least 2 options for Multiple Choice exercise.')
+        return
+      }
+      exerciseSpec = JSON.stringify({ options: opts, correctIndex: Number(mcqCorrect) })
+    } else if (exerciseType === 'ExactString') {
+      if (!exactAnswer.trim()) {
+        alert('Please provide the correct answer for Exact String exercise.')
+        return
+      }
+      exerciseSpec = JSON.stringify({ acceptedAnswers: [exactAnswer.trim()], caseSensitive: exactCaseSensitive })
+    }
+
     try {
       const newEx = await createExercise({
         title,
         language,
+        exerciseType,
+        exerciseSpec,
         description,
         starterCode,
         solutionCode,
@@ -98,6 +130,11 @@ export default function Exercises() {
       setStarterCode('')
       setSolutionCode('')
       setTestCasesSpec('')
+      setMcqOpt1('')
+      setMcqOpt2('')
+      setMcqOpt3('')
+      setMcqOpt4('')
+      setExactAnswer('')
       setShowAddForm(false)
       // Auto enroll created exercise
       await handleToggleEnroll(newEx.id)
@@ -110,12 +147,12 @@ export default function Exercises() {
     try {
       const detail = await getExercise(ex.id)
       setActiveExercise(detail)
-      setPracticeCode(detail.starterCode || detail.solutionCode || '// Write your solution here...')
+      setPracticeCode(detail.starterCode || detail.solutionCode || '')
       setPracticeLang(detail.language || 'csharp')
       setRunResult(null)
     } catch (err) {
       setActiveExercise(ex)
-      setPracticeCode(ex.starterCode || '// Write your solution here...')
+      setPracticeCode(ex.starterCode || '')
       setPracticeLang(ex.language || 'csharp')
       setRunResult(null)
     }
@@ -126,12 +163,13 @@ export default function Exercises() {
     }
   }
 
-  const handleRunCode = async () => {
+  const handleRunCode = async (submittedPayload) => {
     if (!activeExercise) return
     setRunning(true)
     setRunResult(null)
     try {
-      const res = await runExerciseCode(activeExercise.id, practiceCode, practiceLang)
+      const codeToSubmit = typeof submittedPayload === 'string' ? submittedPayload : practiceCode
+      const res = await runExerciseCode(activeExercise.id, codeToSubmit, practiceLang)
       setRunResult(res)
     } catch (err) {
       setRunResult({ passed: false, result: 'FAIL', details: 'Error: ' + (err.message || err), durationMs: 0 })
@@ -168,6 +206,12 @@ export default function Exercises() {
     go: { label: 'Go', color: '#00ADD8', bg: '#e8f9fd' }
   }
 
+  const typeBadges = {
+    CodeExecution: { label: '⚡ Code Exec', bg: '#e7f5ff', color: '#1864ab' },
+    MultipleChoice: { label: '🔘 MCQ', bg: '#fff3bf', color: '#f59f00' },
+    ExactString: { label: '✏️ Short Answer', bg: '#e6fcb5', color: '#5c940d' }
+  }
+
   return (
     <div style={{ maxWidth: 1040, margin: '24px auto', padding: '0 16px' }}>
       {/* Header & Tabs */}
@@ -175,7 +219,7 @@ export default function Exercises() {
         <div>
           <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 700 }}>⚡ Personal Exercise Collection & Practice</h2>
           <p style={{ margin: '4px 0 0 0', color: '#6c757d', fontSize: '0.9rem' }}>
-            Build your personal coding queue and practice exercises scheduled with the SM-2 algorithm
+            Build your personal exercise queue with Code Execution, Multiple Choice, and Short Answer exercises
           </p>
         </div>
 
@@ -229,7 +273,7 @@ export default function Exercises() {
             <div className="empty-state" style={{ padding: 40 }}>
               <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', color: '#2b8a3e' }}>🎉 All Caught Up!</h3>
               <p style={{ margin: 0, color: '#6c757d', fontSize: '0.95rem' }}>
-                No coding exercises in your personal collection are due right now. Browse "All Platform Exercises" below or check out card exercises to add more!
+                No exercises in your personal collection are due right now. Browse "All Platform Exercises" below or check out card exercises to add more!
               </p>
             </div>
           ) : (
@@ -256,6 +300,7 @@ export default function Exercises() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
                 {dueQueue.map((ex, idx) => {
                   const badge = langBadges[ex.language] || { label: ex.language, color: '#333', bg: '#eee' }
+                  const typeB = typeBadges[ex.exerciseType || 'CodeExecution'] || typeBadges.CodeExecution
                   return (
                     <div
                       key={ex.id}
@@ -271,11 +316,16 @@ export default function Exercises() {
                       }}
                     >
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
                           <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600 }}>{ex.title}</h4>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
-                            {badge.label}
-                          </span>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: typeB.bg, color: typeB.color }}>
+                              {typeB.label}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
+                              {badge.label}
+                            </span>
+                          </div>
                         </div>
 
                         {ex.description && (
@@ -338,6 +388,7 @@ export default function Exercises() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
               {exercises.map(ex => {
                 const badge = langBadges[ex.language] || { label: ex.language, color: '#333', bg: '#eee' }
+                const typeB = typeBadges[ex.exerciseType || 'CodeExecution'] || typeBadges.CodeExecution
                 const isEnrolled = enrolledIds.has(ex.id)
                 const ease = ex.averageEaseFactor ?? 2.50
                 const reviews = ex.totalReviewsCount || 0
@@ -364,6 +415,9 @@ export default function Exercises() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
                         <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600 }}>{ex.title}</h4>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: typeB.bg, color: typeB.color }}>
+                            {typeB.label}
+                          </span>
                           <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: diff.bg, color: diff.color }} title={`Average Ease Factor: ${ease}`}>
                             {diff.label} {reviews ? `(${ease})` : ''}
                           </span>
@@ -411,34 +465,86 @@ export default function Exercises() {
       {/* Add New Exercise Modal */}
       {showAddForm && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', padding: 24, borderRadius: 12, width: '90%', maxWidth: 560 }}>
-            <h3 style={{ margin: '0 0 16px 0' }}>+ Add New Coding Exercise</h3>
+          <div style={{ background: '#fff', padding: 24, borderRadius: 12, width: '90%', maxWidth: 620, maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 style={{ margin: '0 0 16px 0' }}>+ Add New Exercise</h3>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Title</label>
                 <input className="form-control" value={title} onChange={e => setTitle(e.target.value)} required placeholder="e.g. Reverse String in Python" />
               </div>
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language</label>
-                <select className="form-control" value={language} onChange={e => setLanguage(e.target.value)}>
-                  <option value="csharp">C#</option>
-                  <option value="python">Python</option>
-                  <option value="javascript">JavaScript</option>
-                  <option value="go">Go</option>
-                </select>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Exercise Format</label>
+                  <select className="form-control" value={exerciseType} onChange={e => setExerciseType(e.target.value)}>
+                    <option value="CodeExecution">⚡ Code Execution</option>
+                    <option value="MultipleChoice">🔘 Multiple Choice (MCQ)</option>
+                    <option value="ExactString">✏️ Exact String / Short Answer</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language Tag</label>
+                  <select className="form-control" value={language} onChange={e => setLanguage(e.target.value)}>
+                    <option value="csharp">C#</option>
+                    <option value="python">Python</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="go">Go</option>
+                  </select>
+                </div>
               </div>
+
               <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Instructions</label>
-                <textarea className="form-control" rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="Exercise problem statement..." />
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Instructions / Problem Statement</label>
+                <textarea className="form-control" rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="Exercise instructions or question text..." />
               </div>
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Starter Code</label>
-                <textarea className="form-control" rows={3} style={{ fontFamily: 'monospace' }} value={starterCode} onChange={e => setStarterCode(e.target.value)} placeholder="def solution():..." />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Solution Code</label>
-                <textarea className="form-control" rows={3} style={{ fontFamily: 'monospace' }} value={solutionCode} onChange={e => setSolutionCode(e.target.value)} placeholder="reference solution code..." />
-              </div>
+
+              {/* Dynamic inputs based on exerciseType */}
+              {exerciseType === 'CodeExecution' && (
+                <>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Starter Code</label>
+                    <textarea className="form-control" rows={3} style={{ fontFamily: 'monospace' }} value={starterCode} onChange={e => setStarterCode(e.target.value)} placeholder="def solution():..." />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Solution Code (Test Assertions)</label>
+                    <textarea className="form-control" rows={3} style={{ fontFamily: 'monospace' }} value={solutionCode} onChange={e => setSolutionCode(e.target.value)} placeholder="reference solution or assertion code..." />
+                  </div>
+                </>
+              )}
+
+              {exerciseType === 'MultipleChoice' && (
+                <div style={{ background: '#f8f9fa', padding: 14, borderRadius: 8, border: '1px solid #dee2e6', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Multiple Choice Options:</label>
+                  <input className="form-control" placeholder="Option A" value={mcqOpt1} onChange={e => setMcqOpt1(e.target.value)} required />
+                  <input className="form-control" placeholder="Option B" value={mcqOpt2} onChange={e => setMcqOpt2(e.target.value)} required />
+                  <input className="form-control" placeholder="Option C (Optional)" value={mcqOpt3} onChange={e => setMcqOpt3(e.target.value)} />
+                  <input className="form-control" placeholder="Option D (Optional)" value={mcqOpt4} onChange={e => setMcqOpt4(e.target.value)} />
+                  
+                  <div style={{ marginTop: 4 }}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 4 }}>Correct Option:</label>
+                    <select className="form-control" value={mcqCorrect} onChange={e => setMcqCorrect(Number(e.target.value))}>
+                      <option value={0}>Option A (First Option)</option>
+                      <option value={1}>Option B (Second Option)</option>
+                      {mcqOpt3 && <option value={2}>Option C (Third Option)</option>}
+                      {mcqOpt4 && <option value={3}>Option D (Fourth Option)</option>}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {exerciseType === 'ExactString' && (
+                <div style={{ background: '#f8f9fa', padding: 14, borderRadius: 8, border: '1px solid #dee2e6', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 4 }}>Correct Answer (Exact Match):</label>
+                    <input className="form-control" placeholder="e.g. const" value={exactAnswer} onChange={e => setExactAnswer(e.target.value)} required />
+                  </div>
+                  <label style={{ fontSize: '0.85rem', color: '#495057', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={exactCaseSensitive} onChange={e => setExactCaseSensitive(e.target.checked)} />
+                    Case-sensitive matching
+                  </label>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
                 <button type="button" className="btn-study-tool" onClick={() => setShowAddForm(false)}>Cancel</button>
                 <button type="submit" className="btn-primary">Save & Add to Collection</button>
@@ -529,44 +635,21 @@ export default function Exercises() {
                 </div>
               )}
 
-              <div>
-                <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Code Solution</label>
-                  <select
-                    className="form-control"
-                    style={{ width: 'auto', padding: '2px 8px', fontSize: '0.85rem' }}
-                    value={practiceLang}
-                    onChange={e => setPracticeLang(e.target.value)}
-                  >
-                    <option value="csharp">C#</option>
-                    <option value="python">Python</option>
-                    <option value="javascript">JavaScript</option>
-                    <option value="go">Go</option>
-                  </select>
-                </div>
+              {/* Multi-Modal Exercise Renderer */}
+              <ExerciseRenderer
+                exercise={activeExercise}
+                practiceCode={practiceCode}
+                setPracticeCode={setPracticeCode}
+                practiceLang={practiceLang}
+                setPracticeLang={setPracticeLang}
+                onRunCode={handleRunCode}
+                running={running}
+                runResult={runResult}
+              />
 
-                <textarea
-                  className="form-control"
-                  rows={9}
-                  style={{
-                    fontFamily: 'Consolas, Monaco, monospace',
-                    fontSize: '0.9rem',
-                    background: '#1e1e1e',
-                    color: '#d4d4d4',
-                    resize: 'vertical'
-                  }}
-                  value={practiceCode}
-                  onChange={e => setPracticeCode(e.target.value)}
-                />
-              </div>
-
-              {/* Action & Status Bar */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
-                <button className="btn-primary" onClick={handleRunCode} disabled={running} style={{ padding: '8px 20px', fontSize: '0.9rem' }}>
-                  {running ? 'Running Solution...' : '▶ Run Solution'}
-                </button>
-
-                {runResult && (
+              {/* Status & Output Box */}
+              {runResult && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{
                       padding: '5px 12px',
@@ -582,25 +665,23 @@ export default function Exercises() {
                       ({runResult.durationMs}ms)
                     </span>
                   </div>
-                )}
-              </div>
 
-              {/* Output Details Box */}
-              {runResult?.details && (
-                <div style={{
-                  padding: 14,
-                  borderRadius: 8,
-                  background: runResult.passed ? '#f8f9fa' : '#fff5f5',
-                  color: runResult.passed ? '#212529' : '#c92a2a',
-                  fontSize: '0.85rem',
-                  fontFamily: 'Consolas, Monaco, monospace',
-                  border: runResult.passed ? '1px solid #e9ecef' : '1px solid #ffc9c9',
-                  maxHeight: 200,
-                  overflowY: 'auto',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word'
-                }}>
-                  {runResult.details}
+                  {runResult.details && (
+                    <div style={{
+                      padding: 12,
+                      borderRadius: 8,
+                      background: runResult.passed ? '#f8f9fa' : '#fff5f5',
+                      color: runResult.passed ? '#212529' : '#c92a2a',
+                      fontSize: '0.85rem',
+                      fontFamily: 'Consolas, Monaco, monospace',
+                      border: runResult.passed ? '1px solid #e9ecef' : '1px solid #ffc9c9',
+                      maxHeight: 180,
+                      overflowY: 'auto',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {runResult.details}
+                    </div>
+                  )}
                 </div>
               )}
 
