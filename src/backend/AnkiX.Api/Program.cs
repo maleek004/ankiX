@@ -102,41 +102,48 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Always ensure the database schema is up to date on startup using EF Core Migrations.
-using (var startupScope = app.Services.CreateScope())
+// Ensure the database schema is up to date on startup using EF Core Migrations safely.
+try
 {
-    var startupDb = startupScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    startupDb.Database.Migrate();
-    startupDb.Database.ExecuteSqlRaw(@"
-        IF NOT EXISTS (
-            SELECT * FROM sys.columns 
-            WHERE object_id = OBJECT_ID(N'[dbo].[CardFollowups]') 
-            AND name = N'LinkedCardIds'
-        )
-        BEGIN
-            ALTER TABLE [CardFollowups] ADD [LinkedCardIds] NVARCHAR(500) NULL;
-        END
+    using (var startupScope = app.Services.CreateScope())
+    {
+        var startupDb = startupScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        startupDb.Database.Migrate();
+        startupDb.Database.ExecuteSqlRaw(@"
+            IF NOT EXISTS (
+                SELECT * FROM sys.columns 
+                WHERE object_id = OBJECT_ID(N'[dbo].[CardFollowups]') 
+                AND name = N'LinkedCardIds'
+            )
+            BEGIN
+                ALTER TABLE [CardFollowups] ADD [LinkedCardIds] NVARCHAR(500) NULL;
+            END
 
-        IF OBJECT_ID(N'[dbo].[UserExercises]', N'U') IS NULL
-        BEGIN
-            CREATE TABLE [dbo].[UserExercises] (
-                [UserId] INT NOT NULL,
-                [ExerciseId] INT NOT NULL,
-                [EnrolledAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
-                CONSTRAINT [PK_UserExercises] PRIMARY KEY CLUSTERED ([UserId] ASC, [ExerciseId] ASC)
-            );
-        END
+            IF OBJECT_ID(N'[dbo].[UserExercises]', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [dbo].[UserExercises] (
+                    [UserId] INT NOT NULL,
+                    [ExerciseId] INT NOT NULL,
+                    [EnrolledAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    CONSTRAINT [PK_UserExercises] PRIMARY KEY CLUSTERED ([UserId] ASC, [ExerciseId] ASC)
+                );
+            END
 
-        IF NOT EXISTS (
-            SELECT * FROM sys.columns 
-            WHERE object_id = OBJECT_ID(N'[dbo].[Exercises]') 
-            AND name = N'ExerciseType'
-        )
-        BEGIN
-            ALTER TABLE [Exercises] ADD [ExerciseType] NVARCHAR(50) NOT NULL DEFAULT 'CodeExecution';
-            ALTER TABLE [Exercises] ADD [ExerciseSpec] NVARCHAR(MAX) NULL;
-        END
-    ");
+            IF NOT EXISTS (
+                SELECT * FROM sys.columns 
+                WHERE object_id = OBJECT_ID(N'[dbo].[Exercises]') 
+                AND name = N'ExerciseType'
+            )
+            BEGIN
+                ALTER TABLE [Exercises] ADD [ExerciseType] NVARCHAR(50) NOT NULL DEFAULT 'CodeExecution';
+                ALTER TABLE [Exercises] ADD [ExerciseSpec] NVARCHAR(MAX) NULL;
+            END
+        ");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[Startup Warning] Database migration failed: {ex.Message}");
 }
 
 // Seed data when invoked with the 'seed' argument: dotnet run -- seed
