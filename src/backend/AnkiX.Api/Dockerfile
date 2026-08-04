@@ -12,4 +12,4 @@ WORKDIR /app
 COPY --from=build /app/publish .
 
 # Heroku assigns dynamic PORT environment variable at runtime
-CMD CMD_PORT="${PORT:-8080}" && dotnet AnkiX.Api.dll --urls "http://0.0.0.0:${CMD_PORT}"
+CMD ["sh", "-c", "dotnet AnkiX.Api.dll --urls http://0.0.0.0:${PORT:-8080}"]
