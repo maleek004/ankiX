@@ -1,10 +1,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY ["src/backend/AnkiX.Api/AnkiX.Api.csproj", "./"]
+COPY ["AnkiX.Api.csproj", "./"]
 RUN dotnet restore "AnkiX.Api.csproj"
 
-COPY src/backend/AnkiX.Api/ .
+COPY . .
 RUN dotnet publish "AnkiX.Api.csproj" -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
