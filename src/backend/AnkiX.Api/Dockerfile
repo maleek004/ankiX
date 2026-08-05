@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY ["src/backend/AnkiX.Api/AnkiX.Api.csproj", "./"]
@@ -7,7 +7,7 @@ RUN dotnet restore "AnkiX.Api.csproj"
 COPY src/backend/AnkiX.Api/ .
 RUN dotnet publish "AnkiX.Api.csproj" -c Release -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
