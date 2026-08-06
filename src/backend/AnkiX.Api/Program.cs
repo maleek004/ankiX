@@ -193,8 +193,23 @@ using (var startupScope = app.Services.CreateScope())
     int sampleId = startupDb.Communities.Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefault();
     if (sampleId > 0)
     {
-        startupDb.Database.ExecuteSql($"UPDATE [Decks] SET [CommunityId] = {sampleId} WHERE [CommunityId] IS NULL;");
-        startupDb.Database.ExecuteSql($"UPDATE [Exercises] SET [CommunityId] = {sampleId} WHERE [CommunityId] IS NULL;");
+        var unassignedDecks = startupDb.Decks.Where(d => d.CommunityId == null).ToList();
+        foreach (var d in unassignedDecks)
+        {
+            d.CommunityId = sampleId;
+        }
+
+        var unassignedEx = startupDb.Exercises.Where(e => e.CommunityId == null).ToList();
+        foreach (var e in unassignedEx)
+        {
+            e.CommunityId = sampleId;
+        }
+
+        if (unassignedDecks.Count > 0 || unassignedEx.Count > 0)
+        {
+            startupDb.SaveChanges();
+            Console.WriteLine($"[BACKFILL] Linked {unassignedDecks.Count} decks and {unassignedEx.Count} exercises to Sample Community (id: {sampleId}).");
+        }
     }
 }
 
