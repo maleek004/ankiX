@@ -245,6 +245,10 @@ using (var startupScope = app.Services.CreateScope())
     {
         startupDb.SaveChanges();
     }
+
+    // Direct SQL fallback to ensure all unassigned rows in Azure SQL database are updated
+    startupDb.Database.ExecuteSql($"UPDATE [Decks] SET [CommunityId] = {sampleComm.Id} WHERE [CommunityId] IS NULL OR [CommunityId] = 0;");
+    startupDb.Database.ExecuteSql($"UPDATE [Exercises] SET [CommunityId] = {sampleComm.Id} WHERE [CommunityId] IS NULL OR [CommunityId] = 0;");
 }
 
 // Seed data when invoked with the 'seed' argument: dotnet run -- seed
