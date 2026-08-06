@@ -212,6 +212,22 @@ if (shouldSeed)
         db.SaveChanges();
     }
 
+    var sampleComm = db.Communities.FirstOrDefault(c => c.Slug == "sample");
+    if (sampleComm == null)
+    {
+        sampleComm = new Community
+        {
+            Name = "Sample Community",
+            Slug = "sample",
+            Description = "Official AnkiX Sample Community containing starter decks, flashcards, and multi-modal exercises.",
+            IsPublic = true,
+            CreatedByUserId = 1,
+            CreatedAt = DateTime.UtcNow
+        };
+        db.Communities.Add(sampleComm);
+        db.SaveChanges();
+    }
+
     var globalComm = db.Communities.FirstOrDefault(c => c.Slug == "global");
     if (globalComm == null)
     {
@@ -250,7 +266,7 @@ if (shouldSeed)
         {
             Title = "Algorithms & Data Structures",
             Description = "Micro-coding cards and hands-on algorithm challenges",
-            CommunityId = globalComm.Id,
+            CommunityId = sampleComm.Id,
             CreatedAt = DateTime.UtcNow
         };
         db.Decks.Add(deck);
@@ -279,7 +295,7 @@ if (shouldSeed)
             StarterCode = "def is_even(n):\n    # Write your solution here\n    pass",
             SolutionCode = "def is_even(n):\n    return n % 2 == 0",
             TestCasesSpec = "# Unit Tests\nif __name__ == '__main__':\n    assert is_even(4) is True, f'Expected True for 4, got {is_even(4)!r}'\n    assert is_even(7) is False, f'Expected False for 7, got {is_even(7)!r}'\n    assert is_even(0) is True, f'Expected True for 0, got {is_even(0)!r}'\n    print('✓ All Unit Tests Passed!')",
-            CommunityId = globalComm.Id,
+            CommunityId = sampleComm.Id,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -291,7 +307,7 @@ if (shouldSeed)
             StarterCode = "def reverse_string(s):\n    # Write your solution here\n    pass",
             SolutionCode = "def reverse_string(s):\n    return s[::-1]",
             TestCasesSpec = "# Unit Tests\nif __name__ == '__main__':\n    assert reverse_string('hello') == 'olleh', f'Expected olleh, got {reverse_string(\"hello\")!r}'\n    assert reverse_string('Python') == 'nohtyP', f'Expected nohtyP, got {reverse_string(\"Python\")!r}'\n    print('✓ All Unit Tests Passed!')",
-            CommunityId = globalComm.Id,
+            CommunityId = sampleComm.Id,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -303,7 +319,7 @@ if (shouldSeed)
             StarterCode = "function addNumbers(a, b) {\n  // Write your solution here\n}",
             SolutionCode = "function addNumbers(a, b) {\n  return a + b;\n}",
             TestCasesSpec = "// Unit Tests\ntry {\n  if (addNumbers(2, 3) !== 5) throw new Error(`Expected 5, got ${addNumbers(2, 3)}`);\n  if (addNumbers(-1, 1) !== 0) throw new Error(`Expected 0, got ${addNumbers(-1, 1)}`);\n  console.log('✓ All Unit Tests Passed!');\n} catch(e) { console.error('Assertion Error:', e.message); process.exit(1); }",
-            CommunityId = globalComm.Id,
+            CommunityId = sampleComm.Id,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -315,7 +331,7 @@ if (shouldSeed)
             StarterCode = "function getMax(numbers) {\n  // Write your solution here\n}",
             SolutionCode = "function getMax(numbers) {\n  return Math.max(...numbers);\n}",
             TestCasesSpec = "// Unit Tests\ntry {\n  if (getMax([1, 5, 3, 9, 2]) !== 9) throw new Error(`Expected 9, got ${getMax([1, 5, 3, 9, 2])}`);\n  if (getMax([-10, -3, -5]) !== -3) throw new Error(`Expected -3, got ${getMax([-10, -3, -5])}`);\n  console.log('✓ All Unit Tests Passed!');\n} catch(e) { console.error('Assertion Error:', e.message); process.exit(1); }",
-            CommunityId = globalComm.Id,
+            CommunityId = sampleComm.Id,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -327,7 +343,7 @@ if (shouldSeed)
             StarterCode = "package main\n\nfunc Square(n int) int {\n    // Write your solution here\n    return 0\n}",
             SolutionCode = "package main\n\nfunc Square(n int) int {\n    return n * n\n}",
             TestCasesSpec = "import \"fmt\"\n\nfunc main() {\n    if Square(4) != 16 { panic(fmt.Sprintf(\"Expected 16, got %d\", Square(4))) }\n    if Square(-3) != 9 { panic(fmt.Sprintf(\"Expected 9, got %d\", Square(-3))) }\n    fmt.Println(\"✓ All Unit Tests Passed!\")\n}",
-            CommunityId = globalComm.Id,
+            CommunityId = sampleComm.Id,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -339,7 +355,7 @@ if (shouldSeed)
             ExerciseType = "MultipleChoice",
             Description = "Which C# keyword is required on a base class method to allow a derived class to override its implementation polymorphically?",
             ExerciseSpec = "{\"options\":[\"override\",\"virtual\",\"abstract\",\"static\"],\"correctIndex\":1}",
-            CommunityId = seComm.Id,
+            CommunityId = sampleComm.Id,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -350,7 +366,7 @@ if (shouldSeed)
             ExerciseType = "MultipleChoice",
             Description = "In Object-Oriented software architecture, what key capability does an Interface provide that a single C# base class does NOT?",
             ExerciseSpec = "{\"options\":[\"Multiple inheritance of contracts / capabilities\",\"Private state encapsulation\",\"Constructors with parameters\",\"Static property storage\"],\"correctIndex\":0}",
-            CommunityId = seComm.Id,
+            CommunityId = sampleComm.Id,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -361,7 +377,7 @@ if (shouldSeed)
             ExerciseType = "MultipleChoice",
             Description = "What is the primary objective of Encapsulation in Object-Oriented Programming?",
             ExerciseSpec = "{\"options\":[\"Allowing child classes to inherit parent methods\",\"Bundling data with methods and restricting direct access to internal state\",\"Executing different code paths based on dynamic method signatures\",\"Ensuring functions have no side effects\"],\"correctIndex\":1}",
-            CommunityId = seComm.Id,
+            CommunityId = sampleComm.Id,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -372,7 +388,7 @@ if (shouldSeed)
             ExerciseType = "ExactString",
             Description = "Which pillar of Object-Oriented Programming refers to hiding internal implementation complexity and exposing only essential interfaces?",
             ExerciseSpec = "{\"acceptedAnswers\":[\"Abstraction\",\"abstraction\"],\"caseSensitive\":false}",
-            CommunityId = seComm.Id,
+            CommunityId = sampleComm.Id,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -383,7 +399,7 @@ if (shouldSeed)
             ExerciseType = "ExactString",
             Description = "In the SOLID principles of Object-Oriented Design, what principle does the letter 'L' represent?",
             ExerciseSpec = "{\"acceptedAnswers\":[\"Liskov\",\"Liskov Substitution\",\"Liskov substitution\"],\"caseSensitive\":false}",
-            CommunityId = seComm.Id,
+            CommunityId = sampleComm.Id,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -394,7 +410,7 @@ if (shouldSeed)
             ExerciseType = "ExactString",
             Description = "What programming term describes data structures or objects whose state CANNOT be modified after creation?",
             ExerciseSpec = "{\"acceptedAnswers\":[\"Immutable\",\"immutability\",\"immutable\"],\"caseSensitive\":false}",
-            CommunityId = seComm.Id,
+            CommunityId = sampleComm.Id,
             CreatedAt = DateTime.UtcNow
         };
 

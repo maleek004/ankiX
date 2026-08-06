@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useAuth } from '../auth/AuthProvider'
 import {
   getCommunities,
   getCommunityBySlug,
@@ -12,6 +13,7 @@ import {
 
 export default function Communities() {
   const { slug } = useParams()
+  const auth = useAuth()
   const [communities, setCommunities] = useState([])
   const [activeCommunity, setActiveCommunity] = useState(null)
   const [communityDecks, setCommunityDecks] = useState([])
@@ -135,7 +137,7 @@ export default function Communities() {
               ← All Communities
             </Link>
           )}
-          {token && (
+          {auth?.user?.role === 'Admin' && (
             <button
               onClick={() => setShowCreateModal(true)}
               className="btn btn-primary"

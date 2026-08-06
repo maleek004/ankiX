@@ -105,7 +105,7 @@ public sealed class CommunitiesController : ControllerBase
         });
     }
 
-    [Authorize]
+    [Authorize(Roles = Roles.Admin)]
     [HttpPost]
     public async Task<ActionResult<CommunityResponse>> CreateCommunity([FromBody] CreateCommunityRequest request)
     {
