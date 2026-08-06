@@ -118,7 +118,7 @@ public sealed class ExercisesController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = $"{Roles.Contributor},{Roles.Admin}")]
+    [Authorize]
     public async Task<ActionResult<ExerciseDetailResponse>> CreateExercise([FromBody] CreateExerciseRequest request)
     {
         int? userId = null;
@@ -127,6 +127,8 @@ public sealed class ExercisesController : ControllerBase
         {
             userId = parsedId;
         }
+
+        if (!await CanManageContentAsync(request.CommunityId)) return Forbid();
 
         Exercise exercise = new Exercise
         {
@@ -163,7 +165,7 @@ public sealed class ExercisesController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize]
     public async Task<IActionResult> UpdateExercise([FromRoute] int id, [FromBody] UpdateExerciseRequest request)
     {
         Exercise? exercise = await dbContext.Exercises.FirstOrDefaultAsync(e => e.Id == id);
@@ -171,6 +173,8 @@ public sealed class ExercisesController : ControllerBase
         {
             return NotFound(new { message = "Exercise not found." });
         }
+
+        if (!await CanManageContentAsync(exercise.CommunityId)) return Forbid();
 
         string language = request.Language.Trim().ToLowerInvariant();
         if (language is not "csharp" and not "python" and not "javascript" and not "go")
@@ -190,7 +194,7 @@ public sealed class ExercisesController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize]
     public async Task<IActionResult> DeleteExercise([FromRoute] int id)
     {
         Exercise? exercise = await dbContext.Exercises.FirstOrDefaultAsync(e => e.Id == id);
@@ -198,6 +202,8 @@ public sealed class ExercisesController : ControllerBase
         {
             return NotFound(new { message = "Exercise not found." });
         }
+
+        if (!await CanManageContentAsync(exercise.CommunityId)) return Forbid();
 
         // Also clean up join table records
         List<CardExercise> joins = await dbContext.CardExercises
@@ -737,5 +743,33 @@ public sealed class ExercisesController : ControllerBase
         await dbContext.SaveChangesAsync();
 
         return Ok(new { message = "Exercises database re-seeded successfully with 5 basic coding challenges and test assertion suites." });
+    }
+
+    private async Task<bool> CanManageContentAsync(int? communityId)
+    {
+        if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Contributor))
+        {
+            return true;
+        }
+
+        if (!communityId.HasValue || communityId.Value <= 0)
+        {
+            return false;
+        }
+
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            return false;
+        }
+
+        string? memberRole = await dbContext.CommunityMembers
+            .Where(m => m.CommunityId == communityId.Value && m.UserId == userId)
+            .Select(m => m.Role)
+            .FirstOrDefaultAsync();
+
+        return memberRole == CommunityRoles.Owner
+            || memberRole == CommunityRoles.Admin
+            || memberRole == CommunityRoles.Contributor;
     }
 }

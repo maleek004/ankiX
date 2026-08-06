@@ -22,7 +22,7 @@ public sealed class ContentController : ControllerBase
 
     [HttpPost("decks")]
     [HttpPost("/api/decks")]
-    [Authorize(Roles = $"{Roles.Contributor},{Roles.Admin}")]
+    [Authorize]
     public async Task<ActionResult<DeckResponse>> CreateDeck([FromBody] CreateDeckRequest request)
     {
         int? userId = null;
@@ -31,6 +31,8 @@ public sealed class ContentController : ControllerBase
         {
             userId = parsedId;
         }
+
+        if (!await CanManageContentAsync(request.CommunityId)) return Forbid();
 
         Deck deck = new Deck
         {
@@ -57,7 +59,7 @@ public sealed class ContentController : ControllerBase
 
     [HttpPut("decks/{deckId:int}")]
     [HttpPut("/api/decks/{deckId:int}")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize]
     public async Task<IActionResult> UpdateDeck([FromRoute] int deckId, [FromBody] UpdateDeckRequest request)
     {
         Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(entity => entity.Id == deckId);
@@ -65,6 +67,8 @@ public sealed class ContentController : ControllerBase
         {
             return NotFound(new { message = "Deck not found." });
         }
+
+        if (!await CanManageContentAsync(deck.CommunityId)) return Forbid();
 
         deck.Title = request.Title.Trim();
         deck.Description = request.Description?.Trim();
@@ -74,7 +78,7 @@ public sealed class ContentController : ControllerBase
 
     [HttpDelete("decks/{deckId:int}")]
     [HttpDelete("/api/decks/{deckId:int}")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize]
     public async Task<IActionResult> DeleteDeck([FromRoute] int deckId)
     {
         Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(entity => entity.Id == deckId);
@@ -82,6 +86,8 @@ public sealed class ContentController : ControllerBase
         {
             return NotFound(new { message = "Deck not found." });
         }
+
+        if (!await CanManageContentAsync(deck.CommunityId)) return Forbid();
 
         bool hasCards = await dbContext.Cards.AnyAsync(card => card.DeckId == deckId);
         if (hasCards)
@@ -96,15 +102,13 @@ public sealed class ContentController : ControllerBase
 
     [HttpPost("cards")]
     [HttpPost("/api/decks/{deckId:int}/cards")]
-    [Authorize(Roles = $"{Roles.Contributor},{Roles.Admin}")]
+    [Authorize]
     public async Task<ActionResult<CardResponse>> CreateCard([FromBody] CreateCardRequest request, [FromRoute] int? deckId = null)
     {
         int targetDeckId = request.DeckId > 0 ? request.DeckId : (deckId ?? 0);
-        bool deckExists = await dbContext.Decks.AnyAsync(deck => deck.Id == targetDeckId);
-        if (!deckExists)
-        {
-            return NotFound(new { message = "Deck not found." });
-        }
+        Deck? targetDeck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == targetDeckId);
+        if (targetDeck is null) return NotFound(new { message = "Deck not found." });
+        if (!await CanManageContentAsync(targetDeck.CommunityId)) return Forbid();
 
         string cardType = request.Type.Trim().ToLowerInvariant();
         if (cardType is not "micro-coding" and not "concept" and not "basic")
@@ -146,6 +150,9 @@ public sealed class ContentController : ControllerBase
         {
             return NotFound(new { message = "Card not found." });
         }
+
+        Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId);
+        if (!await CanManageContentAsync(deck?.CommunityId)) return Forbid();
 
         string cardType = request.Type.Trim().ToLowerInvariant();
         if (cardType is not "micro-coding" and not "concept" and not "basic")
@@ -210,8 +217,39 @@ public sealed class ContentController : ControllerBase
             return NotFound(new { message = "Card not found." });
         }
 
+        Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId);
+        if (!await CanManageContentAsync(deck?.CommunityId)) return Forbid();
+
         dbContext.Cards.Remove(card);
         await dbContext.SaveChangesAsync();
         return NoContent();
+    }
+
+    private async Task<bool> CanManageContentAsync(int? communityId)
+    {
+        if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Contributor))
+        {
+            return true;
+        }
+
+        if (!communityId.HasValue || communityId.Value <= 0)
+        {
+            return false;
+        }
+
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            return false;
+        }
+
+        string? memberRole = await dbContext.CommunityMembers
+            .Where(m => m.CommunityId == communityId.Value && m.UserId == userId)
+            .Select(m => m.Role)
+            .FirstOrDefaultAsync();
+
+        return memberRole == CommunityRoles.Owner
+            || memberRole == CommunityRoles.Admin
+            || memberRole == CommunityRoles.Contributor;
     }
 }

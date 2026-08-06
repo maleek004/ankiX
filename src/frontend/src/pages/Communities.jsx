@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { useCommunity } from '../community/CommunityProvider'
-import { getCommunities, createCommunity, joinCommunity } from '../api'
+import { getCommunities, createCommunity, joinCommunity, getCommunityMembers, updateCommunityMemberRole } from '../api'
 
 export default function Communities() {
   const auth = useAuth()
@@ -13,6 +13,9 @@ export default function Communities() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [createForm, setCreateForm] = useState({ name: '', slug: '', description: '', isPublic: true })
   const [actionLoading, setActionLoading] = useState(false)
+  const [managingMembersCommunity, setManagingMembersCommunity] = useState(null)
+  const [members, setMembers] = useState([])
+  const [membersLoading, setMembersLoading] = useState(false)
 
   const token = auth?.user ? localStorage.getItem('ankix_token') : null
 
@@ -81,6 +84,32 @@ export default function Communities() {
       alert(err.message || 'Failed to create community')
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  async function openManageMembers(e, community) {
+    e.stopPropagation()
+    setManagingMembersCommunity(community)
+    setMembersLoading(true)
+    try {
+      const data = await getCommunityMembers(community.slug)
+      setMembers(data || [])
+    } catch (err) {
+      alert(err.message || 'Failed to load members')
+    } finally {
+      setMembersLoading(false)
+    }
+  }
+
+  async function handleRoleChange(targetUserId, newRole) {
+    if (!managingMembersCommunity) return
+    try {
+      await updateCommunityMemberRole(managingMembersCommunity.slug, targetUserId, newRole)
+      const updated = await getCommunityMembers(managingMembersCommunity.slug)
+      setMembers(updated || [])
+      await loadCommunities()
+    } catch (err) {
+      alert(err.message || 'Failed to update role')
     }
   }
 
@@ -170,13 +199,24 @@ export default function Communities() {
 
               <div style={{ marginTop: 'auto', paddingTop: '0.5rem' }}>
                 {c.userRole ? (
-                  <button
-                    className="btn btn-primary"
-                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.9rem' }}
-                    onClick={(e) => { e.stopPropagation(); enterCommunity(c) }}
-                  >
-                    Enter Community →
-                  </button>
+                  <>
+                    <button
+                      className="btn btn-primary"
+                      style={{ width: '100%', padding: '0.5rem', fontSize: '0.9rem' }}
+                      onClick={(e) => { e.stopPropagation(); enterCommunity(c) }}
+                    >
+                      Enter Community →
+                    </button>
+                    {(c.userRole === 'Owner' || c.userRole === 'Admin' || auth?.user?.role === 'Admin') && (
+                      <button
+                        className="btn btn-secondary"
+                        style={{ marginTop: 6, width: '100%', padding: '0.4rem', fontSize: '0.85rem' }}
+                        onClick={(e) => openManageMembers(e, c)}
+                      >
+                        👥 Manage Members
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <button
                     className="btn btn-secondary"
@@ -262,6 +302,81 @@ export default function Communities() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Members Modal */}
+      {managingMembersCommunity && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 1000
+          }}
+          onClick={() => setManagingMembersCommunity(null)}
+        >
+          <div
+            style={{
+              background: '#fff', borderRadius: 16, padding: '2rem',
+              width: '100%', maxWidth: 650, maxHeight: '90vh', overflow: 'auto'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ margin: 0, color: '#1e293b' }}>👥 Manage Members — {managingMembersCommunity.name}</h2>
+              <button className="btn btn-secondary" onClick={() => setManagingMembersCommunity(null)}>✕</button>
+            </div>
+
+            {membersLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>Loading members...</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', fontSize: '0.85rem', color: '#64748b' }}>
+                    <th style={{ padding: '8px' }}>User</th>
+                    <th style={{ padding: '8px' }}>Role</th>
+                    <th style={{ padding: '8px', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.map(m => (
+                    <tr key={m.userId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '8px' }}>
+                        <div style={{ fontWeight: 600, color: '#1e293b' }}>{m.displayName || m.email}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{m.email}</div>
+                      </td>
+                      <td style={{ padding: '8px' }}>
+                        <span style={{
+                          fontSize: '0.75rem', padding: '2px 8px', borderRadius: 999,
+                          background: m.role === 'Owner' ? '#fef3c7' : m.role === 'Admin' ? '#e0e7ff' : '#f1f5f9',
+                          color: m.role === 'Owner' ? '#92400e' : m.role === 'Admin' ? '#3730a3' : '#475569',
+                          fontWeight: 600
+                        }}>
+                          {m.role}
+                        </span>
+                      </td>
+                      <td style={{ padding: '8px', textAlign: 'right' }}>
+                        {(managingMembersCommunity.userRole === 'Owner' || auth?.user?.role === 'Admin' || (managingMembersCommunity.userRole === 'Admin' && m.role !== 'Owner')) ? (
+                          <select
+                            value={m.role}
+                            onChange={e => handleRoleChange(m.userId, e.target.value)}
+                            style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                          >
+                            <option value="Admin">Admin</option>
+                            <option value="Contributor">Contributor</option>
+                            <option value="Member">Member</option>
+                            {managingMembersCommunity.userRole === 'Owner' && <option value="Owner">Owner</option>}
+                          </select>
+                        ) : (
+                          <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}

@@ -19,7 +19,7 @@ export default function Decks(){
     }
     let mounted = true
     import('../api.js').then(m => {
-      setCanCreate(m.canCreateContent())
+      setCanCreate(m.canCreateContent(activeCommunity?.role))
       return m.getDecks(activeCommunity.id)
     }).then(data => {
       if (!mounted) return

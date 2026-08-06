@@ -255,6 +255,50 @@ public sealed class CommunitiesController : ControllerBase
         return Ok(members);
     }
 
+    [Authorize]
+    [HttpPut("{slug}/members/{targetUserId:int}/role")]
+    public async Task<IActionResult> UpdateMemberRole(string slug, int targetUserId, [FromBody] UpdateMemberRoleRequest request)
+    {
+        var community = await dbContext.Communities.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
+        if (community == null) return NotFound("Community not found.");
+
+        int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var callerMembership = await dbContext.CommunityMembers
+            .FirstOrDefaultAsync(m => m.CommunityId == community.Id && m.UserId == currentUserId);
+
+        bool isSystemAdmin = User.IsInRole(Roles.Admin);
+        bool isCommunityOwnerOrAdmin = callerMembership?.Role == CommunityRoles.Owner || callerMembership?.Role == CommunityRoles.Admin;
+
+        if (!isSystemAdmin && !isCommunityOwnerOrAdmin)
+        {
+            return Forbid();
+        }
+
+        string newRole = request.Role.Trim();
+        if (newRole is not CommunityRoles.Owner and not CommunityRoles.Admin and not CommunityRoles.Contributor and not CommunityRoles.Member)
+        {
+            return BadRequest("Role must be 'Owner', 'Admin', 'Contributor', or 'Member'.");
+        }
+
+        var targetMembership = await dbContext.CommunityMembers
+            .FirstOrDefaultAsync(m => m.CommunityId == community.Id && m.UserId == targetUserId);
+
+        if (targetMembership == null)
+        {
+            return NotFound("Member not found in community.");
+        }
+
+        if ((newRole == CommunityRoles.Owner || targetMembership.Role == CommunityRoles.Owner) && !isSystemAdmin && callerMembership?.Role != CommunityRoles.Owner)
+        {
+            return BadRequest("Only community owners can manage Owner role.");
+        }
+
+        targetMembership.Role = newRole;
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new { message = $"Role updated to '{newRole}' successfully." });
+    }
+
     private int? GetCurrentUserId()
     {
         string? val = User.FindFirstValue(ClaimTypes.NameIdentifier);

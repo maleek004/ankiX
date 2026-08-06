@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace AnkiX.Api.Contracts.Content;
 
 public sealed class CreateCommunityRequest
@@ -51,4 +53,10 @@ public sealed class CommunityMemberResponse
     public string Role { get; set; } = string.Empty;
 
     public DateTime JoinedAt { get; set; }
+}
+
+public sealed class UpdateMemberRoleRequest
+{
+    [Required]
+    public string Role { get; set; } = string.Empty;
 }

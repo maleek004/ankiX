@@ -75,13 +75,19 @@ export function getUser(){
   return null
 }
 
-export function canCreateContent(){
+export function canCreateContent(communityRole = null){
   const user = getUser()
   if(!user) return false
   const role = user.role || user.Role
-  if(!role) return false
-  const lowerRole = role.toLowerCase()
-  return lowerRole === 'admin' || lowerRole === 'contributor'
+  if(role) {
+    const lowerRole = role.toLowerCase()
+    if(lowerRole === 'admin' || lowerRole === 'contributor') return true
+  }
+  if(communityRole) {
+    const lowerCommRole = communityRole.toLowerCase()
+    if(lowerCommRole === 'owner' || lowerCommRole === 'admin' || lowerCommRole === 'contributor') return true
+  }
+  return false
 }
 
 export function logout(){
@@ -503,6 +509,25 @@ export async function leaveCommunity(slug){
   if(!res.ok){
     const errText = await res.text()
     throw new Error(errText || 'Failed to leave community')
+  }
+  return res.json()
+}
+
+export async function getCommunityMembers(slug){
+  const res = await fetch(`${API_BASE}/communities/${slug}/members`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch community members')
+  return res.json()
+}
+
+export async function updateCommunityMemberRole(slug, targetUserId, role){
+  const res = await fetch(`${API_BASE}/communities/${slug}/members/${targetUserId}/role`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ role })
+  })
+  if(!res.ok){
+    const errText = await res.text()
+    throw new Error(errText || 'Failed to update member role')
   }
   return res.json()
 }

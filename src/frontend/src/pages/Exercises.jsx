@@ -57,7 +57,7 @@ export default function Exercises() {
   const loadData = async () => {
     if (!activeCommunity) { navigate('/communities'); return }
     try {
-      setCanCreate(canCreateContent())
+      setCanCreate(canCreateContent(activeCommunity?.role))
       const [allEx, collectionIds, dueEx] = await Promise.all([
         getExercises(activeLang, activeCommunity?.id),
         getMyCollectionExerciseIds(),
