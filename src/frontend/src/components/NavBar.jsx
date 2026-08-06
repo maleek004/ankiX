@@ -14,6 +14,7 @@ export default function NavBar(){
         </Link>
         <nav>
           <ul className="navbar-nav">
+            <li><Link to="/communities" className="nav-link">🌐 Communities</Link></li>
             <li><Link to="/decks" className="nav-link">Decks</Link></li>
             <li><Link to="/exercises" className="nav-link">Exercises</Link></li>
             {auth?.user?.role === 'Admin' && (

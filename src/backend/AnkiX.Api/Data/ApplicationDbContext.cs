@@ -31,11 +31,28 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<UserExercise> UserExercises => Set<UserExercise>();
 
+    public DbSet<Community> Communities => Set<Community>();
+
+    public DbSet<CommunityMember> CommunityMembers => Set<CommunityMember>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>()
             .HasIndex(user => user.Email)
             .IsUnique();
+
+        modelBuilder.Entity<Community>()
+            .HasIndex(community => community.Slug)
+            .IsUnique();
+
+        modelBuilder.Entity<CommunityMember>()
+            .HasKey(cm => new { cm.CommunityId, cm.UserId });
+
+        modelBuilder.Entity<Deck>()
+            .HasIndex(d => d.CommunityId);
+
+        modelBuilder.Entity<Exercise>()
+            .HasIndex(e => e.CommunityId);
 
         modelBuilder.Entity<Card>()
             .HasIndex(card => card.DeckId);

@@ -15,6 +15,8 @@ public sealed class Deck
 
     public int? CreatedByUserId { get; set; }
 
+    public int? CommunityId { get; set; }
+
     [Column(TypeName = "datetime2")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

@@ -451,3 +451,65 @@ export async function importCardsText(deckId, content, format = 'csv'){
   }
   return res.json()
 }
+
+export async function getCommunities(){
+  const res = await fetch(`${API_BASE}/communities`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch communities')
+  return res.json()
+}
+
+export async function getCommunityBySlug(slug){
+  const res = await fetch(`${API_BASE}/communities/${slug}`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch community')
+  return res.json()
+}
+
+export async function createCommunity(communityData){
+  const res = await fetch(`${API_BASE}/communities`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(communityData)
+  })
+  if(!res.ok){
+    const errText = await res.text()
+    throw new Error(errText || 'Failed to create community')
+  }
+  return res.json()
+}
+
+export async function joinCommunity(slug){
+  const res = await fetch(`${API_BASE}/communities/${slug}/join`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const errText = await res.text()
+    throw new Error(errText || 'Failed to join community')
+  }
+  return res.json()
+}
+
+export async function leaveCommunity(slug){
+  const res = await fetch(`${API_BASE}/communities/${slug}/leave`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const errText = await res.text()
+    throw new Error(errText || 'Failed to leave community')
+  }
+  return res.json()
+}
+
+export async function getCommunityDecks(slug){
+  const res = await fetch(`${API_BASE}/communities/${slug}/decks`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch community decks')
+  return res.json()
+}
+
+export async function getCommunityExercises(slug){
+  const res = await fetch(`${API_BASE}/communities/${slug}/exercises`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch community exercises')
+  return res.json()
+}
+
