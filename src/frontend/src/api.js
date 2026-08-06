@@ -533,4 +533,15 @@ export async function updateCommunityMemberRole(slug, targetUserId, role){
 }
 
 
-
+export async function addCommunityMember(slug, email, role = 'Member'){
+  const res = await fetch(`${API_BASE}/communities/${slug}/members`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ email, role })
+  })
+  if(!res.ok){
+    const errText = await res.text()
+    throw new Error(errText || 'Failed to add member')
+  }
+  return res.json()
+}

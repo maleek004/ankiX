@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { useCommunity } from '../community/CommunityProvider'
-import { getCommunities, createCommunity, joinCommunity, getCommunityMembers, updateCommunityMemberRole } from '../api'
+import { getCommunities, createCommunity, joinCommunity, getCommunityMembers, updateCommunityMemberRole, addCommunityMember } from '../api'
 
 export default function Communities() {
   const auth = useAuth()
@@ -16,6 +16,9 @@ export default function Communities() {
   const [managingMembersCommunity, setManagingMembersCommunity] = useState(null)
   const [members, setMembers] = useState([])
   const [membersLoading, setMembersLoading] = useState(false)
+  const [addMemberEmail, setAddMemberEmail] = useState('')
+  const [addMemberRole, setAddMemberRole] = useState('Member')
+  const [addMemberLoading, setAddMemberLoading] = useState(false)
 
   const token = auth?.user ? localStorage.getItem('ankix_token') : null
 
@@ -110,6 +113,24 @@ export default function Communities() {
       await loadCommunities()
     } catch (err) {
       alert(err.message || 'Failed to update role')
+    }
+  }
+
+  async function handleAddMember(e) {
+    e.preventDefault()
+    if (!managingMembersCommunity || !addMemberEmail.trim()) return
+    setAddMemberLoading(true)
+    try {
+      await addCommunityMember(managingMembersCommunity.slug, addMemberEmail.trim(), addMemberRole)
+      setAddMemberEmail('')
+      setAddMemberRole('Member')
+      const updated = await getCommunityMembers(managingMembersCommunity.slug)
+      setMembers(updated || [])
+      await loadCommunities()
+    } catch (err) {
+      alert(err.message || 'Failed to add member')
+    } finally {
+      setAddMemberLoading(false)
     }
   }
 
@@ -331,6 +352,32 @@ export default function Communities() {
             {membersLoading ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>Loading members...</div>
             ) : (
+              <>
+              {/* Add Member Form */}
+              <form onSubmit={handleAddMember} style={{ background: '#f8fafc', padding: '1rem', borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: '1.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  type="email"
+                  className="form-control"
+                  placeholder="Enter registered user email..."
+                  value={addMemberEmail}
+                  onChange={e => setAddMemberEmail(e.target.value)}
+                  style={{ flex: 1, minWidth: 200 }}
+                  required
+                />
+                <select
+                  value={addMemberRole}
+                  onChange={e => setAddMemberRole(e.target.value)}
+                  style={{ padding: '0.5rem', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                >
+                  <option value="Member">Member</option>
+                  <option value="Contributor">Contributor</option>
+                  <option value="Admin">Admin</option>
+                  {managingMembersCommunity.userRole === 'Owner' && <option value="Owner">Owner</option>}
+                </select>
+                <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }} disabled={addMemberLoading}>
+                  {addMemberLoading ? 'Adding...' : '➕ Add Member'}
+                </button>
+              </form>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', fontSize: '0.85rem', color: '#64748b' }}>
@@ -376,6 +423,7 @@ export default function Communities() {
                   ))}
                 </tbody>
               </table>
+              </>
             )}
           </div>
         </div>

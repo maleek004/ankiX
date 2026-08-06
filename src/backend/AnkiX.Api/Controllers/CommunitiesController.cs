@@ -256,6 +256,77 @@ public sealed class CommunitiesController : ControllerBase
     }
 
     [Authorize]
+    [HttpPost("{slug}/members")]
+    public async Task<ActionResult<CommunityMemberResponse>> AddMember(string slug, [FromBody] AddCommunityMemberRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return BadRequest("Email is required.");
+        }
+
+        var community = await dbContext.Communities.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
+        if (community == null) return NotFound("Community not found.");
+
+        int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var callerMembership = await dbContext.CommunityMembers
+            .FirstOrDefaultAsync(m => m.CommunityId == community.Id && m.UserId == currentUserId);
+
+        bool isSystemAdmin = User.IsInRole(Roles.Admin);
+        bool isCommunityOwnerOrAdmin = callerMembership?.Role == CommunityRoles.Owner || callerMembership?.Role == CommunityRoles.Admin;
+
+        if (!isSystemAdmin && !isCommunityOwnerOrAdmin)
+        {
+            return Forbid();
+        }
+
+        string reqEmail = request.Email.Trim().ToLower();
+        var targetUser = await dbContext.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == reqEmail);
+        if (targetUser == null)
+        {
+            return BadRequest($"No registered user found with email '{request.Email.Trim()}'.");
+        }
+
+        var existingMembership = await dbContext.CommunityMembers
+            .FirstOrDefaultAsync(m => m.CommunityId == community.Id && m.UserId == targetUser.Id);
+
+        if (existingMembership != null)
+        {
+            return BadRequest($"User '{targetUser.Email}' is already a member of this community.");
+        }
+
+        string assignRole = string.IsNullOrWhiteSpace(request.Role) ? CommunityRoles.Member : request.Role.Trim();
+        if (assignRole is not CommunityRoles.Owner and not CommunityRoles.Admin and not CommunityRoles.Contributor and not CommunityRoles.Member)
+        {
+            return BadRequest("Role must be 'Owner', 'Admin', 'Contributor', or 'Member'.");
+        }
+
+        if (assignRole == CommunityRoles.Owner && !isSystemAdmin && callerMembership?.Role != CommunityRoles.Owner)
+        {
+            return BadRequest("Only community owners can assign Owner role.");
+        }
+
+        var newMember = new CommunityMember
+        {
+            CommunityId = community.Id,
+            UserId = targetUser.Id,
+            Role = assignRole,
+            JoinedAt = DateTime.UtcNow
+        };
+
+        dbContext.CommunityMembers.Add(newMember);
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new CommunityMemberResponse
+        {
+            UserId = targetUser.Id,
+            DisplayName = targetUser.DisplayName,
+            Email = targetUser.Email,
+            Role = newMember.Role,
+            JoinedAt = newMember.JoinedAt
+        });
+    }
+
+    [Authorize]
     [HttpPut("{slug}/members/{targetUserId:int}/role")]
     public async Task<IActionResult> UpdateMemberRole(string slug, int targetUserId, [FromBody] UpdateMemberRoleRequest request)
     {

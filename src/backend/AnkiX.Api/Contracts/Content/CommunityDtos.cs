@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using AnkiX.Api.Models;
 
 namespace AnkiX.Api.Contracts.Content;
 
@@ -59,4 +60,13 @@ public sealed class UpdateMemberRoleRequest
 {
     [Required]
     public string Role { get; set; } = string.Empty;
+}
+
+public sealed class AddCommunityMemberRequest
+{
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
+
+    public string Role { get; set; } = CommunityRoles.Member;
 }
