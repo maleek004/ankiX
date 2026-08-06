@@ -182,6 +182,16 @@ using (var startupScope = app.Services.CreateScope())
             ALTER TABLE [Exercises] ADD [ExerciseType] NVARCHAR(50) NOT NULL DEFAULT 'CodeExecution';
             ALTER TABLE [Exercises] ADD [ExerciseSpec] NVARCHAR(MAX) NULL;
         END
+
+        -- Ensure sample community exists and backfill any unassigned decks or exercises
+        IF NOT EXISTS (SELECT 1 FROM [Communities] WHERE [Slug] = 'sample')
+        BEGIN
+            INSERT INTO [Communities] ([Name], [Slug], [Description], [IsPublic], [CreatedByUserId], [CreatedAt])
+            VALUES ('Sample Community', 'sample', 'Official AnkiX Sample Community containing starter decks, flashcards, and multi-modal exercises.', 1, 1, GETUTCDATE());
+        END
+
+        UPDATE [Decks] SET [CommunityId] = (SELECT TOP 1 [Id] FROM [Communities] WHERE [Slug] = 'sample') WHERE [CommunityId] IS NULL;
+        UPDATE [Exercises] SET [CommunityId] = (SELECT TOP 1 [Id] FROM [Communities] WHERE [Slug] = 'sample') WHERE [CommunityId] IS NULL;
     ");
 }
 
