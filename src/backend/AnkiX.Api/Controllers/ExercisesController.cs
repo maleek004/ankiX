@@ -251,14 +251,17 @@ public sealed class ExercisesController : ControllerBase
     }
 
     [HttpPost("/api/cards/{cardId:int}/exercises/{exerciseId:int}")]
-    [Authorize(Roles = $"{Roles.Contributor},{Roles.Admin}")]
+    [Authorize]
     public async Task<IActionResult> LinkExerciseToCard([FromRoute] int cardId, [FromRoute] int exerciseId)
     {
-        bool cardExists = await dbContext.Cards.AnyAsync(c => c.Id == cardId);
-        if (!cardExists)
+        Card? card = await dbContext.Cards.FirstOrDefaultAsync(c => c.Id == cardId);
+        if (card is null)
         {
             return NotFound(new { message = "Card not found." });
         }
+
+        Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId);
+        if (!await CanManageContentAsync(deck?.CommunityId)) return Forbid();
 
         bool exerciseExists = await dbContext.Exercises.AnyAsync(e => e.Id == exerciseId);
         if (!exerciseExists)
@@ -283,9 +286,13 @@ public sealed class ExercisesController : ControllerBase
     }
 
     [HttpDelete("/api/cards/{cardId:int}/exercises/{exerciseId:int}")]
-    [Authorize(Roles = $"{Roles.Contributor},{Roles.Admin}")]
+    [Authorize]
     public async Task<IActionResult> UnlinkExerciseFromCard([FromRoute] int cardId, [FromRoute] int exerciseId)
     {
+        Card? card = await dbContext.Cards.FirstOrDefaultAsync(c => c.Id == cardId);
+        Deck? deck = card != null ? await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId) : null;
+        if (!await CanManageContentAsync(deck?.CommunityId)) return Forbid();
+
         CardExercise? link = await dbContext.CardExercises
             .FirstOrDefaultAsync(ce => ce.CardId == cardId && ce.ExerciseId == exerciseId);
 

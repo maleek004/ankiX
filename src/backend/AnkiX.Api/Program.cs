@@ -249,6 +249,28 @@ using (var startupScope = app.Services.CreateScope())
     // Direct SQL fallback to ensure all unassigned rows in Azure SQL database are updated
     startupDb.Database.ExecuteSql($"UPDATE [Decks] SET [CommunityId] = {sampleComm.Id} WHERE [CommunityId] IS NULL OR [CommunityId] = 0;");
     startupDb.Database.ExecuteSql($"UPDATE [Exercises] SET [CommunityId] = {sampleComm.Id} WHERE [CommunityId] IS NULL OR [CommunityId] = 0;");
+
+    if (!startupDb.CardExercises.Any())
+    {
+        var cards = startupDb.Cards.ToList();
+        var exercises = startupDb.Exercises.ToList();
+        if (cards.Count > 0 && exercises.Count > 0)
+        {
+            var card1 = cards.FirstOrDefault(c => c.Prompt.Contains("Binary Search")) ?? cards.FirstOrDefault();
+            var card2 = cards.FirstOrDefault(c => c.Prompt.Contains("C#")) ?? cards.Skip(1).FirstOrDefault();
+            var card3 = cards.FirstOrDefault(c => c.Prompt.Contains("Python")) ?? cards.Skip(2).FirstOrDefault();
+
+            var exPython = exercises.FirstOrDefault(e => e.Language == "python") ?? exercises.FirstOrDefault();
+            var exCSharp = exercises.FirstOrDefault(e => e.Language == "csharp") ?? exercises.FirstOrDefault();
+            var exJs = exercises.FirstOrDefault(e => e.Language == "javascript") ?? exercises.FirstOrDefault();
+
+            if (card1 != null && exPython != null) startupDb.CardExercises.Add(new CardExercise { CardId = card1.Id, ExerciseId = exPython.Id });
+            if (card2 != null && exCSharp != null) startupDb.CardExercises.Add(new CardExercise { CardId = card2.Id, ExerciseId = exCSharp.Id });
+            if (card3 != null && exJs != null) startupDb.CardExercises.Add(new CardExercise { CardId = card3.Id, ExerciseId = exJs.Id });
+
+            startupDb.SaveChanges();
+        }
+    }
 }
 
 // Seed data when invoked with the 'seed' argument: dotnet run -- seed
