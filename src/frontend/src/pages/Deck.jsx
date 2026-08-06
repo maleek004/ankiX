@@ -432,40 +432,42 @@ export default function Deck(){
                     </div>
                   )}
 
-                  {/* Linked Exercises Section */}
-                  {linkedExercises.length > 0 && (
-                    <div style={{ marginTop: 16, padding: 12, background: '#f8f9fa', borderRadius: 8, border: '1px solid #e9ecef' }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span>⚡ Linked Coding Exercises ({linkedExercises.length})</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {linkedExercises.map((ex, idx) => (
-                          <button
-                            key={ex.id}
-                            style={{
-                              border: '1px solid #0d6efd',
-                              background: '#fff',
-                              borderRadius: 6,
-                              color: '#0d6efd',
-                              padding: '6px 12px',
-                              fontSize: '0.85rem',
-                              fontWeight: 500,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              cursor: 'pointer'
-                            }}
-                            onClick={() => setActivePracticeModal({ exercises: linkedExercises, initialIndex: idx })}
-                          >
-                            <span>▶ {ex.title}</span>
-                            <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>({ex.language})</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {/* Linked Exercises Section — inside followups wrapper */}
                 </div>
               </>
+            )}
+
+            {/* Linked Exercises Section — visible always (before and after answer reveal) */}
+            {linkedExercises.length > 0 && (
+              <div style={{ marginTop: 16, padding: 12, background: '#f8f9fa', borderRadius: 8, border: '1px solid #e9ecef' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>⚡ Linked Coding Exercises ({linkedExercises.length})</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {linkedExercises.map((ex, idx) => (
+                    <button
+                      key={ex.id}
+                      style={{
+                        border: '1px solid #0d6efd',
+                        background: '#fff',
+                        borderRadius: 6,
+                        color: '#0d6efd',
+                        padding: '6px 12px',
+                        fontSize: '0.85rem',
+                        fontWeight: 500,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => setActivePracticeModal({ exercises: linkedExercises, initialIndex: idx })}
+                    >
+                      <span>▶ {ex.title}</span>
+                      <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>({ex.language})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
           <div className="study-bottom-bar">
