@@ -30,15 +30,15 @@ public sealed class CommunitiesController : ControllerBase
             .Select(g => new { CommunityId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.CommunityId, x => x.Count);
 
+        int sampleCommId = await dbContext.Communities.Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
+
         var deckCounts = await dbContext.Decks.AsNoTracking()
-            .Where(d => d.CommunityId.HasValue)
-            .GroupBy(d => d.CommunityId!.Value)
+            .GroupBy(d => d.CommunityId.HasValue && d.CommunityId.Value > 0 ? d.CommunityId.Value : sampleCommId)
             .Select(g => new { CommunityId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.CommunityId, x => x.Count);
 
         var exerciseCounts = await dbContext.Exercises.AsNoTracking()
-            .Where(e => e.CommunityId.HasValue)
-            .GroupBy(e => e.CommunityId!.Value)
+            .GroupBy(e => e.CommunityId.HasValue && e.CommunityId.Value > 0 ? e.CommunityId.Value : sampleCommId)
             .Select(g => new { CommunityId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.CommunityId, x => x.Count);
 
@@ -78,9 +78,12 @@ public sealed class CommunitiesController : ControllerBase
         if (community == null) return NotFound("Community not found.");
 
         int? currentUserId = GetCurrentUserId();
+        int sampleCommId = await dbContext.Communities.Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
+        bool isSample = community.Id == sampleCommId;
+
         int memberCount = await dbContext.CommunityMembers.CountAsync(m => m.CommunityId == community.Id);
-        int deckCount = await dbContext.Decks.CountAsync(d => d.CommunityId == community.Id);
-        int exerciseCount = await dbContext.Exercises.CountAsync(e => e.CommunityId == community.Id);
+        int deckCount = await dbContext.Decks.CountAsync(d => d.CommunityId == community.Id || (isSample && (d.CommunityId == null || d.CommunityId == 0)));
+        int exerciseCount = await dbContext.Exercises.CountAsync(e => e.CommunityId == community.Id || (isSample && (e.CommunityId == null || e.CommunityId == 0)));
 
         string? userRole = null;
         if (currentUserId.HasValue)

@@ -32,7 +32,15 @@ public sealed class DecksController : ControllerBase
         var decksQuery = dbContext.Decks.AsQueryable();
         if (communityId.HasValue)
         {
-            decksQuery = decksQuery.Where(deck => deck.CommunityId == communityId.Value);
+            var sampleCommId = await dbContext.Communities.Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
+            if (communityId.Value == sampleCommId || sampleCommId == 0)
+            {
+                decksQuery = decksQuery.Where(deck => deck.CommunityId == communityId.Value || deck.CommunityId == null || deck.CommunityId == 0);
+            }
+            else
+            {
+                decksQuery = decksQuery.Where(deck => deck.CommunityId == communityId.Value);
+            }
         }
 
         var rawDecks = await decksQuery
