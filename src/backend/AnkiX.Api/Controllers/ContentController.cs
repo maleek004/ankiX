@@ -37,6 +37,7 @@ public sealed class ContentController : ControllerBase
             Title = request.Title.Trim(),
             Description = request.Description?.Trim(),
             CreatedByUserId = userId,
+            CommunityId = request.CommunityId,
             CreatedAt = DateTime.UtcNow
         };
 

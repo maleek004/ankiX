@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useCommunity } from '../community/CommunityProvider'
 
 export default function Decks(){
+  const { activeCommunity } = useCommunity() || {}
+  const navigate = useNavigate()
   const [decks, setDecks] = useState([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -9,44 +12,50 @@ export default function Decks(){
   const [canCreate, setCanCreate] = useState(false)
   const [activeDropdown, setActiveDropdown] = useState(null)
 
-  useEffect(()=>{
+  useEffect(() => {
+    if (!activeCommunity) {
+      navigate('/communities')
+      return
+    }
     let mounted = true
-    import('../api.js').then(m=>{
+    import('../api.js').then(m => {
       setCanCreate(m.canCreateContent())
-      return m.getDecks()
-    }).then(data=>{
-      if(!mounted) return
+      return m.getDecks(activeCommunity.id)
+    }).then(data => {
+      if (!mounted) return
       setDecks(data || [])
-    }).catch(err=>{
+    }).catch(err => {
       console.warn('Could not fetch decks:', err.message || err)
-      setDecks([{id:1,title:'Sample Deck (local)'}])
+      setDecks([])
     })
-    return ()=>{ mounted = false }
-  },[])
+    return () => { mounted = false }
+  }, [activeCommunity, navigate])
 
   const create = async (e) => {
     e.preventDefault()
-    if(!newTitle.trim()) return
-    try{
-      const d = await import('../api.js').then(m=>m.createDeck(newTitle, newDescription))
-      setDecks(prev=>[...prev, d])
+    if (!newTitle.trim()) return
+    try {
+      const d = await import('../api.js').then(m => m.createDeck(newTitle, newDescription, activeCommunity?.id))
+      setDecks(prev => [...prev, d])
       setNewTitle('')
       setNewDescription('')
       setShowAddForm(false)
-    }catch(err){
+    } catch(err) {
       alert('Create deck failed: ' + (err.message || err))
     }
   }
 
   const deleteDeck = async (id) => {
-    if(!confirm('Are you sure you want to delete this deck?')) return
-    try{
-      await import('../api.js').then(m=>m.deleteDeck(id))
-      setDecks(prev=>prev.filter(d=>d.id !== id))
-    }catch(err){
+    if (!confirm('Are you sure you want to delete this deck?')) return
+    try {
+      await import('../api.js').then(m => m.deleteDeck(id))
+      setDecks(prev => prev.filter(d => d.id !== id))
+    } catch(err) {
       alert('Delete deck failed: ' + (err.message || err))
     }
   }
+
+  if (!activeCommunity) return null
 
   return (
     <div>
@@ -71,7 +80,7 @@ export default function Decks(){
                 className="form-control"
                 placeholder="Deck title" 
                 value={newTitle} 
-                onChange={e=>setNewTitle(e.target.value)} 
+                onChange={e => setNewTitle(e.target.value)} 
                 autoFocus
                 required
               />
@@ -82,7 +91,7 @@ export default function Decks(){
                 className="form-control"
                 placeholder="Deck description (optional)" 
                 value={newDescription} 
-                onChange={e=>setNewDescription(e.target.value)} 
+                onChange={e => setNewDescription(e.target.value)} 
               />
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -94,7 +103,7 @@ export default function Decks(){
       )}
 
       {decks.length === 0 ? (
-        <div className="empty-state">No decks available. Create one to get started!</div>
+        <div className="empty-state">No decks in this community yet. Create one to get started!</div>
       ) : (
         <table className="decks-table">
           <tbody>
@@ -133,4 +142,3 @@ export default function Decks(){
     </div>
   )
 }
-

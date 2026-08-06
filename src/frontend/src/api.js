@@ -103,17 +103,20 @@ function authHeaders(){
   }
 }
 
-export async function getDecks(){
-  const res = await fetch(`${API_BASE}/decks`, { headers: authHeaders() })
+export async function getDecks(communityId = null){
+  const query = communityId ? `?communityId=${communityId}` : ''
+  const res = await fetch(`${API_BASE}/decks${query}`, { headers: authHeaders() })
   if(!res.ok) throw new Error('Failed to fetch decks')
   return res.json()
 }
 
-export async function createDeck(title, description = ''){
+export async function createDeck(title, description = '', communityId = null){
+  const body = { title, description }
+  if (communityId) body.communityId = communityId
   const res = await fetch(`${API_BASE}/content/decks`,{
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ title, description })
+    body: JSON.stringify(body)
   })
   if(!res.ok){
     const txt = await res.text()
@@ -260,8 +263,11 @@ export async function getStudyQueue(deckId){
   return res.json()
 }
 
-export async function getExercises(language = ''){
-  const query = language ? `?language=${encodeURIComponent(language)}` : ''
+export async function getExercises(language = '', communityId = null){
+  const params = []
+  if (language) params.push(`language=${encodeURIComponent(language)}`)
+  if (communityId) params.push(`communityId=${communityId}`)
+  const query = params.length ? `?${params.join('&')}` : ''
   const res = await fetch(`${API_BASE}/exercises${query}`, { headers: authHeaders() })
   if(!res.ok) throw new Error('Failed to fetch exercises')
   return res.json()
@@ -501,15 +507,5 @@ export async function leaveCommunity(slug){
   return res.json()
 }
 
-export async function getCommunityDecks(slug){
-  const res = await fetch(`${API_BASE}/communities/${slug}/decks`, { headers: authHeaders() })
-  if(!res.ok) throw new Error('Failed to fetch community decks')
-  return res.json()
-}
 
-export async function getCommunityExercises(slug){
-  const res = await fetch(`${API_BASE}/communities/${slug}/exercises`, { headers: authHeaders() })
-  if(!res.ok) throw new Error('Failed to fetch community exercises')
-  return res.json()
-}
 

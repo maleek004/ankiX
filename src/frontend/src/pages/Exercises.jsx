@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useCommunity } from '../community/CommunityProvider'
 import {
   getExercises,
   getExercise,
@@ -14,6 +16,8 @@ import {
 import ExerciseRenderer from '../components/ExerciseComponents'
 
 export default function Exercises() {
+  const { activeCommunity } = useCommunity() || {}
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('queue') // 'queue' | 'all'
   const [exercises, setExercises] = useState([])
   const [dueQueue, setDueQueue] = useState([])
@@ -51,10 +55,11 @@ export default function Exercises() {
   const [queueIndex, setQueueIndex] = useState(0)
 
   const loadData = async () => {
+    if (!activeCommunity) { navigate('/communities'); return }
     try {
       setCanCreate(canCreateContent())
       const [allEx, collectionIds, dueEx] = await Promise.all([
-        getExercises(activeLang),
+        getExercises(activeLang, activeCommunity?.id),
         getMyCollectionExerciseIds(),
         getMyDueExercises()
       ])
@@ -122,7 +127,8 @@ export default function Exercises() {
         description,
         starterCode,
         solutionCode,
-        testCasesSpec
+        testCasesSpec,
+        communityId: activeCommunity?.id
       })
       setExercises(prev => [newEx, ...prev])
       setTitle('')

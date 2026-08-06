@@ -75,6 +75,8 @@ public sealed class CreateExerciseRequest
     public string? SolutionCode { get; set; }
 
     public string? TestCasesSpec { get; set; }
+
+    public int? CommunityId { get; set; }
 }
 
 public sealed class UpdateExerciseRequest

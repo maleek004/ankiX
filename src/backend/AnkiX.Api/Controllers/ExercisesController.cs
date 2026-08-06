@@ -31,7 +31,7 @@ public sealed class ExercisesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ExerciseResponse>>> GetExercises([FromQuery] string? language = null)
+    public async Task<ActionResult<IEnumerable<ExerciseResponse>>> GetExercises([FromQuery] string? language = null, [FromQuery] int? communityId = null)
     {
         IQueryable<Exercise> query = dbContext.Exercises.AsNoTracking();
 
@@ -39,6 +39,11 @@ public sealed class ExercisesController : ControllerBase
         {
             string normLang = language.Trim().ToLowerInvariant();
             query = query.Where(e => e.Language.ToLower() == normLang);
+        }
+
+        if (communityId.HasValue)
+        {
+            query = query.Where(e => e.CommunityId == communityId.Value);
         }
 
         var rawExercises = await query
@@ -134,6 +139,7 @@ public sealed class ExercisesController : ControllerBase
             SolutionCode = request.SolutionCode,
             TestCasesSpec = request.TestCasesSpec,
             CreatedByUserId = userId,
+            CommunityId = request.CommunityId,
             CreatedAt = DateTime.UtcNow
         };
 

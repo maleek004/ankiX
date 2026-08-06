@@ -1,10 +1,12 @@
 import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
+import { useCommunity } from '../community/CommunityProvider'
 
 export default function NavBar(){
   const auth = useAuth()
   const navigate = useNavigate()
+  const { activeCommunity, clearCommunity } = useCommunity() || {}
 
   return (
     <header className="navbar">
@@ -14,13 +16,36 @@ export default function NavBar(){
         </Link>
         <nav>
           <ul className="navbar-nav">
-            <li><Link to="/communities" className="nav-link">🌐 Communities</Link></li>
-            <li><Link to="/decks" className="nav-link">Decks</Link></li>
-            <li><Link to="/exercises" className="nav-link">Exercises</Link></li>
+            {auth?.user && activeCommunity ? (
+              <>
+                <li>
+                  <Link
+                    to="/communities"
+                    className="nav-link"
+                    onClick={() => clearCommunity()}
+                    style={{
+                      background: 'rgba(99,102,241,0.12)',
+                      borderRadius: 6,
+                      padding: '4px 10px',
+                      fontWeight: 600
+                    }}
+                    title="Switch community"
+                  >
+                    📦 {activeCommunity.name} ▾
+                  </Link>
+                </li>
+                <li><Link to="/decks" className="nav-link">Decks</Link></li>
+                <li><Link to="/exercises" className="nav-link">Exercises</Link></li>
+              </>
+            ) : auth?.user ? (
+              <li><Link to="/communities" className="nav-link">🌐 Communities</Link></li>
+            ) : null}
             {auth?.user?.role === 'Admin' && (
               <li><Link to="/admin/users" className="nav-link">👥 Users</Link></li>
             )}
-            <li><Link to="/search" className="nav-link">🔍 Search</Link></li>
+            {auth?.user && (
+              <li><Link to="/search" className="nav-link">🔍 Search</Link></li>
+            )}
           </ul>
         </nav>
       </div>

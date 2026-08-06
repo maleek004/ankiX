@@ -21,7 +21,7 @@ public sealed class DecksController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<DeckResponse>>> GetDecks()
+    public async Task<ActionResult<IEnumerable<DeckResponse>>> GetDecks([FromQuery] int? communityId = null)
     {
         int userId = 0;
         string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -29,7 +29,13 @@ public sealed class DecksController : ControllerBase
 
         DateTime now = DateTime.UtcNow;
 
-        var rawDecks = await dbContext.Decks
+        var decksQuery = dbContext.Decks.AsQueryable();
+        if (communityId.HasValue)
+        {
+            decksQuery = decksQuery.Where(deck => deck.CommunityId == communityId.Value);
+        }
+
+        var rawDecks = await decksQuery
             .OrderBy(deck => deck.Title)
             .Select(deck => new
             {

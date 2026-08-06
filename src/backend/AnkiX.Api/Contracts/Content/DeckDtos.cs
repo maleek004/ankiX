@@ -25,6 +25,8 @@ public sealed class CreateDeckRequest
 
     [MaxLength(1000)]
     public string? Description { get; set; }
+
+    public int? CommunityId { get; set; }
 }
 
 public sealed class UpdateDeckRequest

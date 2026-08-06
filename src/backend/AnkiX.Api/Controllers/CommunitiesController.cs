@@ -48,7 +48,9 @@ public sealed class CommunitiesController : ControllerBase
                 .ToDictionaryAsync(m => m.CommunityId, m => m.Role)
             : new Dictionary<int, string>();
 
-        var response = communities.Select(c => new CommunityResponse
+        var filtered = communities.Where(c => c.IsPublic || userMemberships.ContainsKey(c.Id)).ToList();
+
+        var response = filtered.Select(c => new CommunityResponse
         {
             Id = c.Id,
             Name = c.Name,
@@ -105,7 +107,7 @@ public sealed class CommunitiesController : ControllerBase
         });
     }
 
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize]
     [HttpPost]
     public async Task<ActionResult<CommunityResponse>> CreateCommunity([FromBody] CreateCommunityRequest request)
     {
@@ -248,57 +250,6 @@ public sealed class CommunitiesController : ControllerBase
                              }).ToListAsync();
 
         return Ok(members);
-    }
-
-    [HttpGet("{slug}/decks")]
-    public async Task<ActionResult<IEnumerable<DeckResponse>>> GetCommunityDecks(string slug)
-    {
-        var community = await dbContext.Communities.AsNoTracking().FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
-        if (community == null) return NotFound("Community not found.");
-
-        var decks = await dbContext.Decks.AsNoTracking()
-            .Where(d => d.CommunityId == community.Id)
-            .ToListAsync();
-
-        var response = decks.Select(d => new DeckResponse
-        {
-            Id = d.Id,
-            Title = d.Title,
-            Description = d.Description,
-            CreatedByUserId = d.CreatedByUserId,
-            DueCount = 0,
-            LearnCount = 0
-        });
-
-        return Ok(response);
-    }
-
-    [HttpGet("{slug}/exercises")]
-    public async Task<ActionResult<IEnumerable<ExerciseResponse>>> GetCommunityExercises(string slug)
-    {
-        var community = await dbContext.Communities.AsNoTracking().FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
-        if (community == null) return NotFound("Community not found.");
-
-        var exercises = await dbContext.Exercises.AsNoTracking()
-            .Where(e => e.CommunityId == community.Id)
-            .ToListAsync();
-
-        var response = exercises.Select(e => new ExerciseResponse
-        {
-            Id = e.Id,
-            Title = e.Title,
-            Description = e.Description,
-            Language = e.Language,
-            ExerciseType = e.ExerciseType,
-            ExerciseSpec = e.ExerciseSpec,
-            CreatedByUserId = e.CreatedByUserId,
-            CreatedAt = e.CreatedAt,
-            LinkedCardsCount = 0,
-            AverageEaseFactor = 2.50,
-            TotalReviewsCount = 0
-        });
-
-        return Ok(response);
     }
 
     private int? GetCurrentUserId()
