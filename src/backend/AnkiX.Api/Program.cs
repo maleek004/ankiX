@@ -183,33 +183,67 @@ using (var startupScope = app.Services.CreateScope())
             ALTER TABLE [Exercises] ADD [ExerciseSpec] NVARCHAR(MAX) NULL;
         END
 
-        IF NOT EXISTS (SELECT 1 FROM [Communities] WHERE [Slug] = 'sample')
-        BEGIN
-            INSERT INTO [Communities] ([Name], [Slug], [Description], [IsPublic], [CreatedByUserId], [CreatedAt])
-            VALUES ('Sample Community', 'sample', 'Official AnkiX Sample Community containing starter decks, flashcards, and multi-modal exercises.', 1, 1, GETUTCDATE());
-        END
     ");
 
-    int sampleId = startupDb.Communities.Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefault();
-    if (sampleId > 0)
+    var sampleComm = startupDb.Communities.FirstOrDefault(c => c.Slug == "sample");
+    if (sampleComm == null)
     {
-        var unassignedDecks = startupDb.Decks.Where(d => d.CommunityId == null).ToList();
-        foreach (var d in unassignedDecks)
+        sampleComm = new Community
         {
-            d.CommunityId = sampleId;
-        }
+            Name = "Sample Community",
+            Slug = "sample",
+            Description = "Official AnkiX Sample Community containing starter decks, flashcards, and multi-modal exercises.",
+            IsPublic = true,
+            CreatedByUserId = 1,
+            CreatedAt = DateTime.UtcNow
+        };
+        startupDb.Communities.Add(sampleComm);
+        startupDb.SaveChanges();
+    }
 
-        var unassignedEx = startupDb.Exercises.Where(e => e.CommunityId == null).ToList();
-        foreach (var e in unassignedEx)
+    if (!startupDb.Communities.Any(c => c.Slug == "global"))
+    {
+        startupDb.Communities.Add(new Community
         {
-            e.CommunityId = sampleId;
-        }
+            Name = "Global Learning Commons",
+            Slug = "global",
+            Description = "The default public community for all AnkiX flashcards and coding challenges.",
+            IsPublic = true,
+            CreatedByUserId = 1,
+            CreatedAt = DateTime.UtcNow
+        });
+        startupDb.SaveChanges();
+    }
 
-        if (unassignedDecks.Count > 0 || unassignedEx.Count > 0)
+    if (!startupDb.Communities.Any(c => c.Slug == "software-engineering"))
+    {
+        startupDb.Communities.Add(new Community
         {
-            startupDb.SaveChanges();
-            Console.WriteLine($"[BACKFILL] Linked {unassignedDecks.Count} decks and {unassignedEx.Count} exercises to Sample Community (id: {sampleId}).");
-        }
+            Name = "Software Engineering & Paradigms",
+            Slug = "software-engineering",
+            Description = "Master OOP, Design Patterns, SOLID principles, and multi-language programming.",
+            IsPublic = true,
+            CreatedByUserId = 1,
+            CreatedAt = DateTime.UtcNow
+        });
+        startupDb.SaveChanges();
+    }
+
+    var unassignedDecks = startupDb.Decks.Where(d => d.CommunityId == null || d.CommunityId == 0).ToList();
+    foreach (var d in unassignedDecks)
+    {
+        d.CommunityId = sampleComm.Id;
+    }
+
+    var unassignedEx = startupDb.Exercises.Where(e => e.CommunityId == null || e.CommunityId == 0).ToList();
+    foreach (var e in unassignedEx)
+    {
+        e.CommunityId = sampleComm.Id;
+    }
+
+    if (unassignedDecks.Count > 0 || unassignedEx.Count > 0)
+    {
+        startupDb.SaveChanges();
     }
 }
 
