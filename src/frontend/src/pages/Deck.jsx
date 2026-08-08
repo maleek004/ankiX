@@ -433,7 +433,7 @@ export default function Deck(){
                           {followups.map(f => (
                             <li key={f.id} className="followup-item">
                               <div className="followup-meta">
-                                <span className="followup-author">{f.authorDisplayName}</span>
+                                <span className="followup-author">{api.getEffectiveDisplayName(f.authorDisplayName, f.authorDisplayName)}</span>
                                 <span className="followup-date">
                                   {new Date(f.createdAt).toLocaleDateString()}
                                 </span>

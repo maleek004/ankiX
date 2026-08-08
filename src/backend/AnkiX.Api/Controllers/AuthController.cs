@@ -1,5 +1,6 @@
 using AnkiX.Api.Contracts.Auth;
 using AnkiX.Api.Data;
+using AnkiX.Api.Helpers;
 using AnkiX.Api.Models;
 using AnkiX.Api.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -32,9 +33,7 @@ public sealed class AuthController : ControllerBase
             return Conflict(new { message = "Email already exists." });
         }
 
-        string displayName = string.IsNullOrWhiteSpace(request.DisplayName)
-            ? normalizedEmail.Split('@')[0]
-            : request.DisplayName.Trim();
+        string displayName = UserHelper.GetEffectiveDisplayName(request.DisplayName, normalizedEmail);
 
         User user = new User
         {
@@ -52,6 +51,7 @@ public sealed class AuthController : ControllerBase
         {
             userId = user.Id,
             email = user.Email,
+            displayName = user.DisplayName,
             role = user.Role
         });
     }
@@ -75,6 +75,7 @@ public sealed class AuthController : ControllerBase
             {
                 Id = user.Id,
                 Email = user.Email,
+                DisplayName = UserHelper.GetEffectiveDisplayName(user.DisplayName, user.Email),
                 Role = user.Role
             }
         };

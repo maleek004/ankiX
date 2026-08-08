@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using AnkiX.Api.Data;
+using AnkiX.Api.Helpers;
 using AnkiX.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -197,9 +198,15 @@ public sealed class SearchController : ControllerBase
             if (matchingFollowups.Count > 0)
             {
                 List<int> authorIds = matchingFollowups.Select(f => f.AuthorUserId).Distinct().ToList();
-                Dictionary<int, string> userNames = await dbContext.Users.AsNoTracking()
+                var authors = await dbContext.Users.AsNoTracking()
                     .Where(u => authorIds.Contains(u.Id))
-                    .ToDictionaryAsync(u => u.Id, u => u.DisplayName ?? u.Email);
+                    .Select(u => new { u.Id, u.DisplayName, u.Email })
+                    .ToListAsync();
+
+                Dictionary<int, string> userNames = authors.ToDictionary(
+                    u => u.Id,
+                    u => UserHelper.GetEffectiveDisplayName(u.DisplayName, u.Email)
+                );
 
                 List<int> cardIds = matchingFollowups.Select(f => f.CardId).Distinct().ToList();
                 Dictionary<int, int> cardDeckIds = await dbContext.Cards.AsNoTracking()

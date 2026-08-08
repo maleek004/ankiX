@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { globalSearch } from '../api'
+import { globalSearch, getEffectiveDisplayName } from '../api'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import ExercisePracticeModal from './Exercises'
 
@@ -317,7 +317,7 @@ export default function Search() {
                         )}
                       </div>
                       <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
-                        Asked by {f.authorDisplayName} in <strong>{f.deckTitle}</strong>
+                        Asked by {getEffectiveDisplayName(f.authorDisplayName, f.authorDisplayName)} in <strong>{f.deckTitle}</strong>
                       </span>
                     </div>
 

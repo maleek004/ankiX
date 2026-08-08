@@ -1,5 +1,6 @@
 using AnkiX.Api.Contracts.Study;
 using AnkiX.Api.Data;
+using AnkiX.Api.Helpers;
 using AnkiX.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,7 +21,7 @@ public sealed class FollowupsController : ControllerBase
         this.dbContext = dbContext;
     }
 
-    /// <summary>Returns all follow-up questions for a given card, newest first.</summary>
+    /// <summary>Lists all follow-up questions for a card in ascending order of creation.</summary>
     [HttpGet]
     public async Task<ActionResult<IEnumerable<FollowupResponse>>> GetFollowups([FromRoute] int cardId)
     {
@@ -32,7 +33,7 @@ public sealed class FollowupsController : ControllerBase
 
         List<CardFollowup> followups = await dbContext.CardFollowups
             .Where(f => f.CardId == cardId)
-            .OrderByDescending(f => f.CreatedAt)
+            .OrderBy(f => f.CreatedAt)
             .ToListAsync();
 
         if (followups.Count == 0)
@@ -42,9 +43,15 @@ public sealed class FollowupsController : ControllerBase
 
         // Resolve author display names in a single query
         List<int> authorIds = followups.Select(f => f.AuthorUserId).Distinct().ToList();
-        Dictionary<int, string> authorNames = await dbContext.Users
+        var authors = await dbContext.Users
             .Where(u => authorIds.Contains(u.Id))
-            .ToDictionaryAsync(u => u.Id, u => u.DisplayName ?? u.Email);
+            .Select(u => new { u.Id, u.DisplayName, u.Email })
+            .ToListAsync();
+
+        Dictionary<int, string> authorNames = authors.ToDictionary(
+            u => u.Id,
+            u => UserHelper.GetEffectiveDisplayName(u.DisplayName, u.Email)
+        );
 
         List<FollowupResponse> responses = followups.Select(f => new FollowupResponse
         {
@@ -90,10 +97,14 @@ public sealed class FollowupsController : ControllerBase
         dbContext.CardFollowups.Add(followup);
         await dbContext.SaveChangesAsync();
 
-        string authorDisplayName = await dbContext.Users
+        var author = await dbContext.Users
             .Where(u => u.Id == userId)
-            .Select(u => u.DisplayName ?? u.Email)
-            .FirstOrDefaultAsync() ?? "Unknown";
+            .Select(u => new { u.DisplayName, u.Email })
+            .FirstOrDefaultAsync();
+
+        string authorDisplayName = author != null
+            ? UserHelper.GetEffectiveDisplayName(author.DisplayName, author.Email)
+            : "Unknown";
 
         return CreatedAtAction(nameof(GetFollowups), new { cardId }, new FollowupResponse
         {

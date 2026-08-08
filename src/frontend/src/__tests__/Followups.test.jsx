@@ -32,6 +32,7 @@ vi.mock('../api.js', () => ({
   getCards: (...args) => mockGetCards(...args),
   getFollowups: (...args) => mockGetFollowups(...args),
   getCardExercises: (...args) => mockGetCardExercises(...args),
+  getEffectiveDisplayName: (displayName, email) => displayName || (email ? email.split('@')[0] : 'User'),
   canCreateContent: () => true,
   getDecks: async () => [],
   getAllCards: async () => []

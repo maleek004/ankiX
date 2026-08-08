@@ -2,6 +2,7 @@ import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
+import { getEffectiveDisplayName } from '../api'
 
 export default function NavBar(){
   const auth = useAuth()
@@ -53,7 +54,7 @@ export default function NavBar(){
       <div className="navbar-right">
         {auth?.user ? (
           <>
-            <span>{auth.user.displayName || auth.user.email}</span>
+            <span>{getEffectiveDisplayName(auth.user.displayName, auth.user.email)}</span>
             <button className="btn-logout" onClick={auth.logout}>Log Out</button>
           </>
         ) : (

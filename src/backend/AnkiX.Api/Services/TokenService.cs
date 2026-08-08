@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using AnkiX.Api.Helpers;
 using AnkiX.Api.Models;
 using AnkiX.Api.Options;
 using Microsoft.Extensions.Options;
@@ -23,10 +24,14 @@ public sealed class TokenService : ITokenService
         SymmetricSecurityKey signingKey = new SymmetricSecurityKey(signingKeyBytes);
         SigningCredentials credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
 
+        string displayName = UserHelper.GetEffectiveDisplayName(user.DisplayName, user.Email);
+
         List<Claim> claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
+            new Claim(ClaimTypes.GivenName, displayName),
+            new Claim("displayName", displayName),
             new Claim(ClaimTypes.Role, user.Role)
         };
 

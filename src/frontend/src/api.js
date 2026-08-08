@@ -53,6 +53,21 @@ export async function login(email, password){
   return data
 }
 
+export function getEffectiveDisplayName(displayName, email) {
+  if (displayName && typeof displayName === 'string' && displayName.trim()) {
+    const trimmed = displayName.trim()
+    if (trimmed.includes('@') && !trimmed.includes(' ')) {
+      return trimmed.split('@')[0]
+    }
+    return trimmed
+  }
+  if (email && typeof email === 'string' && email.trim()) {
+    const trimmedEmail = email.trim()
+    return trimmedEmail.includes('@') ? trimmedEmail.split('@')[0] : trimmedEmail
+  }
+  return 'User'
+}
+
 export function getToken(){
   return localStorage.getItem('ankix_token')
 }
@@ -60,7 +75,11 @@ export function getToken(){
 export function getUser(){
   const storedUser = localStorage.getItem('ankix_user')
   if(storedUser){
-    try { return JSON.parse(storedUser) } catch {}
+    try {
+      const u = JSON.parse(storedUser)
+      const displayName = getEffectiveDisplayName(u.displayName || u.DisplayName, u.email || u.Email)
+      return { ...u, displayName }
+    } catch {}
   }
   const token = getToken()
   if(token){
@@ -69,7 +88,9 @@ export function getUser(){
       const role = payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || payload['role'] || payload['Role']
       const email = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'] || payload['email']
       const id = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || payload['sub'] || payload['id']
-      return { id, email, role }
+      const rawDisplayName = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname'] || payload['displayName'] || payload['given_name'] || payload['name']
+      const displayName = getEffectiveDisplayName(rawDisplayName, email)
+      return { id, email, role, displayName }
     } catch {}
   }
   return null

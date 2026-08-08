@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
-import { getStudyGroups, createStudyGroup, joinStudyGroup, getStudyGroupMembers, updateStudyGroupMemberRole, addStudyGroupMember } from '../api'
+import { getStudyGroups, createStudyGroup, joinStudyGroup, getStudyGroupMembers, updateStudyGroupMemberRole, addStudyGroupMember, getEffectiveDisplayName } from '../api'
 
 export default function StudyGroups() {
   const auth = useAuth()
@@ -394,7 +394,7 @@ export default function StudyGroups() {
                   {members.map(m => (
                     <tr key={m.userId} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '8px' }}>
-                        <div style={{ fontWeight: 600, color: '#1e293b' }}>{m.displayName || m.email}</div>
+                        <div style={{ fontWeight: 600, color: '#1e293b' }}>{getEffectiveDisplayName(m.displayName, m.email)}</div>
                         <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{m.email}</div>
                       </td>
                       <td style={{ padding: '8px' }}>
