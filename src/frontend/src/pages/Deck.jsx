@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import ExerciseRenderer from '../components/ExerciseComponents'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
+import * as api from '../api'
 
 export default function Deck(){
   const { activeStudyGroup } = useStudyGroup() || {}
@@ -35,12 +36,11 @@ export default function Deck(){
 
   const handleOpenLinkedCards = async (followup) => {
     try {
-      const m = await import('../api.js')
       const cardIds = followup.linkedCardIds && followup.linkedCardIds.length > 0
         ? followup.linkedCardIds
         : (followup.linkedCardId ? [followup.linkedCardId] : [])
       if (cardIds.length === 0) return
-      const cards = await Promise.all(cardIds.map(id => m.getCard(id).catch(() => null)))
+      const cards = await Promise.all(cardIds.map(id => api.getCard(id).catch(() => null)))
       const validCards = cards.filter(Boolean)
       if (validCards.length === 0) {
         alert('Could not load linked answer cards.')
@@ -59,11 +59,10 @@ export default function Deck(){
 
   // ── Load deck info + study queue ──────────────────────────────────────────
   const loadQueue = useCallback(async () => {
-    const m = await import('../api.js')
     const [d, q, cs] = await Promise.all([
-      m.getDeck(id).catch(() => null),
-      m.getStudyQueue(id).catch(() => ({ newCount:0, learningCount:0, reviewCount:0, dueCards:[] })),
-      m.getCards(id).catch(() => [])
+      api.getDeck(id).catch(() => null),
+      api.getStudyQueue(id).catch(() => ({ newCount:0, learningCount:0, reviewCount:0, dueCards:[] })),
+      api.getCards(id).catch(() => [])
     ])
     setDeck(d)
     setQueue(q)
@@ -76,13 +75,9 @@ export default function Deck(){
   }, [id])
 
   useEffect(() => {
-    let mounted = true
-    import('../api.js').then(m => {
-      setCanCreate(m.canCreateContent(activeStudyGroup?.role))
-    })
-    if (mounted) loadQueue()
-    return () => { mounted = false }
-  }, [id, loadQueue])
+    setCanCreate(api.canCreateContent(activeStudyGroup?.role))
+    loadQueue()
+  }, [id, loadQueue, activeStudyGroup?.role])
 
   // Reset followup panel and fetch linked exercises whenever the card changes
   useEffect(() => {
@@ -93,7 +88,7 @@ export default function Deck(){
 
     const currentCardId = queue?.dueCards?.[currentIndex]?.id
     if (currentCardId) {
-      import('../api.js').then(m => m.getCardExercises(currentCardId))
+      api.getCardExercises(currentCardId)
         .then(exs => setLinkedExercises(exs || []))
         .catch(() => setLinkedExercises([]))
     }
@@ -106,7 +101,7 @@ export default function Deck(){
   const loadFollowups = useCallback(async (cardId) => {
     setFollowupsLoading(true)
     try {
-      const data = await import('../api.js').then(m => m.getFollowups(cardId))
+      const data = await api.getFollowups(cardId)
       setFollowups(data || [])
     } catch(err) {
       console.warn('Could not load followups:', err.message || err)
@@ -128,7 +123,7 @@ export default function Deck(){
     if (!newQuestion.trim() || !currentCard) return
     setSubmittingFollowup(true)
     try {
-      const created = await import('../api.js').then(m => m.addFollowup(currentCard.id, newQuestion.trim()))
+      const created = await api.addFollowup(currentCard.id, newQuestion.trim())
       setFollowups(prev => [created, ...prev])
       setNewQuestion('')
     } catch(err) {
@@ -143,7 +138,7 @@ export default function Deck(){
   // learning cards may have come back due (1-min or 10-min intervals elapsed).
   const rateCard = async (outcome) => {
     try {
-      await import('../api.js').then(m => m.submitReview(currentCard.id, outcome))
+      await api.submitReview(currentCard.id, outcome)
     } catch(err) {
       console.warn('Review submission failed (continuing study):', err.message || err)
     }
@@ -164,7 +159,7 @@ export default function Deck(){
     e.preventDefault()
     if(!prompt.trim()) return
     try{
-      const c = await import('../api.js').then(m => m.createCard(id, prompt, validationSpec, type))
+      const c = await api.createCard(id, prompt, validationSpec, type)
       setAllCards(prev => [...prev, c])
       setPrompt(''); setValidationSpec(''); setType('basic')
       alert('Card added!')
@@ -175,7 +170,7 @@ export default function Deck(){
   const removeCard = async (cardId) => {
     if(!confirm('Delete card?')) return
     try{
-      await import('../api.js').then(m => m.deleteCard(id, cardId))
+      await api.deleteCard(id, cardId)
       setAllCards(prev => prev.filter(c => c.id !== cardId))
       await loadQueue()
     }catch(err){ alert('Delete failed: ' + (err.message || err)) }
@@ -209,7 +204,7 @@ export default function Deck(){
   const handleResetProgress = async () => {
     if(!confirm('Are you sure you want to reset your study progress for this deck? All cards will be returned to your New Queue.')) return
     try{
-      await import('../api.js').then(m => m.resetDeckProgress(id))
+      await api.resetDeckProgress(id)
       await loadQueue()
       alert('Deck progress reset successfully! All cards are now back in your New Queue.')
     }catch(err){ alert('Reset progress failed: ' + (err.message || err)) }
