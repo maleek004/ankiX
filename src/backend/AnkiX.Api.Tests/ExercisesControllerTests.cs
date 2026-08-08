@@ -25,9 +25,10 @@ public class ExercisesControllerTests
 
     private static ExercisesController CreateController(ApplicationDbContext db, int userId = 1, string role = "Admin")
     {
-        var options = Options.Create(new ExecutionApiOptions());
+        var options = Microsoft.Extensions.Options.Options.Create(new ExecutionApiOptions());
         var execService = new CodeExecutionService(new HttpClient(), options);
-        var controller = new ExercisesController(db, execService);
+        var schedulerService = new ReviewSchedulerService();
+        var controller = new ExercisesController(db, execService, schedulerService);
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, userId.ToString()),
@@ -106,7 +107,7 @@ public class ExercisesControllerTests
 
         var getCardExResult = await controller.GetExercisesForCard(cardId: 10);
         var okResult = Assert.IsType<OkObjectResult>(getCardExResult.Result);
-        var list = Assert.IsAssignableFrom<IEnumerable<ExerciseResponse>>(okResult.Value);
+        var list = Assert.IsAssignableFrom<IEnumerable<ExerciseDetailResponse>>(okResult.Value);
         Assert.Single(list);
     }
 }

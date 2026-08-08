@@ -31,9 +31,9 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<UserExercise> UserExercises => Set<UserExercise>();
 
-    public DbSet<Community> Communities => Set<Community>();
+    public DbSet<StudyGroup> StudyGroups => Set<StudyGroup>();
 
-    public DbSet<CommunityMember> CommunityMembers => Set<CommunityMember>();
+    public DbSet<StudyGroupMember> StudyGroupMembers => Set<StudyGroupMember>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,18 +41,18 @@ public sealed class ApplicationDbContext : DbContext
             .HasIndex(user => user.Email)
             .IsUnique();
 
-        modelBuilder.Entity<Community>()
-            .HasIndex(community => community.Slug)
+        modelBuilder.Entity<StudyGroup>()
+            .HasIndex(sg => sg.Slug)
             .IsUnique();
 
-        modelBuilder.Entity<CommunityMember>()
-            .HasKey(cm => new { cm.CommunityId, cm.UserId });
+        modelBuilder.Entity<StudyGroupMember>()
+            .HasKey(sgm => new { sgm.StudyGroupId, sgm.UserId });
 
         modelBuilder.Entity<Deck>()
-            .HasIndex(d => d.CommunityId);
+            .HasIndex(d => d.StudyGroupId);
 
         modelBuilder.Entity<Exercise>()
-            .HasIndex(e => e.CommunityId);
+            .HasIndex(e => e.StudyGroupId);
 
         modelBuilder.Entity<Card>()
             .HasIndex(card => card.DeckId);

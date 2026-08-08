@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useCommunity } from '../community/CommunityProvider'
+import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import {
   getExercises,
   getExercise,
@@ -16,7 +16,7 @@ import {
 import ExerciseRenderer from '../components/ExerciseComponents'
 
 export default function Exercises() {
-  const { activeCommunity } = useCommunity() || {}
+  const { activeStudyGroup } = useStudyGroup() || {}
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('queue') // 'queue' | 'all'
   const [exercises, setExercises] = useState([])
@@ -55,11 +55,11 @@ export default function Exercises() {
   const [queueIndex, setQueueIndex] = useState(0)
 
   const loadData = async () => {
-    if (!activeCommunity) { navigate('/communities'); return }
+    if (!activeStudyGroup) { navigate('/study-groups'); return }
     try {
-      setCanCreate(canCreateContent(activeCommunity?.role))
+      setCanCreate(canCreateContent(activeStudyGroup?.role))
       const [allEx, collectionIds, dueEx] = await Promise.all([
-        getExercises(activeLang, activeCommunity?.id),
+        getExercises(activeLang, activeStudyGroup?.id),
         getMyCollectionExerciseIds(),
         getMyDueExercises()
       ])
@@ -128,7 +128,7 @@ export default function Exercises() {
         starterCode,
         solutionCode,
         testCasesSpec,
-        communityId: activeCommunity?.id
+        studyGroupId: activeStudyGroup?.id
       })
       setExercises(prev => [newEx, ...prev])
       setTitle('')
@@ -384,7 +384,7 @@ export default function Exercises() {
             </div>
 
             <span style={{ fontSize: '0.8rem', color: '#6c757d', fontStyle: 'italic' }}>
-              ⚡ Sorted by community difficulty: Easiest ➔ Hardest
+              ⚡ Sorted by study group difficulty: Easiest ➔ Hardest
             </span>
           </div>
 

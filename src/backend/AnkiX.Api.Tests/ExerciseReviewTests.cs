@@ -26,7 +26,7 @@ public class ExerciseReviewTests
 
     private static ExercisesController CreateController(ApplicationDbContext db, int userId = 200, string role = "User")
     {
-        var options = Options.Create(new ExecutionApiOptions());
+        var options = Microsoft.Extensions.Options.Options.Create(new ExecutionApiOptions());
         var execService = new CodeExecutionService(new HttpClient(), options);
         var schedulerService = new ReviewSchedulerService();
         var controller = new ExercisesController(db, execService, schedulerService);

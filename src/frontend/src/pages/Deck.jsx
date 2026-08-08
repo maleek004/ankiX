@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import ExerciseRenderer from '../components/ExerciseComponents'
-import { useCommunity } from '../community/CommunityProvider'
+import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 
 export default function Deck(){
-  const { activeCommunity } = useCommunity() || {}
+  const { activeStudyGroup } = useStudyGroup() || {}
   const { id } = useParams()
   const [deck, setDeck]           = useState(null)
   const [queue, setQueue]         = useState({ newCount:0, learningCount:0, reviewCount:0, dueCards:[] })
@@ -78,7 +78,7 @@ export default function Deck(){
   useEffect(() => {
     let mounted = true
     import('../api.js').then(m => {
-      setCanCreate(m.canCreateContent(activeCommunity?.role))
+      setCanCreate(m.canCreateContent(activeStudyGroup?.role))
     })
     if (mounted) loadQueue()
     return () => { mounted = false }

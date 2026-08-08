@@ -75,7 +75,7 @@ export function getUser(){
   return null
 }
 
-export function canCreateContent(communityRole = null){
+export function canCreateContent(studyGroupRole = null){
   const user = getUser()
   if(!user) return false
   const role = user.role || user.Role
@@ -83,9 +83,9 @@ export function canCreateContent(communityRole = null){
     const lowerRole = role.toLowerCase()
     if(lowerRole === 'admin' || lowerRole === 'contributor') return true
   }
-  if(communityRole) {
-    const lowerCommRole = communityRole.toLowerCase()
-    if(lowerCommRole === 'owner' || lowerCommRole === 'admin' || lowerCommRole === 'contributor') return true
+  if(studyGroupRole) {
+    const lowerGroupRole = studyGroupRole.toLowerCase()
+    if(lowerGroupRole === 'owner' || lowerGroupRole === 'admin' || lowerGroupRole === 'contributor') return true
   }
   return false
 }
@@ -109,16 +109,16 @@ function authHeaders(){
   }
 }
 
-export async function getDecks(communityId = null){
-  const query = communityId ? `?communityId=${communityId}` : ''
+export async function getDecks(studyGroupId = null){
+  const query = studyGroupId ? `?studyGroupId=${studyGroupId}` : ''
   const res = await fetch(`${API_BASE}/decks${query}`, { headers: authHeaders() })
   if(!res.ok) throw new Error('Failed to fetch decks')
   return res.json()
 }
 
-export async function createDeck(title, description = '', communityId = null){
+export async function createDeck(title, description = '', studyGroupId = null){
   const body = { title, description }
-  if (communityId) body.communityId = communityId
+  if (studyGroupId) body.studyGroupId = studyGroupId
   const res = await fetch(`${API_BASE}/content/decks`,{
     method: 'POST',
     headers: authHeaders(),
@@ -269,10 +269,10 @@ export async function getStudyQueue(deckId){
   return res.json()
 }
 
-export async function getExercises(language = '', communityId = null){
+export async function getExercises(language = '', studyGroupId = null){
   const params = []
   if (language) params.push(`language=${encodeURIComponent(language)}`)
-  if (communityId) params.push(`communityId=${communityId}`)
+  if (studyGroupId) params.push(`studyGroupId=${studyGroupId}`)
   const query = params.length ? `?${params.join('&')}` : ''
   const res = await fetch(`${API_BASE}/exercises${query}`, { headers: authHeaders() })
   if(!res.ok) throw new Error('Failed to fetch exercises')
@@ -464,63 +464,69 @@ export async function importCardsText(deckId, content, format = 'csv'){
   return res.json()
 }
 
-export async function getCommunities(){
-  const res = await fetch(`${API_BASE}/communities`, { headers: authHeaders() })
-  if(!res.ok) throw new Error('Failed to fetch communities')
+export async function getStudyGroups(){
+  const res = await fetch(`${API_BASE}/study-groups`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch study groups')
   return res.json()
 }
+export const getCommunities = getStudyGroups
 
-export async function getCommunityBySlug(slug){
-  const res = await fetch(`${API_BASE}/communities/${slug}`, { headers: authHeaders() })
-  if(!res.ok) throw new Error('Failed to fetch community')
+export async function getStudyGroupBySlug(slug){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch study group')
   return res.json()
 }
+export const getCommunityBySlug = getStudyGroupBySlug
 
-export async function createCommunity(communityData){
-  const res = await fetch(`${API_BASE}/communities`, {
+export async function createStudyGroup(studyGroupData){
+  const res = await fetch(`${API_BASE}/study-groups`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify(communityData)
+    body: JSON.stringify(studyGroupData)
   })
   if(!res.ok){
     const errText = await res.text()
-    throw new Error(errText || 'Failed to create community')
+    throw new Error(errText || 'Failed to create study group')
   }
   return res.json()
 }
+export const createCommunity = createStudyGroup
 
-export async function joinCommunity(slug){
-  const res = await fetch(`${API_BASE}/communities/${slug}/join`, {
+export async function joinStudyGroup(slug){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/join`, {
     method: 'POST',
     headers: authHeaders()
   })
   if(!res.ok){
     const errText = await res.text()
-    throw new Error(errText || 'Failed to join community')
+    throw new Error(errText || 'Failed to join study group')
   }
   return res.json()
 }
+export const joinCommunity = joinStudyGroup
 
-export async function leaveCommunity(slug){
-  const res = await fetch(`${API_BASE}/communities/${slug}/leave`, {
+export async function leaveStudyGroup(slug){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/leave`, {
     method: 'DELETE',
     headers: authHeaders()
   })
   if(!res.ok){
     const errText = await res.text()
-    throw new Error(errText || 'Failed to leave community')
+    throw new Error(errText || 'Failed to leave study group')
   }
   return res.json()
 }
+export const leaveCommunity = leaveStudyGroup
 
-export async function getCommunityMembers(slug){
-  const res = await fetch(`${API_BASE}/communities/${slug}/members`, { headers: authHeaders() })
-  if(!res.ok) throw new Error('Failed to fetch community members')
+export async function getStudyGroupMembers(slug){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/members`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch study group members')
   return res.json()
 }
+export const getCommunityMembers = getStudyGroupMembers
 
-export async function updateCommunityMemberRole(slug, targetUserId, role){
-  const res = await fetch(`${API_BASE}/communities/${slug}/members/${targetUserId}/role`, {
+export async function updateStudyGroupMemberRole(slug, targetUserId, role){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/members/${targetUserId}/role`, {
     method: 'PUT',
     headers: authHeaders(),
     body: JSON.stringify({ role })
@@ -531,10 +537,10 @@ export async function updateCommunityMemberRole(slug, targetUserId, role){
   }
   return res.json()
 }
+export const updateCommunityMemberRole = updateStudyGroupMemberRole
 
-
-export async function addCommunityMember(slug, email, role = 'Member'){
-  const res = await fetch(`${API_BASE}/communities/${slug}/members`, {
+export async function addStudyGroupMember(slug, email, role = 'Member'){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/members`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ email, role })
@@ -545,3 +551,4 @@ export async function addCommunityMember(slug, email, role = 'Member'){
   }
   return res.json()
 }
+export const addCommunityMember = addStudyGroupMember

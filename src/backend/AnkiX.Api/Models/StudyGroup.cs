@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AnkiX.Api.Models;
 
-public sealed class Community
+public sealed class StudyGroup
 {
     public int Id { get; set; }
 

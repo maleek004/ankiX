@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useCommunity } from '../community/CommunityProvider'
+import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 
 export default function Decks(){
-  const { activeCommunity } = useCommunity() || {}
+  const { activeStudyGroup } = useStudyGroup() || {}
   const navigate = useNavigate()
   const [decks, setDecks] = useState([])
   const [showAddForm, setShowAddForm] = useState(false)
@@ -13,14 +13,14 @@ export default function Decks(){
   const [activeDropdown, setActiveDropdown] = useState(null)
 
   useEffect(() => {
-    if (!activeCommunity) {
-      navigate('/communities')
+    if (!activeStudyGroup) {
+      navigate('/study-groups')
       return
     }
     let mounted = true
     import('../api.js').then(m => {
-      setCanCreate(m.canCreateContent(activeCommunity?.role))
-      return m.getDecks(activeCommunity.id)
+      setCanCreate(m.canCreateContent(activeStudyGroup?.role))
+      return m.getDecks(activeStudyGroup.id)
     }).then(data => {
       if (!mounted) return
       setDecks(data || [])
@@ -29,13 +29,13 @@ export default function Decks(){
       setDecks([])
     })
     return () => { mounted = false }
-  }, [activeCommunity, navigate])
+  }, [activeStudyGroup, navigate])
 
   const create = async (e) => {
     e.preventDefault()
     if (!newTitle.trim()) return
     try {
-      const d = await import('../api.js').then(m => m.createDeck(newTitle, newDescription, activeCommunity?.id))
+      const d = await import('../api.js').then(m => m.createDeck(newTitle, newDescription, activeStudyGroup?.id))
       setDecks(prev => [...prev, d])
       setNewTitle('')
       setNewDescription('')
@@ -55,7 +55,7 @@ export default function Decks(){
     }
   }
 
-  if (!activeCommunity) return null
+  if (!activeStudyGroup) return null
 
   return (
     <div>
@@ -103,7 +103,7 @@ export default function Decks(){
       )}
 
       {decks.length === 0 ? (
-        <div className="empty-state">No decks in this community yet. Create one to get started!</div>
+        <div className="empty-state">No decks in this study group yet. Create one to get started!</div>
       ) : (
         <table className="decks-table">
           <tbody>

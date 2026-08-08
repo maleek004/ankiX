@@ -1,7 +1,7 @@
 import React from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
-import { CommunityProvider } from './community/CommunityProvider'
+import { StudyGroupProvider } from './studyGroup/StudyGroupProvider'
 import RequireAuth from './auth/RequireAuth'
 import NavBar from './components/NavBar'
 import Home from './pages/Home'
@@ -12,12 +12,12 @@ import Deck from './pages/Deck'
 import Exercises from './pages/Exercises'
 import AdminUsers from './pages/AdminUsers'
 import Search from './pages/Search'
-import Communities from './pages/Communities'
+import StudyGroups from './pages/StudyGroups'
 
 export default function App(){
   return (
     <AuthProvider>
-      <CommunityProvider>
+      <StudyGroupProvider>
         <BrowserRouter>
           <div className="app">
             <NavBar />
@@ -26,7 +26,8 @@ export default function App(){
                 <Route path="/" element={<Home/>} />
                 <Route path="/login" element={<Login/>} />
                 <Route path="/register" element={<Register/>} />
-                <Route path="/communities" element={<RequireAuth><Communities/></RequireAuth>} />
+                <Route path="/study-groups" element={<RequireAuth><StudyGroups/></RequireAuth>} />
+                <Route path="/communities" element={<Navigate to="/study-groups" replace />} />
                 <Route path="/search" element={<RequireAuth><Search/></RequireAuth>} />
                 <Route path="/decks" element={<RequireAuth><Decks/></RequireAuth>} />
                 <Route path="/decks/:id" element={<RequireAuth><Deck/></RequireAuth>} />
@@ -36,7 +37,7 @@ export default function App(){
             </main>
           </div>
         </BrowserRouter>
-      </CommunityProvider>
+      </StudyGroupProvider>
     </AuthProvider>
   )
 }

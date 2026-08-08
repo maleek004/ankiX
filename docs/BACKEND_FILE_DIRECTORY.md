@@ -24,6 +24,7 @@ This document provides a comprehensive inventory of all source files in the back
 - **`Contracts/Content/CardDtos.cs`**: Specifies the request and response data structures for creating, updating, and returning flashcards.
 - **`Contracts/Content/DeckDtos.cs`**: Specifies the request and response data structures for managing study decks and listing card counts.
 - **`Contracts/Content/ExerciseDtos.cs`**: Specifies the request and response data structures for coding exercises, including starter code, solution code, test cases, and difficulty ratings.
+- **`Contracts/Content/StudyGroupDtos.cs`**: Specifies the request and response data structures for study groups, member management, and role assignments.
 - **`Contracts/Study/FollowupDtos.cs`**: Specifies the request and response payloads for submitting, viewing, and linking card follow-up questions.
 - **`Contracts/Study/ReviewDtos.cs`**: Specifies the request and response structures for recording flashcard and exercise study reviews with SM-2 recall outcomes.
 - **`Contracts/Study/RunDtos.cs`**: Specifies the request and response payloads for executing code submissions against test assertion runners.
@@ -38,10 +39,11 @@ This document provides a comprehensive inventory of all source files in the back
 - **`Controllers/CardRunsController.cs`**: Handles code execution requests for cards with interactive code runners.
 - **`Controllers/ContentController.cs`**: Provides endpoints for browsing, retrieving, and inspecting global platform flashcards.
 - **`Controllers/DecksController.cs`**: Manages CRUD operations for study decks and their associated flashcards.
-- **`Controllers/ExercisesController.cs`**: Manages coding exercise creation, execution, personal collection enrollment, SRS queue reviews, and community difficulty sorting.
+- **`Controllers/ExercisesController.cs`**: Manages coding exercise creation, execution, personal collection enrollment, SRS queue reviews, and study group difficulty sorting.
 - **`Controllers/FollowupsController.cs`**: Handles asking follow-up questions on study cards, linking follow-ups to standalone answer cards, and unlinking cards.
 - **`Controllers/ReviewsController.cs`**: Handles recording SuperMemo SM-2 recall reviews for flashcards and updating review schedules.
 - **`Controllers/SearchController.cs`**: Provides a global full-text search endpoint querying Decks, Cards, Exercises, and Follow-ups across the platform.
+- **`Controllers/StudyGroupsController.cs`**: Manages CRUD operations for study groups, membership enrollment, and role management.
 - **`Controllers/StudyQueueController.cs`**: Returns due study cards for a given deck scheduled by the SM-2 algorithm for user study sessions.
 
 ---
@@ -58,6 +60,9 @@ This document provides a comprehensive inventory of all source files in the back
 - **`Models/ExerciseReviewRecord.cs`**: Tracks historical SuperMemo SM-2 review outcomes, ease factors, intervals, and next review timestamps for coding exercises.
 - **`Models/ReviewRecord.cs`**: Tracks historical SuperMemo SM-2 review outcomes, ease factors, intervals, and next review timestamps for flashcards.
 - **`Models/Roles.cs`**: Defines string constants for system authorization roles (`Admin`, `Contributor`, `User`).
+- **`Models/StudyGroup.cs`**: Represents a study group entity containing name, slug, description, visibility, and creator user ID.
+- **`Models/StudyGroupMember.cs`**: Represents the join entity tracking user membership and roles in study groups.
+- **`Models/StudyGroupRoles.cs`**: Defines string constants for study group roles (`Owner`, `Admin`, `Contributor`, `Member`).
 - **`Models/User.cs`**: Represents a user account entity storing email, password hash, display name, role, and registration date.
 - **`Models/UserExercise.cs`**: Represents the join entity tracking which coding exercises a user has enrolled into their personal collection.
 

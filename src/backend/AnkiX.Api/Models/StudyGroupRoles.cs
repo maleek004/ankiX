@@ -1,6 +1,6 @@
 namespace AnkiX.Api.Models;
 
-public static class CommunityRoles
+public static class StudyGroupRoles
 {
     public const string Owner = "Owner";
     public const string Admin = "Admin";

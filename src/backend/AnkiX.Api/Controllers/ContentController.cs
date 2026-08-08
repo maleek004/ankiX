@@ -32,14 +32,14 @@ public sealed class ContentController : ControllerBase
             userId = parsedId;
         }
 
-        if (!await CanManageContentAsync(request.CommunityId)) return Forbid();
+        if (!await CanManageContentAsync(request.StudyGroupId)) return Forbid();
 
         Deck deck = new Deck
         {
             Title = request.Title.Trim(),
             Description = request.Description?.Trim(),
             CreatedByUserId = userId,
-            CommunityId = request.CommunityId,
+            StudyGroupId = request.StudyGroupId,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -68,7 +68,7 @@ public sealed class ContentController : ControllerBase
             return NotFound(new { message = "Deck not found." });
         }
 
-        if (!await CanManageContentAsync(deck.CommunityId)) return Forbid();
+        if (!await CanManageContentAsync(deck.StudyGroupId)) return Forbid();
 
         deck.Title = request.Title.Trim();
         deck.Description = request.Description?.Trim();
@@ -87,7 +87,7 @@ public sealed class ContentController : ControllerBase
             return NotFound(new { message = "Deck not found." });
         }
 
-        if (!await CanManageContentAsync(deck.CommunityId)) return Forbid();
+        if (!await CanManageContentAsync(deck.StudyGroupId)) return Forbid();
 
         bool hasCards = await dbContext.Cards.AnyAsync(card => card.DeckId == deckId);
         if (hasCards)
@@ -108,7 +108,7 @@ public sealed class ContentController : ControllerBase
         int targetDeckId = request.DeckId > 0 ? request.DeckId : (deckId ?? 0);
         Deck? targetDeck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == targetDeckId);
         if (targetDeck is null) return NotFound(new { message = "Deck not found." });
-        if (!await CanManageContentAsync(targetDeck.CommunityId)) return Forbid();
+        if (!await CanManageContentAsync(targetDeck.StudyGroupId)) return Forbid();
 
         string cardType = request.Type.Trim().ToLowerInvariant();
         if (cardType is not "micro-coding" and not "concept" and not "basic")
@@ -152,7 +152,7 @@ public sealed class ContentController : ControllerBase
         }
 
         Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId);
-        if (!await CanManageContentAsync(deck?.CommunityId)) return Forbid();
+        if (!await CanManageContentAsync(deck?.StudyGroupId)) return Forbid();
 
         string cardType = request.Type.Trim().ToLowerInvariant();
         if (cardType is not "micro-coding" and not "concept" and not "basic")
@@ -218,21 +218,21 @@ public sealed class ContentController : ControllerBase
         }
 
         Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId);
-        if (!await CanManageContentAsync(deck?.CommunityId)) return Forbid();
+        if (!await CanManageContentAsync(deck?.StudyGroupId)) return Forbid();
 
         dbContext.Cards.Remove(card);
         await dbContext.SaveChangesAsync();
         return NoContent();
     }
 
-    private async Task<bool> CanManageContentAsync(int? communityId)
+    private async Task<bool> CanManageContentAsync(int? studyGroupId)
     {
         if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Contributor))
         {
             return true;
         }
 
-        if (!communityId.HasValue || communityId.Value <= 0)
+        if (!studyGroupId.HasValue || studyGroupId.Value <= 0)
         {
             return false;
         }
@@ -243,13 +243,13 @@ public sealed class ContentController : ControllerBase
             return false;
         }
 
-        string? memberRole = await dbContext.CommunityMembers
-            .Where(m => m.CommunityId == communityId.Value && m.UserId == userId)
+        string? memberRole = await dbContext.StudyGroupMembers
+            .Where(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId)
             .Select(m => m.Role)
             .FirstOrDefaultAsync();
 
-        return memberRole == CommunityRoles.Owner
-            || memberRole == CommunityRoles.Admin
-            || memberRole == CommunityRoles.Contributor;
+        return memberRole == StudyGroupRoles.Owner
+            || memberRole == StudyGroupRoles.Admin
+            || memberRole == StudyGroupRoles.Contributor;
     }
 }

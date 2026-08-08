@@ -25,7 +25,7 @@ public class CardRunsControllerTests
 
     private static CardRunsController CreateController(ApplicationDbContext db, int userId = 101, string role = "User")
     {
-        var options = Options.Create(new ExecutionApiOptions());
+        var options = Microsoft.Extensions.Options.Options.Create(new ExecutionApiOptions());
         var execService = new CodeExecutionService(new HttpClient(), options);
         var controller = new CardRunsController(db, execService);
 

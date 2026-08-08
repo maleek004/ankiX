@@ -31,7 +31,7 @@ public sealed class ExercisesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ExerciseResponse>>> GetExercises([FromQuery] string? language = null, [FromQuery] int? communityId = null)
+    public async Task<ActionResult<IEnumerable<ExerciseResponse>>> GetExercises([FromQuery] string? language = null, [FromQuery] int? studyGroupId = null, [FromQuery] int? communityId = null)
     {
         IQueryable<Exercise> query = dbContext.Exercises.AsNoTracking();
 
@@ -41,9 +41,10 @@ public sealed class ExercisesController : ControllerBase
             query = query.Where(e => e.Language.ToLower() == normLang);
         }
 
-        if (communityId.HasValue)
+        int? groupId = studyGroupId ?? communityId;
+        if (groupId.HasValue)
         {
-            query = query.Where(e => e.CommunityId == communityId.Value);
+            query = query.Where(e => e.StudyGroupId == groupId.Value);
         }
 
         var rawExercises = await query
@@ -128,20 +129,26 @@ public sealed class ExercisesController : ControllerBase
             userId = parsedId;
         }
 
-        if (!await CanManageContentAsync(request.CommunityId)) return Forbid();
+        if (!await CanManageContentAsync(request.StudyGroupId)) return Forbid();
+
+        string language = request.Language.Trim().ToLowerInvariant();
+        if (language is not "csharp" and not "python" and not "javascript" and not "go")
+        {
+            return BadRequest(new { message = "Language must be one of: csharp, python, javascript, go." });
+        }
 
         Exercise exercise = new Exercise
         {
             Title = request.Title.Trim(),
             Description = request.Description,
-            Language = request.Language.Trim().ToLowerInvariant(),
+            Language = language,
             ExerciseType = !string.IsNullOrWhiteSpace(request.ExerciseType) ? request.ExerciseType.Trim() : "CodeExecution",
             ExerciseSpec = request.ExerciseSpec,
             StarterCode = request.StarterCode,
             SolutionCode = request.SolutionCode,
             TestCasesSpec = request.TestCasesSpec,
             CreatedByUserId = userId,
-            CommunityId = request.CommunityId,
+            StudyGroupId = request.StudyGroupId,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -174,7 +181,7 @@ public sealed class ExercisesController : ControllerBase
             return NotFound(new { message = "Exercise not found." });
         }
 
-        if (!await CanManageContentAsync(exercise.CommunityId)) return Forbid();
+        if (!await CanManageContentAsync(exercise.StudyGroupId)) return Forbid();
 
         string language = request.Language.Trim().ToLowerInvariant();
         if (language is not "csharp" and not "python" and not "javascript" and not "go")
@@ -203,7 +210,7 @@ public sealed class ExercisesController : ControllerBase
             return NotFound(new { message = "Exercise not found." });
         }
 
-        if (!await CanManageContentAsync(exercise.CommunityId)) return Forbid();
+        if (!await CanManageContentAsync(exercise.StudyGroupId)) return Forbid();
 
         // Also clean up join table records
         List<CardExercise> joins = await dbContext.CardExercises
@@ -261,7 +268,7 @@ public sealed class ExercisesController : ControllerBase
         }
 
         Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId);
-        if (!await CanManageContentAsync(deck?.CommunityId)) return Forbid();
+        if (!await CanManageContentAsync(deck?.StudyGroupId)) return Forbid();
 
         bool exerciseExists = await dbContext.Exercises.AnyAsync(e => e.Id == exerciseId);
         if (!exerciseExists)
@@ -291,7 +298,7 @@ public sealed class ExercisesController : ControllerBase
     {
         Card? card = await dbContext.Cards.FirstOrDefaultAsync(c => c.Id == cardId);
         Deck? deck = card != null ? await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId) : null;
-        if (!await CanManageContentAsync(deck?.CommunityId)) return Forbid();
+        if (!await CanManageContentAsync(deck?.StudyGroupId)) return Forbid();
 
         CardExercise? link = await dbContext.CardExercises
             .FirstOrDefaultAsync(ce => ce.CardId == cardId && ce.ExerciseId == exerciseId);
@@ -752,14 +759,14 @@ public sealed class ExercisesController : ControllerBase
         return Ok(new { message = "Exercises database re-seeded successfully with 5 basic coding challenges and test assertion suites." });
     }
 
-    private async Task<bool> CanManageContentAsync(int? communityId)
+    private async Task<bool> CanManageContentAsync(int? studyGroupId)
     {
         if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Contributor))
         {
             return true;
         }
 
-        if (!communityId.HasValue || communityId.Value <= 0)
+        if (!studyGroupId.HasValue || studyGroupId.Value <= 0)
         {
             return false;
         }
@@ -770,13 +777,13 @@ public sealed class ExercisesController : ControllerBase
             return false;
         }
 
-        string? memberRole = await dbContext.CommunityMembers
-            .Where(m => m.CommunityId == communityId.Value && m.UserId == userId)
+        string? memberRole = await dbContext.StudyGroupMembers
+            .Where(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId)
             .Select(m => m.Role)
             .FirstOrDefaultAsync();
 
-        return memberRole == CommunityRoles.Owner
-            || memberRole == CommunityRoles.Admin
-            || memberRole == CommunityRoles.Contributor;
+        return memberRole == StudyGroupRoles.Owner
+            || memberRole == StudyGroupRoles.Admin
+            || memberRole == StudyGroupRoles.Contributor;
     }
 }

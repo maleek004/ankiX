@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
-import { useCommunity } from '../community/CommunityProvider'
-import { getCommunities, createCommunity, joinCommunity, getCommunityMembers, updateCommunityMemberRole, addCommunityMember } from '../api'
+import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
+import { getStudyGroups, createStudyGroup, joinStudyGroup, getStudyGroupMembers, updateStudyGroupMemberRole, addStudyGroupMember } from '../api'
 
-export default function Communities() {
+export default function StudyGroups() {
   const auth = useAuth()
-  const { setActiveCommunity } = useCommunity()
+  const { setActiveStudyGroup } = useStudyGroup()
   const navigate = useNavigate()
-  const [communities, setCommunities] = useState([])
+  const [studyGroups, setStudyGroups] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [createForm, setCreateForm] = useState({ name: '', slug: '', description: '', isPublic: true })
   const [actionLoading, setActionLoading] = useState(false)
-  const [managingMembersCommunity, setManagingMembersCommunity] = useState(null)
+  const [managingMembersStudyGroup, setManagingMembersStudyGroup] = useState(null)
   const [members, setMembers] = useState([])
   const [membersLoading, setMembersLoading] = useState(false)
   const [addMemberEmail, setAddMemberEmail] = useState('')
@@ -23,46 +23,46 @@ export default function Communities() {
   const token = auth?.user ? localStorage.getItem('ankix_token') : null
 
   useEffect(() => {
-    loadCommunities()
+    loadStudyGroups()
   }, [])
 
-  async function loadCommunities() {
+  async function loadStudyGroups() {
     setLoading(true)
     try {
-      const data = await getCommunities()
-      setCommunities(data || [])
+      const data = await getStudyGroups()
+      setStudyGroups(data || [])
     } catch (err) {
-      console.error('Failed to load communities:', err)
+      console.error('Failed to load study groups:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  function enterCommunity(community) {
-    setActiveCommunity({
-      id: community.id,
-      slug: community.slug,
-      name: community.name,
-      role: community.userRole
+  function enterStudyGroup(group) {
+    setActiveStudyGroup({
+      id: group.id,
+      slug: group.slug,
+      name: group.name,
+      role: group.userRole
     })
     navigate('/decks')
   }
 
-  async function handleJoinAndEnter(community) {
+  async function handleJoinAndEnter(group) {
     setActionLoading(true)
     try {
-      await joinCommunity(community.slug)
-      await loadCommunities()
+      await joinStudyGroup(group.slug)
+      await loadStudyGroups()
       // After joining, enter immediately
-      setActiveCommunity({
-        id: community.id,
-        slug: community.slug,
-        name: community.name,
+      setActiveStudyGroup({
+        id: group.id,
+        slug: group.slug,
+        name: group.name,
         role: 'Member'
       })
       navigate('/decks')
     } catch (err) {
-      alert(err.message || 'Failed to join community')
+      alert(err.message || 'Failed to join study group')
     } finally {
       setActionLoading(false)
     }
@@ -72,11 +72,11 @@ export default function Communities() {
     e.preventDefault()
     setActionLoading(true)
     try {
-      const created = await createCommunity(createForm)
+      const created = await createStudyGroup(createForm)
       setShowCreateModal(false)
       setCreateForm({ name: '', slug: '', description: '', isPublic: true })
-      // Enter the newly created community
-      setActiveCommunity({
+      // Enter the newly created study group
+      setActiveStudyGroup({
         id: created.id,
         slug: created.slug,
         name: created.name,
@@ -84,18 +84,18 @@ export default function Communities() {
       })
       navigate('/decks')
     } catch (err) {
-      alert(err.message || 'Failed to create community')
+      alert(err.message || 'Failed to create study group')
     } finally {
       setActionLoading(false)
     }
   }
 
-  async function openManageMembers(e, community) {
+  async function openManageMembers(e, group) {
     e.stopPropagation()
-    setManagingMembersCommunity(community)
+    setManagingMembersStudyGroup(group)
     setMembersLoading(true)
     try {
-      const data = await getCommunityMembers(community.slug)
+      const data = await getStudyGroupMembers(group.slug)
       setMembers(data || [])
     } catch (err) {
       alert(err.message || 'Failed to load members')
@@ -105,12 +105,12 @@ export default function Communities() {
   }
 
   async function handleRoleChange(targetUserId, newRole) {
-    if (!managingMembersCommunity) return
+    if (!managingMembersStudyGroup) return
     try {
-      await updateCommunityMemberRole(managingMembersCommunity.slug, targetUserId, newRole)
-      const updated = await getCommunityMembers(managingMembersCommunity.slug)
+      await updateStudyGroupMemberRole(managingMembersStudyGroup.slug, targetUserId, newRole)
+      const updated = await getStudyGroupMembers(managingMembersStudyGroup.slug)
       setMembers(updated || [])
-      await loadCommunities()
+      await loadStudyGroups()
     } catch (err) {
       alert(err.message || 'Failed to update role')
     }
@@ -118,15 +118,15 @@ export default function Communities() {
 
   async function handleAddMember(e) {
     e.preventDefault()
-    if (!managingMembersCommunity || !addMemberEmail.trim()) return
+    if (!managingMembersStudyGroup || !addMemberEmail.trim()) return
     setAddMemberLoading(true)
     try {
-      await addCommunityMember(managingMembersCommunity.slug, addMemberEmail.trim(), addMemberRole)
+      await addStudyGroupMember(managingMembersStudyGroup.slug, addMemberEmail.trim(), addMemberRole)
       setAddMemberEmail('')
       setAddMemberRole('Member')
-      const updated = await getCommunityMembers(managingMembersCommunity.slug)
+      const updated = await getStudyGroupMembers(managingMembersStudyGroup.slug)
       setMembers(updated || [])
-      await loadCommunities()
+      await loadStudyGroups()
     } catch (err) {
       alert(err.message || 'Failed to add member')
     } finally {
@@ -134,16 +134,16 @@ export default function Communities() {
     }
   }
 
-  if (loading) return <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Loading communities...</div>
+  if (loading) return <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Loading study groups...</div>
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '2rem', color: '#1e293b' }}>🌐 Learning Communities</h1>
+          <h1 style={{ margin: 0, fontSize: '2rem', color: '#1e293b' }}>🌐 Study Groups</h1>
           <p style={{ margin: '0.25rem 0 0 0', color: '#64748b' }}>
-            Select a community to access its decks and exercises.
+            Select a study group to access its decks and exercises.
           </p>
         </div>
         {token && (
@@ -152,20 +152,20 @@ export default function Communities() {
             className="btn btn-primary"
             style={{ padding: '0.5rem 1.25rem' }}
           >
-            ➕ Create Community
+            ➕ Create Study Group
           </button>
         )}
       </div>
 
-      {/* Communities Grid */}
-      {communities.length === 0 ? (
+      {/* Study Groups Grid */}
+      {studyGroups.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', background: '#f8fafc', borderRadius: 12 }}>
-          <p style={{ fontSize: '1.1rem' }}>No communities available yet.</p>
+          <p style={{ fontSize: '1.1rem' }}>No study groups available yet.</p>
           <p>Create the first one!</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
-          {communities.map(c => (
+          {studyGroups.map(c => (
             <div
               key={c.id}
               style={{
@@ -179,7 +179,7 @@ export default function Communities() {
                 transition: 'box-shadow 0.2s, transform 0.2s',
                 cursor: 'pointer'
               }}
-              onClick={() => c.userRole ? enterCommunity(c) : null}
+              onClick={() => c.userRole ? enterStudyGroup(c) : null}
               onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(99,102,241,0.13)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
               onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none' }}
             >
@@ -224,9 +224,9 @@ export default function Communities() {
                     <button
                       className="btn btn-primary"
                       style={{ width: '100%', padding: '0.5rem', fontSize: '0.9rem' }}
-                      onClick={(e) => { e.stopPropagation(); enterCommunity(c) }}
+                      onClick={(e) => { e.stopPropagation(); enterStudyGroup(c) }}
                     >
-                      Enter Community →
+                      Enter Study Group →
                     </button>
                     {(c.userRole === 'Owner' || c.userRole === 'Admin' || auth?.user?.role === 'Admin') && (
                       <button
@@ -254,7 +254,7 @@ export default function Communities() {
         </div>
       )}
 
-      {/* Create Community Modal */}
+      {/* Create Study Group Modal */}
       {showCreateModal && (
         <div
           style={{
@@ -271,7 +271,7 @@ export default function Communities() {
             }}
             onClick={e => e.stopPropagation()}
           >
-            <h2 style={{ margin: '0 0 1.5rem 0', color: '#1e293b' }}>➕ Create Community</h2>
+            <h2 style={{ margin: '0 0 1.5rem 0', color: '#1e293b' }}>➕ Create Study Group</h2>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ display: 'block', fontWeight: 600, marginBottom: 4, fontSize: '0.85rem' }}>Name *</label>
@@ -303,7 +303,7 @@ export default function Communities() {
                   className="form-control"
                   value={createForm.description}
                   onChange={e => setCreateForm({ ...createForm, description: e.target.value })}
-                  placeholder="What is this community about?"
+                  placeholder="What is this study group about?"
                   rows={3}
                   style={{ resize: 'vertical' }}
                 />
@@ -314,7 +314,7 @@ export default function Communities() {
                   checked={createForm.isPublic}
                   onChange={e => setCreateForm({ ...createForm, isPublic: e.target.checked })}
                 />
-                Public community (visible to everyone)
+                Public study group (visible to everyone)
               </label>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>Cancel</button>
@@ -328,14 +328,14 @@ export default function Communities() {
       )}
 
       {/* Manage Members Modal */}
-      {managingMembersCommunity && (
+      {managingMembersStudyGroup && (
         <div
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(0,0,0,0.5)', display: 'flex',
             alignItems: 'center', justifyContent: 'center', zIndex: 1000
           }}
-          onClick={() => setManagingMembersCommunity(null)}
+          onClick={() => setManagingMembersStudyGroup(null)}
         >
           <div
             style={{
@@ -345,8 +345,8 @@ export default function Communities() {
             onClick={e => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ margin: 0, color: '#1e293b' }}>👥 Manage Members — {managingMembersCommunity.name}</h2>
-              <button className="btn btn-secondary" onClick={() => setManagingMembersCommunity(null)}>✕</button>
+              <h2 style={{ margin: 0, color: '#1e293b' }}>👥 Manage Members — {managingMembersStudyGroup.name}</h2>
+              <button className="btn btn-secondary" onClick={() => setManagingMembersStudyGroup(null)}>✕</button>
             </div>
 
             {membersLoading ? (
@@ -372,7 +372,7 @@ export default function Communities() {
                   <option value="Member">Member</option>
                   <option value="Contributor">Contributor</option>
                   <option value="Admin">Admin</option>
-                  {managingMembersCommunity.userRole === 'Owner' && <option value="Owner">Owner</option>}
+                  {managingMembersStudyGroup.userRole === 'Owner' && <option value="Owner">Owner</option>}
                 </select>
                 <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }} disabled={addMemberLoading}>
                   {addMemberLoading ? 'Adding...' : '➕ Add Member'}
@@ -404,7 +404,7 @@ export default function Communities() {
                         </span>
                       </td>
                       <td style={{ padding: '8px', textAlign: 'right' }}>
-                        {(managingMembersCommunity.userRole === 'Owner' || auth?.user?.role === 'Admin' || (managingMembersCommunity.userRole === 'Admin' && m.role !== 'Owner')) ? (
+                        {(managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin' || (managingMembersStudyGroup.userRole === 'Admin' && m.role !== 'Owner')) ? (
                           <select
                             value={m.role}
                             onChange={e => handleRoleChange(m.userId, e.target.value)}
@@ -413,7 +413,7 @@ export default function Communities() {
                             <option value="Admin">Admin</option>
                             <option value="Contributor">Contributor</option>
                             <option value="Member">Member</option>
-                            {managingMembersCommunity.userRole === 'Owner' && <option value="Owner">Owner</option>}
+                            {managingMembersStudyGroup.userRole === 'Owner' && <option value="Owner">Owner</option>}
                           </select>
                         ) : (
                           <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>—</span>

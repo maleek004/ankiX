@@ -3,7 +3,7 @@ using AnkiX.Api.Models;
 
 namespace AnkiX.Api.Contracts.Content;
 
-public sealed class CreateCommunityRequest
+public sealed class CreateStudyGroupRequest
 {
     public string Name { get; set; } = string.Empty;
 
@@ -16,7 +16,7 @@ public sealed class CreateCommunityRequest
     public bool IsPublic { get; set; } = true;
 }
 
-public sealed class CommunityResponse
+public sealed class StudyGroupResponse
 {
     public int Id { get; set; }
 
@@ -43,7 +43,7 @@ public sealed class CommunityResponse
     public DateTime CreatedAt { get; set; }
 }
 
-public sealed class CommunityMemberResponse
+public sealed class StudyGroupMemberResponse
 {
     public int UserId { get; set; }
 
@@ -62,11 +62,11 @@ public sealed class UpdateMemberRoleRequest
     public string Role { get; set; } = string.Empty;
 }
 
-public sealed class AddCommunityMemberRequest
+public sealed class AddStudyGroupMemberRequest
 {
     [Required]
     [EmailAddress]
     public string Email { get; set; } = string.Empty;
 
-    public string Role { get; set; } = CommunityRoles.Member;
+    public string Role { get; set; } = StudyGroupRoles.Member;
 }

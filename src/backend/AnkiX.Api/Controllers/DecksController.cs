@@ -21,7 +21,7 @@ public sealed class DecksController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<DeckResponse>>> GetDecks([FromQuery] int? communityId = null)
+    public async Task<ActionResult<IEnumerable<DeckResponse>>> GetDecks([FromQuery] int? studyGroupId = null, [FromQuery] int? communityId = null)
     {
         int userId = 0;
         string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -29,17 +29,19 @@ public sealed class DecksController : ControllerBase
 
         DateTime now = DateTime.UtcNow;
 
+        int? groupId = studyGroupId ?? communityId;
+
         var decksQuery = dbContext.Decks.AsQueryable();
-        if (communityId.HasValue)
+        if (groupId.HasValue)
         {
-            var sampleCommId = await dbContext.Communities.Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
-            if (communityId.Value == sampleCommId || sampleCommId == 0)
+            var sampleGroupId = await dbContext.StudyGroups.Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
+            if (groupId.Value == sampleGroupId || sampleGroupId == 0)
             {
-                decksQuery = decksQuery.Where(deck => deck.CommunityId == communityId.Value || deck.CommunityId == null || deck.CommunityId == 0);
+                decksQuery = decksQuery.Where(deck => deck.StudyGroupId == groupId.Value || deck.StudyGroupId == null || deck.StudyGroupId == 0);
             }
             else
             {
-                decksQuery = decksQuery.Where(deck => deck.CommunityId == communityId.Value);
+                decksQuery = decksQuery.Where(deck => deck.StudyGroupId == groupId.Value);
             }
         }
 

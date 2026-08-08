@@ -76,7 +76,7 @@ public sealed class CreateExerciseRequest
 
     public string? TestCasesSpec { get; set; }
 
-    public int? CommunityId { get; set; }
+    public int? StudyGroupId { get; set; }
 }
 
 public sealed class UpdateExerciseRequest

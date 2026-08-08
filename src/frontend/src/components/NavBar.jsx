@@ -1,12 +1,12 @@
 import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
-import { useCommunity } from '../community/CommunityProvider'
+import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 
 export default function NavBar(){
   const auth = useAuth()
   const navigate = useNavigate()
-  const { activeCommunity, clearCommunity } = useCommunity() || {}
+  const { activeStudyGroup, clearStudyGroup } = useStudyGroup() || {}
 
   return (
     <header className="navbar">
@@ -16,29 +16,29 @@ export default function NavBar(){
         </Link>
         <nav>
           <ul className="navbar-nav">
-            {auth?.user && activeCommunity ? (
+            {auth?.user && activeStudyGroup ? (
               <>
                 <li>
                   <Link
-                    to="/communities"
+                    to="/study-groups"
                     className="nav-link"
-                    onClick={() => clearCommunity()}
+                    onClick={() => clearStudyGroup()}
                     style={{
                       background: 'rgba(99,102,241,0.12)',
                       borderRadius: 6,
                       padding: '4px 10px',
                       fontWeight: 600
                     }}
-                    title="Switch community"
+                    title="Switch study group"
                   >
-                    📦 {activeCommunity.name} ▾
+                    📦 {activeStudyGroup.name} ▾
                   </Link>
                 </li>
                 <li><Link to="/decks" className="nav-link">Decks</Link></li>
                 <li><Link to="/exercises" className="nav-link">Exercises</Link></li>
               </>
             ) : auth?.user ? (
-              <li><Link to="/communities" className="nav-link">🌐 Communities</Link></li>
+              <li><Link to="/study-groups" className="nav-link">👥 Study Groups</Link></li>
             ) : null}
             {auth?.user?.role === 'Admin' && (
               <li><Link to="/admin/users" className="nav-link">👥 Users</Link></li>
