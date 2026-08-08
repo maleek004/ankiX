@@ -429,8 +429,9 @@ export async function unenrollExercise(id){
   return res.json()
 }
 
-export async function getMyDueExercises(){
-  const res = await fetch(`${API_BASE}/exercises/my-due`, { headers: authHeaders() })
+export async function getMyDueExercises(studyGroupId = null){
+  const query = studyGroupId ? `?studyGroupId=${studyGroupId}` : ''
+  const res = await fetch(`${API_BASE}/exercises/my-due${query}`, { headers: authHeaders() })
   if(!res.ok) throw new Error('Failed to fetch my due exercises')
   return res.json()
 }

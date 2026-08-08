@@ -61,7 +61,7 @@ export default function Exercises() {
       const [allEx, collectionIds, dueEx] = await Promise.all([
         getExercises(activeLang, activeStudyGroup?.id),
         getMyCollectionExerciseIds(),
-        getMyDueExercises()
+        getMyDueExercises(activeStudyGroup?.id)
       ])
       setExercises(allEx || [])
       setEnrolledIds(new Set(collectionIds || []))
@@ -90,7 +90,7 @@ export default function Exercises() {
       } else {
         await enrollExercise(exId)
         setEnrolledIds(prev => new Set(prev).add(exId))
-        const dueEx = await getMyDueExercises()
+        const dueEx = await getMyDueExercises(activeStudyGroup?.id)
         setDueQueue(dueEx || [])
       }
     } catch (err) {
@@ -191,7 +191,7 @@ export default function Exercises() {
       setEnrolledIds(prev => new Set(prev).add(activeExercise.id))
       
       // Refresh due queue
-      const updatedDue = await getMyDueExercises()
+      const updatedDue = await getMyDueExercises(activeStudyGroup?.id)
       setDueQueue(updatedDue || [])
 
       if (queueIndex >= 0 && updatedDue.length > 0) {
@@ -268,7 +268,7 @@ export default function Exercises() {
             color: activeTab === 'all' ? '#0d6efd' : '#495057'
           }}
         >
-          📚 All Platform Exercises ({exercises.length})
+          📚 All Study Group Exercises ({exercises.length})
         </button>
       </div>
 
@@ -279,7 +279,7 @@ export default function Exercises() {
             <div className="empty-state" style={{ padding: 40 }}>
               <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', color: '#2b8a3e' }}>🎉 All Caught Up!</h3>
               <p style={{ margin: 0, color: '#6c757d', fontSize: '0.95rem' }}>
-                No exercises in your personal collection are due right now. Browse "All Platform Exercises" below or check out card exercises to add more!
+                No exercises in your personal collection are due right now. Browse "All Study Group Exercises" below or check out card exercises to add more!
               </p>
             </div>
           ) : (
@@ -328,9 +328,11 @@ export default function Exercises() {
                             <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: typeB.bg, color: typeB.color }}>
                               {typeB.label}
                             </span>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
-                              {badge.label}
-                            </span>
+                            {(!ex.exerciseType || ex.exerciseType === 'CodeExecution') && (
+                              <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
+                                {badge.label}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -358,7 +360,7 @@ export default function Exercises() {
         </div>
       )}
 
-      {/* Tab 2: All Platform Exercises */}
+      {/* Tab 2: All Study Group Exercises */}
       {activeTab === 'all' && (
         <div>
           {/* Language & Difficulty Ordering Info */}
@@ -427,9 +429,11 @@ export default function Exercises() {
                           <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: diff.bg, color: diff.color }} title={`Average Ease Factor: ${ease}`}>
                             {diff.label} {reviews ? `(${ease})` : ''}
                           </span>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
-                            {badge.label}
-                          </span>
+                          {(!ex.exerciseType || ex.exerciseType === 'CodeExecution') && (
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
+                              {badge.label}
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -479,7 +483,7 @@ export default function Exercises() {
                 <input className="form-control" value={title} onChange={e => setTitle(e.target.value)} required placeholder="e.g. Reverse String in Python" />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: exerciseType === 'CodeExecution' ? '1fr 1fr' : '1fr', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Exercise Format</label>
                   <select className="form-control" value={exerciseType} onChange={e => setExerciseType(e.target.value)}>
@@ -488,15 +492,17 @@ export default function Exercises() {
                     <option value="ExactString">✏️ Exact String / Short Answer</option>
                   </select>
                 </div>
-                <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language Tag</label>
-                  <select className="form-control" value={language} onChange={e => setLanguage(e.target.value)}>
-                    <option value="csharp">C#</option>
-                    <option value="python">Python</option>
-                    <option value="javascript">JavaScript</option>
-                    <option value="go">Go</option>
-                  </select>
-                </div>
+                {exerciseType === 'CodeExecution' && (
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language Tag</label>
+                    <select className="form-control" value={language} onChange={e => setLanguage(e.target.value)}>
+                      <option value="csharp">C#</option>
+                      <option value="python">Python</option>
+                      <option value="javascript">JavaScript</option>
+                      <option value="go">Go</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div>

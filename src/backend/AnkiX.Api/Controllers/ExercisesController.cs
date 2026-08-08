@@ -613,7 +613,7 @@ public sealed class ExercisesController : ControllerBase
     /// Gets all exercises in the current user's personal collection that are due for review.
     /// </summary>
     [HttpGet("my-due")]
-    public async Task<ActionResult<IEnumerable<ExerciseResponse>>> GetMyDueExercises()
+    public async Task<ActionResult<IEnumerable<ExerciseResponse>>> GetMyDueExercises([FromQuery] int? studyGroupId = null, [FromQuery] int? communityId = null)
     {
         string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!int.TryParse(userIdClaim, out int userId))
@@ -634,15 +634,48 @@ public sealed class ExercisesController : ControllerBase
             return Ok(new List<ExerciseResponse>());
         }
 
-        var rawExercises = await dbContext.Exercises
+        List<int> joinedGroupIds = await dbContext.StudyGroupMembers.AsNoTracking()
+            .Where(m => m.UserId == userId)
+            .Select(m => m.StudyGroupId)
+            .ToListAsync();
+
+        var sampleGroupId = await dbContext.StudyGroups.AsNoTracking().Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
+        bool sampleJoined = sampleGroupId > 0 && joinedGroupIds.Contains(sampleGroupId);
+
+        var query = dbContext.Exercises
             .AsNoTracking()
-            .Where(e => enrolledIds.Contains(e.Id))
+            .Where(e => enrolledIds.Contains(e.Id));
+
+        int? groupId = studyGroupId ?? communityId;
+        if (groupId.HasValue && groupId.Value > 0)
+        {
+            if (!joinedGroupIds.Contains(groupId.Value))
+            {
+                return Ok(Array.Empty<ExerciseResponse>());
+            }
+            if (groupId.Value == sampleGroupId || sampleGroupId == 0)
+            {
+                query = query.Where(e => e.StudyGroupId == groupId.Value || e.StudyGroupId == null || e.StudyGroupId == 0);
+            }
+            else
+            {
+                query = query.Where(e => e.StudyGroupId == groupId.Value);
+            }
+        }
+        else
+        {
+            query = query.Where(e => (e.StudyGroupId.HasValue && joinedGroupIds.Contains(e.StudyGroupId.Value)) || (sampleJoined && (e.StudyGroupId == null || e.StudyGroupId == 0)));
+        }
+
+        var rawExercises = await query
             .Select(e => new
             {
                 e.Id,
                 e.Title,
                 e.Description,
                 e.Language,
+                e.ExerciseType,
+                e.ExerciseSpec,
                 e.CreatedByUserId,
                 e.CreatedAt,
                 LatestReview = dbContext.ExerciseReviewRecords
@@ -661,6 +694,8 @@ public sealed class ExercisesController : ControllerBase
                 Title = e.Title,
                 Description = e.Description,
                 Language = e.Language,
+                ExerciseType = e.ExerciseType,
+                ExerciseSpec = e.ExerciseSpec,
                 CreatedByUserId = e.CreatedByUserId,
                 CreatedAt = e.CreatedAt,
                 LinkedCardsCount = dbContext.CardExercises.Count(ce => ce.ExerciseId == e.Id)

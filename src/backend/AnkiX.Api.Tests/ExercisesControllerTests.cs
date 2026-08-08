@@ -110,4 +110,29 @@ public class ExercisesControllerTests
         var list = Assert.IsAssignableFrom<IEnumerable<ExerciseDetailResponse>>(okResult.Value);
         Assert.Single(list);
     }
+
+    [Fact]
+    public async Task GetMyDueExercises_FilteredByStudyGroupId_ReturnsOnlyGroupExercises()
+    {
+        using var db = CreateInMemoryDbContext();
+        int userId = 5;
+        var controller = CreateController(db, userId: userId);
+
+        db.StudyGroupMembers.Add(new StudyGroupMember { StudyGroupId = 1, UserId = userId, Role = "Member" });
+        db.StudyGroupMembers.Add(new StudyGroupMember { StudyGroupId = 2, UserId = userId, Role = "Member" });
+
+        db.Exercises.Add(new Exercise { Id = 1, Title = "Group 1 Ex", StudyGroupId = 1, Language = "csharp" });
+        db.Exercises.Add(new Exercise { Id = 2, Title = "Group 2 Ex", StudyGroupId = 2, Language = "python" });
+
+        db.UserExercises.Add(new UserExercise { UserId = userId, ExerciseId = 1 });
+        db.UserExercises.Add(new UserExercise { UserId = userId, ExerciseId = 2 });
+        await db.SaveChangesAsync();
+
+        var resultGroup1 = await controller.GetMyDueExercises(studyGroupId: 1);
+        var okGroup1 = Assert.IsType<OkObjectResult>(resultGroup1.Result);
+        var listGroup1 = Assert.IsAssignableFrom<IEnumerable<ExerciseResponse>>(okGroup1.Value);
+
+        Assert.Single(listGroup1);
+        Assert.Equal(1, listGroup1.First().Id);
+    }
 }
