@@ -27,6 +27,12 @@ export default function Exercises() {
   const [canCreate, setCanCreate] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
 
+  const [loading, setLoading] = useState(true)
+  const [isCreating, setIsCreating] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
+  const [enrollingId, setEnrollingId] = useState(null)
+  const [submittingReview, setSubmittingReview] = useState(false)
+
   // Add Exercise state
   const [title, setTitle] = useState('')
   const [language, setLanguage] = useState('csharp')
@@ -57,6 +63,7 @@ export default function Exercises() {
 
   const loadData = async () => {
     if (!activeStudyGroup) { navigate('/study-groups'); return }
+    setLoading(true)
     try {
       setCanCreate(canCreateContent(activeStudyGroup?.role))
       const [allEx, collectionIds, dueEx] = await Promise.all([
@@ -69,6 +76,8 @@ export default function Exercises() {
       setDueQueue(dueEx || [])
     } catch (err) {
       console.warn('Could not load exercise data:', err.message || err)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -79,6 +88,7 @@ export default function Exercises() {
   const handleToggleEnroll = async (exId, e) => {
     if (e) e.stopPropagation()
     const isEnrolled = enrolledIds.has(exId)
+    setEnrollingId(exId)
     try {
       if (isEnrolled) {
         await unenrollExercise(exId)
@@ -96,6 +106,8 @@ export default function Exercises() {
       }
     } catch (err) {
       alert('Failed to update collection: ' + (err.message || err))
+    } finally {
+      setEnrollingId(null)
     }
   }
 
@@ -119,6 +131,7 @@ export default function Exercises() {
       exerciseSpec = JSON.stringify({ acceptedAnswers: [exactAnswer.trim()], caseSensitive: exactCaseSensitive })
     }
 
+    setIsCreating(true)
     try {
       const newEx = await createExercise({
         title,
@@ -147,18 +160,23 @@ export default function Exercises() {
       await handleToggleEnroll(newEx.id)
     } catch (err) {
       alert('Create exercise failed: ' + (err.message || err))
+    } finally {
+      setIsCreating(false)
     }
   }
 
   const handleDelete = async (exId, exTitle, e) => {
     if (e) e.stopPropagation()
     if (!window.confirm(`Are you sure you want to delete "${exTitle}"?`)) return
+    setDeletingId(exId)
     try {
       await deleteExercise(exId)
       setExercises(prev => prev.filter(ex => ex.id !== exId))
       setDueQueue(prev => prev.filter(ex => ex.id !== exId))
     } catch (err) {
       alert('Delete exercise failed: ' + (err.message || err))
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -199,6 +217,7 @@ export default function Exercises() {
 
   const handleRateExercise = async (outcome) => {
     if (!activeExercise) return
+    setSubmittingReview(true)
     try {
       await submitExerciseReview(activeExercise.id, outcome)
       setEnrolledIds(prev => new Set(prev).add(activeExercise.id))
@@ -215,6 +234,8 @@ export default function Exercises() {
       }
     } catch (err) {
       alert('Failed to save exercise review: ' + (err.message || err))
+    } finally {
+      setSubmittingReview(false)
     }
   }
 
@@ -288,7 +309,11 @@ export default function Exercises() {
       {/* Tab 1: My Review Queue */}
       {activeTab === 'queue' && (
         <div>
-          {dueQueue.length === 0 ? (
+          {loading ? (
+            <div className="empty-state" style={{ padding: 40 }}>
+              Fetching exercise queue...
+            </div>
+          ) : dueQueue.length === 0 ? (
             <div className="empty-state" style={{ padding: 40 }}>
               <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', color: '#2b8a3e' }}>🎉 All Caught Up!</h3>
               <p style={{ margin: 0, color: '#6c757d', fontSize: '0.95rem' }}>
@@ -364,10 +389,11 @@ export default function Exercises() {
                           {canCreate && (
                             <button
                               style={{ padding: '6px 10px', fontSize: '0.8rem', background: '#fff5f5', color: '#e03131', border: '1px solid #ffc9c9', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                              disabled={deletingId === ex.id}
                               onClick={(e) => handleDelete(ex.id, ex.title, e)}
                               title="Delete exercise"
                             >
-                              🗑️ Delete
+                              {deletingId === ex.id ? 'Deleting...' : '🗑️ Delete'}
                             </button>
                           )}
                           <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => openPractice(ex, true, idx)}>
@@ -414,7 +440,9 @@ export default function Exercises() {
             </span>
           </div>
 
-          {exercises.length === 0 ? (
+          {loading ? (
+            <div className="empty-state">Fetching exercises...</div>
+          ) : exercises.length === 0 ? (
             <div className="empty-state">No exercises found. Add one or select another language filter!</div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
@@ -471,6 +499,7 @@ export default function Exercises() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid #f1f3f5', gap: 6, flexWrap: 'wrap' }}>
                       <button
                         className="btn-study-tool"
+                        disabled={enrollingId === ex.id}
                         style={{
                           padding: '4px 10px',
                           fontSize: '0.8rem',
@@ -481,17 +510,18 @@ export default function Exercises() {
                         }}
                         onClick={(e) => handleToggleEnroll(ex.id, e)}
                       >
-                        {isEnrolled ? '✓ In Collection' : '+ Add to Collection'}
+                        {enrollingId === ex.id ? 'Updating...' : (isEnrolled ? '✓ In Collection' : '+ Add to Collection')}
                       </button>
 
                       <div style={{ display: 'flex', gap: 6 }}>
                         {canCreate && (
                           <button
                             style={{ padding: '6px 10px', fontSize: '0.8rem', background: '#fff5f5', color: '#e03131', border: '1px solid #ffc9c9', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                            disabled={deletingId === ex.id}
                             onClick={(e) => handleDelete(ex.id, ex.title, e)}
                             title="Delete exercise"
                           >
-                            🗑️ Delete
+                            {deletingId === ex.id ? 'Deleting...' : '🗑️ Delete'}
                           </button>
                         )}
                         <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => openPractice(ex)}>
@@ -594,7 +624,9 @@ export default function Exercises() {
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
                 <button type="button" className="btn-study-tool" onClick={() => setShowAddForm(false)}>Cancel</button>
-                <button type="submit" className="btn-primary">Save & Add to Collection</button>
+                <button type="submit" className="btn-primary" disabled={isCreating}>
+                  {isCreating ? 'Saving...' : 'Save & Add to Collection'}
+                </button>
               </div>
             </form>
           </div>
@@ -651,6 +683,7 @@ export default function Exercises() {
 
                 <button
                   className="btn-study-tool"
+                  disabled={enrollingId === activeExercise.id}
                   style={{
                     padding: '3px 10px',
                     fontSize: '0.75rem',
@@ -661,7 +694,7 @@ export default function Exercises() {
                   }}
                   onClick={() => handleToggleEnroll(activeExercise.id)}
                 >
-                  {enrolledIds.has(activeExercise.id) ? '✓ In Collection' : '+ Add to My Exercises'}
+                  {enrollingId === activeExercise.id ? 'Updating...' : (enrolledIds.has(activeExercise.id) ? '✓ In Collection' : '+ Add to My Exercises')}
                 </button>
               </div>
 
@@ -739,10 +772,10 @@ export default function Exercises() {
                     Rate your recall performance for SRS schedule:
                   </div>
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                    <button className="btn-rating again" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Again')}>Again (&lt;1m)</button>
-                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Hard')}>Hard (&lt;1m)</button>
-                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Good')}>Good (&lt;10m)</button>
-                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Easy')}>Easy (1d+)</button>
+                    <button className="btn-rating again" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Again')}>Again (&lt;1m)</button>
+                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Hard')}>Hard (&lt;1m)</button>
+                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Good')}>Good (&lt;10m)</button>
+                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Easy')}>Easy (1d+)</button>
                   </div>
                 </div>
               )}

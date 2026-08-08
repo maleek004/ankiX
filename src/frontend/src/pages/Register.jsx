@@ -5,16 +5,20 @@ export default function Register(){
   const [email, setEmail] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
   const auth = useAuth()
   const submit = async (e) => {
     e.preventDefault()
+    setIsLoading(true)
     try{
       await auth.register(email, password, displayName)
       alert('Registered successfully — please login')
       window.location.href = '/login'
     }catch(err){
       alert('Register failed: ' + (err.message || err))
+    }finally{
+      setIsLoading(false)
     }
   }
 
@@ -35,12 +39,13 @@ export default function Register(){
             <label>Password</label>
             <input className="form-control" type="password" value={password} onChange={e=>setPassword(e.target.value)} required />
           </div>
-          <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: 8 }}>
-            Create Account
+          <button disabled={isLoading} type="submit" className="btn-primary" style={{ width: '100%', marginTop: 8 }}>
+            {isLoading ? "Registering..." : "Create Account"}
           </button>
         </form>
       </div>
     </div>
   )
 }
+
 

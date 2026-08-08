@@ -1,16 +1,20 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
+import { getDecks, createDeck, deleteDeck, canCreateContent } from '../api.js'
 
 export default function Decks(){
   const { activeStudyGroup } = useStudyGroup() || {}
   const navigate = useNavigate()
   const [decks, setDecks] = useState([])
+  const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newDescription, setNewDescription] = useState('')
   const [canCreate, setCanCreate] = useState(false)
   const [activeDropdown, setActiveDropdown] = useState(null)
+  const [isCreating, setIsCreating] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
 
   useEffect(() => {
     if (!activeStudyGroup) {
@@ -18,42 +22,53 @@ export default function Decks(){
       return
     }
     let mounted = true
-    import('../api.js').then(m => {
-      setCanCreate(m.canCreateContent(activeStudyGroup?.role))
-      return m.getDecks(activeStudyGroup.id)
-    }).then(data => {
-      if (!mounted) return
-      setDecks(data || [])
-    }).catch(err => {
-      console.warn('Could not fetch decks:', err.message || err)
-      setDecks([])
-    })
+    setLoading(true)
+    setCanCreate(canCreateContent(activeStudyGroup?.role))
+    getDecks(activeStudyGroup.id)
+      .then(data => {
+        if (!mounted) return
+        setDecks(data || [])
+      })
+      .catch(err => {
+        console.warn('Could not fetch decks:', err.message || err)
+        if (mounted) setDecks([])
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
     return () => { mounted = false }
   }, [activeStudyGroup, navigate])
 
   const create = async (e) => {
     e.preventDefault()
     if (!newTitle.trim()) return
+    setIsCreating(true)
     try {
-      const d = await import('../api.js').then(m => m.createDeck(newTitle, newDescription, activeStudyGroup?.id))
+      const d = await createDeck(newTitle, newDescription, activeStudyGroup?.id)
       setDecks(prev => [...prev, d])
       setNewTitle('')
       setNewDescription('')
       setShowAddForm(false)
     } catch(err) {
       alert('Create deck failed: ' + (err.message || err))
+    } finally {
+      setIsCreating(false)
     }
   }
 
-  const deleteDeck = async (id) => {
+  const handleDeleteDeck = async (id) => {
     if (!confirm('Are you sure you want to delete this deck?')) return
+    setDeletingId(id)
     try {
-      await import('../api.js').then(m => m.deleteDeck(id))
+      await deleteDeck(id)
       setDecks(prev => prev.filter(d => d.id !== id))
     } catch(err) {
       alert('Delete deck failed: ' + (err.message || err))
+    } finally {
+      setDeletingId(null)
     }
   }
+
 
   if (!activeStudyGroup) return null
 
@@ -96,13 +111,17 @@ export default function Decks(){
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button type="button" className="btn-study-tool" onClick={() => setShowAddForm(false)}>Cancel</button>
-              <button type="submit" className="btn-primary">Save Deck</button>
+              <button type="submit" className="btn-primary" disabled={isCreating}>
+                {isCreating ? 'Saving Deck...' : 'Save Deck'}
+              </button>
             </div>
           </form>
         </div>
       )}
 
-      {decks.length === 0 ? (
+      {loading ? (
+        <div className="empty-state">Fetching decks...</div>
+      ) : decks.length === 0 ? (
         <div className="empty-state">No decks in this study group yet. Create one to get started!</div>
       ) : (
         <table className="decks-table">
@@ -129,7 +148,9 @@ export default function Decks(){
                     {activeDropdown === d.id && (
                       <div className="dropdown-menu">
                         <Link to={`/decks/${d.id}`} className="dropdown-item">Study</Link>
-                        <button className="dropdown-item" onClick={() => deleteDeck(d.id)}>Delete</button>
+                        <button className="dropdown-item" disabled={deletingId === d.id} onClick={() => handleDeleteDeck(d.id)}>
+                          {deletingId === d.id ? 'Deleting...' : 'Delete'}
+                        </button>
                       </div>
                     )}
                   </div>
@@ -142,3 +163,4 @@ export default function Decks(){
     </div>
   )
 }
+

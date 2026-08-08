@@ -14,6 +14,12 @@ export default function Deck(){
   const [showAnswer, setShowAnswer]     = useState(false)
   const [userCode, setUserCode]         = useState('')
 
+  const [loading, setLoading]           = useState(true)
+  const [isAddingCard, setIsAddingCard] = useState(false)
+  const [deletingCardId, setDeletingCardId] = useState(null)
+  const [isResetting, setIsResetting]   = useState(false)
+  const [submittingRating, setSubmittingRating] = useState(false)
+
   // Edit / Admin mode toggle
   const [isEditing, setIsEditing]           = useState(false)
   const [prompt, setPrompt]                 = useState('')
@@ -60,20 +66,25 @@ export default function Deck(){
 
   // ── Load deck info + study queue ──────────────────────────────────────────
   const loadQueue = useCallback(async () => {
-    const [d, q, cs] = await Promise.all([
-      api.getDeck(id).catch(() => null),
-      api.getStudyQueue(id).catch(() => ({ newCount:0, learningCount:0, reviewCount:0, dueCards:[] })),
-      api.getCards(id).catch(() => [])
-    ])
-    setDeck(d)
-    setQueue(q)
-    setAllCards(cs || [])
-    setCurrentIndex(0)
-    setShowAnswer(false)
-    setShowFollowups(false)
-    setShowLinkedExercises(false)
-    setFollowups([])
-    setLinkedExercises([])
+    setLoading(true)
+    try {
+      const [d, q, cs] = await Promise.all([
+        api.getDeck(id).catch(() => null),
+        api.getStudyQueue(id).catch(() => ({ newCount:0, learningCount:0, reviewCount:0, dueCards:[] })),
+        api.getCards(id).catch(() => [])
+      ])
+      setDeck(d)
+      setQueue(q)
+      setAllCards(cs || [])
+      setCurrentIndex(0)
+      setShowAnswer(false)
+      setShowFollowups(false)
+      setShowLinkedExercises(false)
+      setFollowups([])
+      setLinkedExercises([])
+    } finally {
+      setLoading(false)
+    }
   }, [id])
 
   useEffect(() => {
@@ -146,10 +157,13 @@ export default function Deck(){
   // After rating: advance to next card. If we finish the queue, reload it —
   // learning cards may have come back due (1-min or 10-min intervals elapsed).
   const rateCard = async (outcome) => {
+    setSubmittingRating(true)
     try {
       await api.submitReview(currentCard.id, outcome)
     } catch(err) {
       console.warn('Review submission failed (continuing study):', err.message || err)
+    } finally {
+      setSubmittingRating(false)
     }
 
     const nextIndex = currentIndex + 1
@@ -167,6 +181,7 @@ export default function Deck(){
   const addCard = async (e) => {
     e.preventDefault()
     if(!prompt.trim()) return
+    setIsAddingCard(true)
     try{
       const c = await api.createCard(id, prompt, validationSpec, type)
       setAllCards(prev => [...prev, c])
@@ -174,15 +189,18 @@ export default function Deck(){
       alert('Card added!')
       await loadQueue() // refresh queue counts
     }catch(err){ alert('Create card failed: ' + (err.message || err)) }
+    finally { setIsAddingCard(false) }
   }
 
   const removeCard = async (cardId) => {
     if(!confirm('Delete card?')) return
+    setDeletingCardId(cardId)
     try{
       await api.deleteCard(id, cardId)
       setAllCards(prev => prev.filter(c => c.id !== cardId))
       await loadQueue()
     }catch(err){ alert('Delete failed: ' + (err.message || err)) }
+    finally { setDeletingCardId(null) }
   }
 
   // Compute display label for each rating button's next-interval hint
@@ -212,11 +230,13 @@ export default function Deck(){
 
   const handleResetProgress = async () => {
     if(!confirm('Are you sure you want to reset your study progress for this deck? All cards will be returned to your New Queue.')) return
+    setIsResetting(true)
     try{
       await api.resetDeckProgress(id)
       await loadQueue()
       alert('Deck progress reset successfully! All cards are now back in your New Queue.')
     }catch(err){ alert('Reset progress failed: ' + (err.message || err)) }
+    finally { setIsResetting(false) }
   }
 
   return (
@@ -267,7 +287,9 @@ export default function Deck(){
                 <option value="micro-coding">micro-coding</option>
               </select>
             </div>
-            <button type="submit" className="btn-primary">Add Card</button>
+            <button type="submit" className="btn-primary" disabled={isAddingCard}>
+              {isAddingCard ? 'Adding Card...' : 'Add Card'}
+            </button>
           </form>
 
           <h4 style={{ marginTop: 24, marginBottom: 12 }}>Existing Cards ({allCards.length})</h4>
@@ -284,9 +306,10 @@ export default function Deck(){
                 </button>
                 <button
                   style={{ color: '#dc3545', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem' }}
+                  disabled={deletingCardId === c.id}
                   onClick={() => removeCard(c.id)}
                 >
-                  [Delete]
+                  {deletingCardId === c.id ? '[Deleting...]' : '[Delete]'}
                 </button>
               </li>
             ))}
@@ -295,7 +318,11 @@ export default function Deck(){
       )}
 
       {/* Card Viewer Area */}
-      {allCards.length === 0 ? (
+      {loading ? (
+        <div className="empty-state">
+          <h3>Fetching deck cards...</h3>
+        </div>
+      ) : allCards.length === 0 ? (
         <div className="empty-state">
           <h3>No cards in this deck yet.</h3>
           <p>Click <strong>Edit</strong> above or the <strong>+</strong> button to add cards!</p>
@@ -312,9 +339,10 @@ export default function Deck(){
               <button 
                 className="btn-study-tool" 
                 style={{ color: '#dc3545', borderColor: '#dc3545' }} 
+                disabled={isResetting}
                 onClick={handleResetProgress}
               >
-                ⚠️ Reset Progress (Move Cards to New)
+                {isResetting ? 'Resetting...' : '⚠️ Reset Progress (Move Cards to New)'}
               </button>
             </div>
             <Link to="/decks" className="btn-study-tool" style={{ textDecoration: 'none' }}>Return to Decks</Link>
@@ -490,19 +518,19 @@ export default function Deck(){
               <div className="rating-buttons-group">
                 <div className="rating-col">
                   <span className="rating-interval">&lt;1m</span>
-                  <button className="btn-rating again" onClick={() => rateCard('Again')}>Again</button>
+                  <button className="btn-rating again" disabled={submittingRating} onClick={() => rateCard('Again')}>Again</button>
                 </div>
                 <div className="rating-col">
                   <span className="rating-interval">&lt;1m</span>
-                  <button className="btn-rating" onClick={() => rateCard('Hard')}>Hard</button>
+                  <button className="btn-rating" disabled={submittingRating} onClick={() => rateCard('Hard')}>Hard</button>
                 </div>
                 <div className="rating-col">
                   <span className="rating-interval">&lt;10m</span>
-                  <button className="btn-rating" onClick={() => rateCard('Good')}>Good</button>
+                  <button className="btn-rating" disabled={submittingRating} onClick={() => rateCard('Good')}>Good</button>
                 </div>
                 <div className="rating-col">
                   <span className="rating-interval">1d+</span>
-                  <button className="btn-rating" onClick={() => rateCard('Easy')}>Easy</button>
+                  <button className="btn-rating" disabled={submittingRating} onClick={() => rateCard('Easy')}>Easy</button>
                 </div>
               </div>
             )}
@@ -567,6 +595,7 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
   const [linkedIds, setLinkedIds] = useState(new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
+  const [linkingId, setLinkingId] = useState(null)
 
   // Inline creation form state
   const [title, setTitle] = useState('')
@@ -612,6 +641,7 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
 
   const handleToggleLink = async (exerciseId) => {
     const isLinked = linkedIds.has(exerciseId)
+    setLinkingId(exerciseId)
     try {
       const m = await import('../api.js')
       if (isLinked) {
@@ -624,6 +654,8 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
       if (onUpdated) onUpdated()
     } catch (err) {
       alert('Link action failed: ' + (err.message || err))
+    } finally {
+      setLinkingId(null)
     }
   }
 
@@ -825,6 +857,7 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
                         </div>
 
                         <button
+                          disabled={linkingId === ex.id}
                           style={{
                             padding: '6px 14px',
                             fontSize: '0.85rem',
@@ -837,7 +870,7 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
                           }}
                           onClick={() => handleToggleLink(ex.id)}
                         >
-                          {isLinked ? '✓ Linked' : '+ Link'}
+                          {linkingId === ex.id ? 'Updating...' : (isLinked ? '✓ Linked' : '+ Link')}
                         </button>
                       </div>
                     )
@@ -947,6 +980,8 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
   const [practiceCode, setPracticeCode] = useState(currentEx?.starterCode || currentEx?.solutionCode || '')
   const [running, setRunning] = useState(false)
   const [runResult, setRunResult] = useState(null)
+  const [enrolling, setEnrolling] = useState(false)
+  const [rating, setRating] = useState(false)
 
   const langBadges = {
     csharp: { label: 'C#', color: '#68217a', bg: '#f2e6f7' },
@@ -987,6 +1022,7 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
 
   const handleToggleEnroll = async () => {
     if (!currentEx?.id) return
+    setEnrolling(true)
     try {
       const m = await import('../api.js')
       if (isEnrolled) {
@@ -998,6 +1034,8 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
       }
     } catch (err) {
       alert('Failed to update collection: ' + (err.message || err))
+    } finally {
+      setEnrolling(false)
     }
   }
 
@@ -1018,6 +1056,7 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
 
   const handleRateExercise = async (outcome) => {
     if (!currentEx) return
+    setRating(true)
     try {
       const m = await import('../api.js')
       const res = await m.submitExerciseReview(currentEx.id, outcome)
@@ -1029,6 +1068,8 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
       }
     } catch (err) {
       alert('Submit review failed: ' + (err.message || err))
+    } finally {
+      setRating(false)
     }
   }
 
@@ -1077,6 +1118,7 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
             </span>
             <button
               className="btn-study-tool"
+              disabled={enrolling}
               style={{
                 padding: '3px 10px',
                 fontSize: '0.75rem',
@@ -1087,7 +1129,7 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
               }}
               onClick={handleToggleEnroll}
             >
-              {isEnrolled ? '✓ In Collection' : '+ Add to My Exercises'}
+              {enrolling ? 'Updating...' : (isEnrolled ? '✓ In Collection' : '+ Add to My Exercises')}
             </button>
           </div>
 
@@ -1189,10 +1231,10 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
                 Rate your recall performance for SRS schedule:
               </div>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <button className="btn-rating again" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Again')}>Again (&lt;1m)</button>
-                <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Hard')}>Hard (&lt;1m)</button>
-                <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Good')}>Good (&lt;10m)</button>
-                <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleRateExercise('Easy')}>Easy (1d+)</button>
+                <button className="btn-rating again" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={rating} onClick={() => handleRateExercise('Again')}>Again (&lt;1m)</button>
+                <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={rating} onClick={() => handleRateExercise('Hard')}>Hard (&lt;1m)</button>
+                <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={rating} onClick={() => handleRateExercise('Good')}>Good (&lt;10m)</button>
+                <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={rating} onClick={() => handleRateExercise('Easy')}>Easy (1d+)</button>
               </div>
             </div>
           )}

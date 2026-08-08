@@ -19,6 +19,7 @@ export default function StudyGroups() {
   const [addMemberEmail, setAddMemberEmail] = useState('')
   const [addMemberRole, setAddMemberRole] = useState('Member')
   const [addMemberLoading, setAddMemberLoading] = useState(false)
+  const [updatingRoleId, setUpdatingRoleId] = useState(null)
 
   const token = auth?.user ? localStorage.getItem('ankix_token') : null
 
@@ -106,6 +107,7 @@ export default function StudyGroups() {
 
   async function handleRoleChange(targetUserId, newRole) {
     if (!managingMembersStudyGroup) return
+    setUpdatingRoleId(targetUserId)
     try {
       await updateStudyGroupMemberRole(managingMembersStudyGroup.slug, targetUserId, newRole)
       const updated = await getStudyGroupMembers(managingMembersStudyGroup.slug)
@@ -113,6 +115,8 @@ export default function StudyGroups() {
       await loadStudyGroups()
     } catch (err) {
       alert(err.message || 'Failed to update role')
+    } finally {
+      setUpdatingRoleId(null)
     }
   }
 
@@ -230,7 +234,7 @@ export default function StudyGroups() {
                     </button>
                     {(c.userRole === 'Owner' || c.userRole === 'Admin' || auth?.user?.role === 'Admin') && (
                       <button
-                        className="btn btn-secondary"
+                        className="btn btn-[#6366f1]"
                         style={{ marginTop: 6, width: '100%', padding: '0.4rem', fontSize: '0.85rem' }}
                         onClick={(e) => openManageMembers(e, c)}
                       >
@@ -407,6 +411,7 @@ export default function StudyGroups() {
                         {(managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin' || (managingMembersStudyGroup.userRole === 'Admin' && m.role !== 'Owner')) ? (
                           <select
                             value={m.role}
+                            disabled={updatingRoleId === m.userId}
                             onChange={e => handleRoleChange(m.userId, e.target.value)}
                             style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
                           >
@@ -431,3 +436,4 @@ export default function StudyGroups() {
     </div>
   )
 }
+
