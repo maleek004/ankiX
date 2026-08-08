@@ -109,16 +109,19 @@ public sealed class FollowupsController : ControllerBase
     }
 
     /// <summary>
-    /// Links a follow-up to an answer card. Contributor/Admin only.
+    /// Links a follow-up to an answer card. Study Group Owner/Admin/Contributor or global Admin/Contributor.
     /// Call PATCH /api/cards/{cardId}/followups/{followupId}/link with { linkedCardId }.
     /// </summary>
     [HttpPatch("{followupId:long}/link")]
-    [Authorize(Roles = $"{Roles.Contributor},{Roles.Admin}")]
     public async Task<IActionResult> LinkAnswerCard(
         [FromRoute] int cardId,
         [FromRoute] long followupId,
         [FromBody] LinkFollowupRequest request)
     {
+        Card? card = await dbContext.Cards.FirstOrDefaultAsync(c => c.Id == cardId);
+        Deck? deck = card != null ? await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId) : null;
+        if (!await CanManageContentAsync(deck?.StudyGroupId)) return Forbid();
+
         CardFollowup? followup = await dbContext.CardFollowups
             .FirstOrDefaultAsync(f => f.Id == followupId && f.CardId == cardId);
 
@@ -140,16 +143,19 @@ public sealed class FollowupsController : ControllerBase
     }
 
     /// <summary>
-    /// Unlinks an answer card from a follow-up. Contributor/Admin only.
+    /// Unlinks an answer card from a follow-up. Study Group Owner/Admin/Contributor or global Admin/Contributor.
     /// Call DELETE /api/cards/{cardId}/followups/{followupId}/link/{linkedCardId}.
     /// </summary>
     [HttpDelete("{followupId:long}/link/{linkedCardId:int}")]
-    [Authorize(Roles = $"{Roles.Contributor},{Roles.Admin}")]
     public async Task<IActionResult> UnlinkAnswerCard(
         [FromRoute] int cardId,
         [FromRoute] long followupId,
         [FromRoute] int linkedCardId)
     {
+        Card? card = await dbContext.Cards.FirstOrDefaultAsync(c => c.Id == cardId);
+        Deck? deck = card != null ? await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId) : null;
+        if (!await CanManageContentAsync(deck?.StudyGroupId)) return Forbid();
+
         CardFollowup? followup = await dbContext.CardFollowups
             .FirstOrDefaultAsync(f => f.Id == followupId && f.CardId == cardId);
 
@@ -162,5 +168,33 @@ public sealed class FollowupsController : ControllerBase
         await dbContext.SaveChangesAsync();
 
         return Ok(new { message = "Follow-up unlinked from answer card.", linkedCardIds = followup.GetLinkedCardIdList() });
+    }
+
+    private async Task<bool> CanManageContentAsync(int? studyGroupId)
+    {
+        if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Contributor))
+        {
+            return true;
+        }
+
+        if (!studyGroupId.HasValue || studyGroupId.Value <= 0)
+        {
+            return false;
+        }
+
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            return false;
+        }
+
+        string? memberRole = await dbContext.StudyGroupMembers
+            .Where(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId)
+            .Select(m => m.Role)
+            .FirstOrDefaultAsync();
+
+        return memberRole == StudyGroupRoles.Owner
+            || memberRole == StudyGroupRoles.Admin
+            || memberRole == StudyGroupRoles.Contributor;
     }
 }

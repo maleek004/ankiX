@@ -149,8 +149,9 @@ export async function getCard(cardId){
   return res.json()
 }
 
-export async function getAllCards(){
-  const res = await fetch(`${API_BASE}/cards`, { headers: authHeaders() })
+export async function getAllCards(studyGroupId = null){
+  const query = studyGroupId ? `?studyGroupId=${studyGroupId}` : ''
+  const res = await fetch(`${API_BASE}/cards${query}`, { headers: authHeaders() })
   if(!res.ok) throw new Error('Failed to fetch all cards')
   return res.json()
 }

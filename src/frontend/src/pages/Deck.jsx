@@ -1245,11 +1245,13 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
 }
 
 function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, onConverted }) {
+  const { activeStudyGroup } = useStudyGroup() || {}
   const [activeTab, setActiveTab] = useState('link') // 'link' | 'create'
   const [existingCards, setExistingCards] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [loadingCards, setLoadingCards] = useState(true)
 
+  const [newPrompt, setNewPrompt] = useState(followup?.questionText || '')
   const [decks, setDecks] = useState([])
   const [targetDeckId, setTargetDeckId] = useState(currentDeckId || '')
   const [validationSpec, setValidationSpec] = useState('')
@@ -1259,8 +1261,8 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
   useEffect(() => {
     let mounted = true
     import('../api.js').then(m => Promise.all([
-      m.getDecks().catch(() => []),
-      m.getAllCards().catch(() => [])
+      m.getDecks(activeStudyGroup?.id).catch(() => []),
+      m.getAllCards(activeStudyGroup?.id).catch(() => [])
     ])).then(([dData, cData]) => {
       if (!mounted) return
       setDecks(dData || [])
@@ -1269,7 +1271,7 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
       setLoadingCards(false)
     })
     return () => { mounted = false }
-  }, [targetDeckId])
+  }, [targetDeckId, activeStudyGroup?.id])
 
   const handleLinkExistingCard = async (existingCardId) => {
     setSaving(true)
@@ -1288,12 +1290,12 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
 
   const handleCreateAndLink = async (e) => {
     e.preventDefault()
-    if (!targetDeckId) return
+    if (!targetDeckId || !newPrompt.trim()) return
     setSaving(true)
     try {
       const m = await import('../api.js')
-      // 1. Create card in selected target deck with locked followup question as prompt
-      const newCard = await m.createCard(targetDeckId, followup.questionText, validationSpec, type)
+      // 1. Create card in selected target deck with user-defined prompt
+      const newCard = await m.createCard(targetDeckId, newPrompt.trim(), validationSpec, type)
 
       // 2. Link followup question to new card
       await m.linkFollowupToCard(parentCard.id, followup.id, newCard.id)
@@ -1405,7 +1407,7 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
               {loadingCards ? (
                 <div style={{ textAlign: 'center', padding: 20, color: '#6c757d' }}>Loading cards catalog...</div>
               ) : filteredCards.length === 0 ? (
-                <div className="empty-state">No matching cards found. Try another search or create a new card in the tab above!</div>
+                <div className="empty-state">No matching cards found in this study group. Try another search or create a new card in the tab above!</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {filteredCards.map(c => (
@@ -1450,30 +1452,16 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
             </div>
           ) : (
             <form onSubmit={handleCreateAndLink} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Read-Only Question Prompt Field */}
+              {/* Question / Prompt Field */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Question / Prompt</label>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: '#6c757d', color: '#fff' }}>
-                    🔒 Read-Only Question Prompt
-                  </span>
-                </div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 6 }}>Question / Prompt</label>
                 <input
                   className="form-control"
-                  value={followup.questionText}
-                  disabled
-                  readOnly
-                  style={{
-                    background: '#e9ecef',
-                    color: '#495057',
-                    fontWeight: 500,
-                    cursor: 'not-allowed',
-                    border: '1px solid #ced4da'
-                  }}
+                  value={newPrompt}
+                  onChange={e => setNewPrompt(e.target.value)}
+                  placeholder="Enter question or prompt for the new card..."
+                  required
                 />
-                <span style={{ fontSize: '0.75rem', color: '#6c757d', marginTop: 4, display: 'block' }}>
-                  The original followup question prompt is locked and cannot be modified.
-                </span>
               </div>
 
               {/* Target Deck & Card Type */}
@@ -1516,7 +1504,7 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
               {/* Submit Button */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
                 <button type="button" className="btn-study-tool" onClick={onClose}>Cancel</button>
-                <button type="submit" className="btn-primary" disabled={saving}>
+                <button type="submit" className="btn-primary" disabled={saving || !newPrompt.trim()}>
                   {saving ? 'Converting Card...' : 'Save & Link Standalone Card 🎴'}
                 </button>
               </div>

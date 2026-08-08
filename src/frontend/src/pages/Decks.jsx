@@ -37,7 +37,7 @@ export default function Decks(){
         if (mounted) setLoading(false)
       })
     return () => { mounted = false }
-  }, [activeStudyGroup, navigate])
+  }, [activeStudyGroup?.id, activeStudyGroup?.role, navigate])
 
   const create = async (e) => {
     e.preventDefault()

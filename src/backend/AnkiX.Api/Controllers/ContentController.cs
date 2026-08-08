@@ -189,9 +189,26 @@ public sealed class ContentController : ControllerBase
 
     [HttpGet("cards")]
     [HttpGet("/api/cards")]
-    public async Task<ActionResult<IEnumerable<CardResponse>>> GetAllCards()
+    public async Task<ActionResult<IEnumerable<CardResponse>>> GetAllCards([FromQuery] int? studyGroupId = null)
     {
+        var decksQuery = dbContext.Decks.AsQueryable();
+        if (studyGroupId.HasValue && studyGroupId.Value > 0)
+        {
+            var sampleGroupId = await dbContext.StudyGroups.AsNoTracking().Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
+            if (studyGroupId.Value == sampleGroupId || sampleGroupId == 0)
+            {
+                decksQuery = decksQuery.Where(deck => deck.StudyGroupId == studyGroupId.Value || deck.StudyGroupId == null || deck.StudyGroupId == 0);
+            }
+            else
+            {
+                decksQuery = decksQuery.Where(deck => deck.StudyGroupId == studyGroupId.Value);
+            }
+        }
+
+        List<int> deckIds = await decksQuery.Select(d => d.Id).ToListAsync();
+
         List<CardResponse> cards = await dbContext.Cards
+            .Where(c => deckIds.Contains(c.DeckId))
             .OrderByDescending(c => c.Id)
             .Select(c => new CardResponse
             {
