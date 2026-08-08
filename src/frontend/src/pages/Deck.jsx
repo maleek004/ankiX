@@ -561,6 +561,7 @@ export default function Deck(){
 }
 
 function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
+  const { activeStudyGroup } = useStudyGroup() || {}
   const [activeTab, setActiveTab] = useState('search') // 'search' | 'create'
   const [exercises, setExercises] = useState([])
   const [linkedIds, setLinkedIds] = useState(new Set())
@@ -569,10 +570,23 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
 
   // Inline creation form state
   const [title, setTitle] = useState('')
-  const [language, setLanguage] = useState('python')
+  const [language, setLanguage] = useState('csharp')
+  const [exerciseType, setExerciseType] = useState('CodeExecution') // 'CodeExecution' | 'MultipleChoice' | 'ExactString'
   const [description, setDescription] = useState('')
   const [starterCode, setStarterCode] = useState('')
   const [solutionCode, setSolutionCode] = useState('')
+
+  // MCQ state
+  const [mcqOpt1, setMcqOpt1] = useState('')
+  const [mcqOpt2, setMcqOpt2] = useState('')
+  const [mcqOpt3, setMcqOpt3] = useState('')
+  const [mcqOpt4, setMcqOpt4] = useState('')
+  const [mcqCorrect, setMcqCorrect] = useState(0)
+
+  // Exact String state
+  const [exactAnswer, setExactAnswer] = useState('')
+  const [exactCaseSensitive, setExactCaseSensitive] = useState(false)
+
   const [creating, setCreating] = useState(false)
 
   const loadData = useCallback(async () => {
@@ -580,7 +594,7 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
     try {
       const m = await import('../api.js')
       const [allExs, cardExs] = await Promise.all([
-        m.getExercises().catch(() => []),
+        m.getExercises('', activeStudyGroup?.id).catch(() => []),
         m.getCardExercises(card.id).catch(() => [])
       ])
       setExercises(allExs || [])
@@ -590,7 +604,7 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
     } finally {
       setLoading(false)
     }
-  }, [card.id])
+  }, [card.id, activeStudyGroup?.id])
 
   useEffect(() => {
     loadData()
@@ -616,15 +630,35 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
   const handleCreateAndLink = async (e) => {
     e.preventDefault()
     if (!title.trim()) return
+
+    let exerciseSpec = null
+    if (exerciseType === 'MultipleChoice') {
+      const opts = [mcqOpt1, mcqOpt2, mcqOpt3, mcqOpt4].map(s => s.trim()).filter(Boolean)
+      if (opts.length < 2) {
+        alert('Please provide at least 2 options for Multiple Choice exercise.')
+        return
+      }
+      exerciseSpec = JSON.stringify({ options: opts, correctIndex: Number(mcqCorrect) })
+    } else if (exerciseType === 'ExactString') {
+      if (!exactAnswer.trim()) {
+        alert('Please provide the correct answer for Exact String exercise.')
+        return
+      }
+      exerciseSpec = JSON.stringify({ acceptedAnswers: [exactAnswer.trim()], caseSensitive: exactCaseSensitive })
+    }
+
     setCreating(true)
     try {
       const m = await import('../api.js')
       const newEx = await m.createExercise({
         title,
         language,
+        exerciseType,
+        exerciseSpec,
         description,
         starterCode,
-        solutionCode
+        solutionCode,
+        studyGroupId: activeStudyGroup?.id
       })
       await m.linkCardExercise(card.id, newEx.id)
       alert(`Created and linked "${title}" to card!`)
@@ -632,6 +666,11 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
       setDescription('')
       setStarterCode('')
       setSolutionCode('')
+      setMcqOpt1('')
+      setMcqOpt2('')
+      setMcqOpt3('')
+      setMcqOpt4('')
+      setExactAnswer('')
       setActiveTab('search')
       await loadData()
       if (onUpdated) onUpdated()
@@ -646,9 +685,15 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
     if (!searchQuery.trim()) return true
     const q = searchQuery.toLowerCase()
     return ex.title.toLowerCase().includes(q) ||
-           ex.language.toLowerCase().includes(q) ||
+           (ex.language && ex.language.toLowerCase().includes(q)) ||
            (ex.description && ex.description.toLowerCase().includes(q))
   })
+
+  const typeBadges = {
+    CodeExecution: { label: '⚡ Code Exec', bg: '#e7f5ff', color: '#1864ab' },
+    MultipleChoice: { label: '🔘 MCQ', bg: '#fff3bf', color: '#f59f00' },
+    ExactString: { label: '✏️ Short Answer', bg: '#e6fcb5', color: '#5c940d' }
+  }
 
   return (
     <div
@@ -685,7 +730,7 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
         {/* Header */}
         <div style={{ padding: '16px 24px', background: '#f8f9fa', borderBottom: '1px solid #dee2e6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>🔗 Link Coding Exercises</h3>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>🔗 Link Exercises</h3>
             <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>Card: "{card.prompt.length > 45 ? card.prompt.substring(0, 45) + '...' : card.prompt}"</span>
           </div>
           <button style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.4rem', color: '#6c757d' }} onClick={onClose}>✕</button>
@@ -746,6 +791,7 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {filteredExercises.map(ex => {
                     const isLinked = linkedIds.has(ex.id)
+                    const typeB = typeBadges[ex.exerciseType || 'CodeExecution'] || typeBadges.CodeExecution
                     return (
                       <div
                         key={ex.id}
@@ -762,9 +808,14 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                             <strong style={{ fontSize: '0.95rem' }}>{ex.title}</strong>
-                            <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#eee' }}>
-                              {ex.language}
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: typeB.bg, color: typeB.color }}>
+                              {typeB.label}
                             </span>
+                            {(!ex.exerciseType || ex.exerciseType === 'CodeExecution') && (
+                              <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#eee' }}>
+                                {ex.language}
+                              </span>
+                            )}
                           </div>
                           {ex.description && (
                             <p style={{ margin: 0, fontSize: '0.8rem', color: '#6c757d', maxWidth: 450, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -796,36 +847,84 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
             </div>
           ) : (
             <form onSubmit={handleCreateAndLink} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <div style={{ flex: 2 }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Exercise Title</label>
-                  <input className="form-control" value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Check Prime Number" required />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Language</label>
-                  <select className="form-control" value={language} onChange={e=>setLanguage(e.target.value)}>
-                    <option value="python">Python</option>
-                    <option value="javascript">JavaScript</option>
-                    <option value="csharp">C#</option>
-                    <option value="go">Go</option>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Exercise Title</label>
+                <input className="form-control" value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Reverse String" required />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: exerciseType === 'CodeExecution' ? '1fr 1fr' : '1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Exercise Format</label>
+                  <select className="form-control" value={exerciseType} onChange={e => setExerciseType(e.target.value)}>
+                    <option value="CodeExecution">⚡ Code Execution</option>
+                    <option value="MultipleChoice">🔘 Multiple Choice (MCQ)</option>
+                    <option value="ExactString">✏️ Exact String / Short Answer</option>
                   </select>
                 </div>
+                {exerciseType === 'CodeExecution' && (
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language Tag</label>
+                    <select className="form-control" value={language} onChange={e => setLanguage(e.target.value)}>
+                      <option value="csharp">C#</option>
+                      <option value="python">Python</option>
+                      <option value="javascript">JavaScript</option>
+                      <option value="go">Go</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Instructions / Description</label>
-                <textarea className="form-control" rows={3} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Describe the problem..." />
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Instructions / Problem Statement</label>
+                <textarea className="form-control" rows={3} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Exercise instructions or question text..." />
               </div>
 
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Starter Code Template</label>
-                <textarea className="form-control" rows={3} style={{ fontFamily: 'monospace' }} value={starterCode} onChange={e=>setStarterCode(e.target.value)} placeholder="initial function signature..." />
-              </div>
+              {exerciseType === 'CodeExecution' && (
+                <>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Starter Code Template</label>
+                    <textarea className="form-control" rows={3} style={{ fontFamily: 'monospace' }} value={starterCode} onChange={e=>setStarterCode(e.target.value)} placeholder="initial function signature..." />
+                  </div>
 
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Solution Code (or Assertion Test Suite)</label>
-                <textarea className="form-control" rows={3} style={{ fontFamily: 'monospace' }} value={solutionCode} onChange={e=>setSolutionCode(e.target.value)} placeholder="reference solution code..." />
-              </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Solution Code (or Assertion Test Suite)</label>
+                    <textarea className="form-control" rows={3} style={{ fontFamily: 'monospace' }} value={solutionCode} onChange={e=>setSolutionCode(e.target.value)} placeholder="reference solution code..." />
+                  </div>
+                </>
+              )}
+
+              {exerciseType === 'MultipleChoice' && (
+                <div style={{ background: '#f8f9fa', padding: 14, borderRadius: 8, border: '1px solid #dee2e6', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Multiple Choice Options:</label>
+                  <input className="form-control" placeholder="Option A" value={mcqOpt1} onChange={e => setMcqOpt1(e.target.value)} required />
+                  <input className="form-control" placeholder="Option B" value={mcqOpt2} onChange={e => setMcqOpt2(e.target.value)} required />
+                  <input className="form-control" placeholder="Option C (Optional)" value={mcqOpt3} onChange={e => setMcqOpt3(e.target.value)} />
+                  <input className="form-control" placeholder="Option D (Optional)" value={mcqOpt4} onChange={e => setMcqOpt4(e.target.value)} />
+
+                  <div style={{ marginTop: 4 }}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 4 }}>Correct Option:</label>
+                    <select className="form-control" value={mcqCorrect} onChange={e => setMcqCorrect(Number(e.target.value))}>
+                      <option value={0}>Option A (First Option)</option>
+                      <option value={1}>Option B (Second Option)</option>
+                      {mcqOpt3 && <option value={2}>Option C (Third Option)</option>}
+                      {mcqOpt4 && <option value={3}>Option D (Fourth Option)</option>}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {exerciseType === 'ExactString' && (
+                <div style={{ background: '#f8f9fa', padding: 14, borderRadius: 8, border: '1px solid #dee2e6', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 4 }}>Correct Answer (Exact Match):</label>
+                    <input className="form-control" placeholder="e.g. const" value={exactAnswer} onChange={e => setExactAnswer(e.target.value)} required />
+                  </div>
+                  <label style={{ fontSize: '0.85rem', color: '#495057', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={exactCaseSensitive} onChange={e => setExactCaseSensitive(e.target.checked)} />
+                    Case-sensitive matching
+                  </label>
+                </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                 <button type="submit" className="btn-primary" disabled={creating}>

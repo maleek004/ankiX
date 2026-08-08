@@ -5,6 +5,7 @@ import {
   getExercises,
   getExercise,
   createExercise,
+  deleteExercise,
   runExerciseCode,
   submitExerciseReview,
   canCreateContent,
@@ -146,6 +147,18 @@ export default function Exercises() {
       await handleToggleEnroll(newEx.id)
     } catch (err) {
       alert('Create exercise failed: ' + (err.message || err))
+    }
+  }
+
+  const handleDelete = async (exId, exTitle, e) => {
+    if (e) e.stopPropagation()
+    if (!window.confirm(`Are you sure you want to delete "${exTitle}"?`)) return
+    try {
+      await deleteExercise(exId)
+      setExercises(prev => prev.filter(ex => ex.id !== exId))
+      setDueQueue(prev => prev.filter(ex => ex.id !== exId))
+    } catch (err) {
+      alert('Delete exercise failed: ' + (err.message || err))
     }
   }
 
@@ -343,13 +356,24 @@ export default function Exercises() {
                         )}
                       </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid #f1f3f5' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid #f1f3f5', gap: 6, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.75rem', color: '#2b8a3e', fontWeight: 600, background: '#d3f9d8', padding: '2px 8px', borderRadius: 4 }}>
                           Due for Review
                         </span>
-                        <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => openPractice(ex, true, idx)}>
-                          Practice Queue ⚡
-                        </button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {canCreate && (
+                            <button
+                              style={{ padding: '6px 10px', fontSize: '0.8rem', background: '#fff5f5', color: '#e03131', border: '1px solid #ffc9c9', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                              onClick={(e) => handleDelete(ex.id, ex.title, e)}
+                              title="Delete exercise"
+                            >
+                              🗑️ Delete
+                            </button>
+                          )}
+                          <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => openPractice(ex, true, idx)}>
+                            Practice Queue ⚡
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -444,7 +468,7 @@ export default function Exercises() {
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid #f1f3f5' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid #f1f3f5', gap: 6, flexWrap: 'wrap' }}>
                       <button
                         className="btn-study-tool"
                         style={{
@@ -460,9 +484,20 @@ export default function Exercises() {
                         {isEnrolled ? '✓ In Collection' : '+ Add to Collection'}
                       </button>
 
-                      <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => openPractice(ex)}>
-                        Practice ⚡
-                      </button>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {canCreate && (
+                          <button
+                            style={{ padding: '6px 10px', fontSize: '0.8rem', background: '#fff5f5', color: '#e03131', border: '1px solid #ffc9c9', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                            onClick={(e) => handleDelete(ex.id, ex.title, e)}
+                            title="Delete exercise"
+                          >
+                            🗑️ Delete
+                          </button>
+                        )}
+                        <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => openPractice(ex)}>
+                          Practice ⚡
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )

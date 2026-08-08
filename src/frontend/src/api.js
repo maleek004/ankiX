@@ -298,6 +298,18 @@ export async function createExercise(exerciseData){
   return res.json()
 }
 
+export async function deleteExercise(id){
+  const res = await fetch(`${API_BASE}/exercises/${id}`,{
+    method: 'DELETE',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to delete exercise')
+  }
+  return true
+}
+
 export async function getCardExercises(cardId){
   const res = await fetch(`${API_BASE}/cards/${cardId}/exercises`, { headers: authHeaders() })
   if(!res.ok) throw new Error('Failed to fetch card exercises')
