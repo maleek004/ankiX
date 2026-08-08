@@ -41,10 +41,37 @@ public sealed class ExercisesController : ControllerBase
             query = query.Where(e => e.Language.ToLower() == normLang);
         }
 
+        int userId = 0;
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int.TryParse(userIdClaim, out userId);
+
+        List<int> joinedGroupIds = await dbContext.StudyGroupMembers.AsNoTracking()
+            .Where(m => m.UserId == userId)
+            .Select(m => m.StudyGroupId)
+            .ToListAsync();
+
+        var sampleGroupId = await dbContext.StudyGroups.AsNoTracking().Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
+        bool sampleJoined = sampleGroupId > 0 && joinedGroupIds.Contains(sampleGroupId);
+
         int? groupId = studyGroupId ?? communityId;
-        if (groupId.HasValue)
+        if (groupId.HasValue && groupId.Value > 0)
         {
-            query = query.Where(e => e.StudyGroupId == groupId.Value);
+            if (!joinedGroupIds.Contains(groupId.Value))
+            {
+                return Ok(Array.Empty<ExerciseResponse>());
+            }
+            if (groupId.Value == sampleGroupId || sampleGroupId == 0)
+            {
+                query = query.Where(e => e.StudyGroupId == groupId.Value || e.StudyGroupId == null || e.StudyGroupId == 0);
+            }
+            else
+            {
+                query = query.Where(e => e.StudyGroupId == groupId.Value);
+            }
+        }
+        else
+        {
+            query = query.Where(e => (e.StudyGroupId.HasValue && joinedGroupIds.Contains(e.StudyGroupId.Value)) || (sampleJoined && (e.StudyGroupId == null || e.StudyGroupId == 0)));
         }
 
         var rawExercises = await query

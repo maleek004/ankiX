@@ -29,12 +29,24 @@ public sealed class DecksController : ControllerBase
 
         DateTime now = DateTime.UtcNow;
 
+        List<int> joinedGroupIds = await dbContext.StudyGroupMembers.AsNoTracking()
+            .Where(m => m.UserId == userId)
+            .Select(m => m.StudyGroupId)
+            .ToListAsync();
+
+        var sampleGroupId = await dbContext.StudyGroups.AsNoTracking().Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
+        bool sampleJoined = sampleGroupId > 0 && joinedGroupIds.Contains(sampleGroupId);
+
         int? groupId = studyGroupId ?? communityId;
 
         var decksQuery = dbContext.Decks.AsQueryable();
-        if (groupId.HasValue)
+        if (groupId.HasValue && groupId.Value > 0)
         {
-            var sampleGroupId = await dbContext.StudyGroups.Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
+            if (!joinedGroupIds.Contains(groupId.Value))
+            {
+                return Ok(Array.Empty<DeckResponse>());
+            }
+
             if (groupId.Value == sampleGroupId || sampleGroupId == 0)
             {
                 decksQuery = decksQuery.Where(deck => deck.StudyGroupId == groupId.Value || deck.StudyGroupId == null || deck.StudyGroupId == 0);
@@ -43,6 +55,10 @@ public sealed class DecksController : ControllerBase
             {
                 decksQuery = decksQuery.Where(deck => deck.StudyGroupId == groupId.Value);
             }
+        }
+        else
+        {
+            decksQuery = decksQuery.Where(deck => (deck.StudyGroupId.HasValue && joinedGroupIds.Contains(deck.StudyGroupId.Value)) || (sampleJoined && (deck.StudyGroupId == null || deck.StudyGroupId == 0)));
         }
 
         var rawDecks = await decksQuery

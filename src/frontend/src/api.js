@@ -394,9 +394,13 @@ export async function unlinkFollowupCard(cardId, followupId, linkedCardId){
   return res.json()
 }
 
-export async function globalSearch(query){
+export async function globalSearch(query, studyGroupId = null){
   if(!query || query.trim().length < 2) return { decks: [], cards: [], exercises: [], followups: [] }
-  const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query.trim())}`, { headers: authHeaders() })
+  let url = `${API_BASE}/search?q=${encodeURIComponent(query.trim())}`
+  if(studyGroupId) {
+    url += `&studyGroupId=${encodeURIComponent(studyGroupId)}`
+  }
+  const res = await fetch(url, { headers: authHeaders() })
   if(!res.ok) throw new Error('Global search failed')
   return res.json()
 }

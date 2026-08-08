@@ -1,16 +1,21 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { globalSearch } from '../api'
+import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import ExercisePracticeModal from './Exercises'
 
 export default function Search() {
+  const { activeStudyGroup } = useStudyGroup() || {}
   const [query, setQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('all') // 'all' | 'decks' | 'cards' | 'exercises' | 'followups'
+  const [searchScope, setSearchScope] = useState(activeStudyGroup ? 'current' : 'all_joined') // 'current' | 'all_joined'
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState({ decks: [], cards: [], exercises: [], followups: [] })
   const [activePracticeExercise, setActivePracticeExercise] = useState(null)
 
   const navigate = useNavigate()
+
+  const targetGroupId = (searchScope === 'current' && activeStudyGroup) ? activeStudyGroup.id : null
 
   useEffect(() => {
     if (!query.trim() || query.trim().length < 2) {
@@ -21,14 +26,14 @@ export default function Search() {
 
     setLoading(true)
     const timer = setTimeout(() => {
-      globalSearch(query)
+      globalSearch(query, targetGroupId)
         .then(data => setResults(data || { decks: [], cards: [], exercises: [], followups: [] }))
         .catch(err => console.error(err))
         .finally(() => setLoading(false))
     }, 300)
 
     return () => clearTimeout(timer)
-  }, [query])
+  }, [query, targetGroupId])
 
   const totalDecks = results.decks?.length || 0
   const totalCards = results.cards?.length || 0
@@ -40,17 +45,59 @@ export default function Search() {
     <div style={{ maxWidth: 960, margin: '30px auto', padding: '0 16px' }}>
       {/* Search Header */}
       <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        <h2 style={{ fontSize: '1.8rem', fontWeight: 700, margin: 0 }}>🔍 Global Platform Search</h2>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: 700, margin: 0 }}>🔍 Platform Search</h2>
         <p style={{ color: '#6c757d', fontSize: '0.95rem', marginTop: 4 }}>
-          Search across all decks, flashcards, coding exercises, and follow-up questions
+          {searchScope === 'current' && activeStudyGroup
+            ? `Searching strictly within "${activeStudyGroup.name}"`
+            : `Searching across all study groups you have joined`}
         </p>
+
+        {/* Scope selector toggle if activeStudyGroup is set */}
+        {activeStudyGroup && (
+          <div style={{ display: 'inline-flex', gap: 6, marginTop: 10, background: '#f1f5f9', padding: 4, borderRadius: 8 }}>
+            <button
+              className="btn"
+              style={{
+                padding: '4px 12px',
+                fontSize: '0.85rem',
+                borderRadius: 6,
+                fontWeight: 600,
+                background: searchScope === 'current' ? '#fff' : 'transparent',
+                color: searchScope === 'current' ? '#0d6efd' : '#64748b',
+                boxShadow: searchScope === 'current' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+              }}
+              onClick={() => setSearchScope('current')}
+            >
+              📦 Current Group ({activeStudyGroup.name})
+            </button>
+            <button
+              className="btn"
+              style={{
+                padding: '4px 12px',
+                fontSize: '0.85rem',
+                borderRadius: 6,
+                fontWeight: 600,
+                background: searchScope === 'all_joined' ? '#fff' : 'transparent',
+                color: searchScope === 'all_joined' ? '#0d6efd' : '#64748b',
+                boxShadow: searchScope === 'all_joined' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+              }}
+              onClick={() => setSearchScope('all_joined')}
+            >
+              🌐 All Joined Groups
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Large Input Field */}
       <div style={{ marginBottom: 20 }}>
         <input
           className="form-control"
-          placeholder="Search decks, cards, code exercises, or follow-ups (e.g. 'python', '2+2', 'reverse')..."
+          placeholder={
+            searchScope === 'current' && activeStudyGroup
+              ? `Search decks, cards, exercises, follow-ups in ${activeStudyGroup.name}...`
+              : "Search decks, cards, exercises, follow-ups in your joined study groups..."
+          }
           value={query}
           onChange={e => setQuery(e.target.value)}
           autoFocus
