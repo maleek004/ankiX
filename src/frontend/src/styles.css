@@ -419,6 +419,13 @@ main.main-content {
   text-align: left;
 }
 
+.followups-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
 .btn-followups-toggle {
   background: none;
   border: none;

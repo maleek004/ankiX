@@ -4,7 +4,7 @@ import '@testing-library/jest-dom'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import Deck from '../pages/Deck'
 
-const { mockGetDeck, mockGetStudyQueue, mockGetCards, mockGetFollowups } = vi.hoisted(() => ({
+const { mockGetDeck, mockGetStudyQueue, mockGetCards, mockGetFollowups, mockGetCardExercises } = vi.hoisted(() => ({
   mockGetDeck: vi.fn().mockResolvedValue({ id: 1, title: 'Test Deck' }),
   mockGetStudyQueue: vi.fn().mockResolvedValue({
     newCount: 1,
@@ -16,6 +16,9 @@ const { mockGetDeck, mockGetStudyQueue, mockGetCards, mockGetFollowups } = vi.ho
   mockGetFollowups: vi.fn().mockResolvedValue([
     { id: 101, questionText: 'Followup 1', authorDisplayName: 'User A', createdAt: '2026-08-08T00:00:00Z' },
     { id: 102, questionText: 'Followup 2', authorDisplayName: 'User B', createdAt: '2026-08-08T00:00:00Z' }
+  ]),
+  mockGetCardExercises: vi.fn().mockResolvedValue([
+    { id: 201, title: 'Check Even Number', language: 'python', description: 'Check if number is even' }
   ])
 }))
 
@@ -28,7 +31,7 @@ vi.mock('../api.js', () => ({
   getStudyQueue: (...args) => mockGetStudyQueue(...args),
   getCards: (...args) => mockGetCards(...args),
   getFollowups: (...args) => mockGetFollowups(...args),
-  getCardExercises: async () => [],
+  getCardExercises: (...args) => mockGetCardExercises(...args),
   canCreateContent: () => true,
   getDecks: async () => [],
   getAllCards: async () => []
@@ -48,6 +51,9 @@ test('Deck renders followups in a scrollable list container', async () => {
     expect(screen.getByText('What is 2+2?')).toBeInTheDocument()
   })
 
+  // Linked exercises should NOT be visible before showing answer
+  expect(screen.queryByText(/Linked Exercises/i)).not.toBeInTheDocument()
+
   const showAnswerBtn = screen.getByText('Show Answer')
   fireEvent.click(showAnswerBtn)
 
@@ -59,4 +65,16 @@ test('Deck renders followups in a scrollable list container', async () => {
 
   const list = followupText.closest('ul')
   expect(list).toHaveClass('followups-list')
+
+  // Click Linked Exercises toggle button
+  const linkedExBtn = screen.getByText(/Linked Exercises/i)
+  fireEvent.click(linkedExBtn)
+
+  // Followup 1 should be closed/hidden when Linked Exercises is open
+  expect(screen.queryByText('Followup 1')).not.toBeInTheDocument()
+
+  // Linked Exercise should be visible in scrollable list
+  const exTitle = await screen.findByText(/Check Even Number/i)
+  expect(exTitle).toBeInTheDocument()
+  expect(exTitle.closest('ul')).toHaveClass('followups-list')
 })
