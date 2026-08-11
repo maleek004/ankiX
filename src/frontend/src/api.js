@@ -53,6 +53,31 @@ export async function login(email, password){
   return data
 }
 
+export async function oauthLogin(provider, { idToken, code, redirectUri } = {}){
+  const res = await fetch(`${API_BASE}/auth/oauth`,{
+    method:'POST',
+    headers:{ 'Content-Type':'application/json'},
+    body: JSON.stringify({ provider, idToken, code, redirectUri })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    let msg = 'OAuth authentication failed'
+    try {
+      const parsed = JSON.parse(txt)
+      msg = parsed.message || msg
+    } catch {}
+    throw new Error(msg)
+  }
+  const data = await res.json()
+  if(data?.accessToken){
+    localStorage.setItem('ankix_token', data.accessToken)
+    if(data?.user){
+      localStorage.setItem('ankix_user', JSON.stringify(data.user))
+    }
+  }
+  return data
+}
+
 export function getEffectiveDisplayName(displayName, email) {
   if (displayName && typeof displayName === 'string' && displayName.trim()) {
     const trimmed = displayName.trim()

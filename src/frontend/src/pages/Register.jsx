@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
+import SocialButtons from '../components/SocialButtons'
 
 export default function Register(){
   const [email, setEmail] = useState('')
@@ -43,9 +44,11 @@ export default function Register(){
             {isLoading ? "Registering..." : "Create Account"}
           </button>
         </form>
+        <SocialButtons mode="register" />
       </div>
     </div>
   )
 }
+
 
 

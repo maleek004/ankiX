@@ -19,6 +19,15 @@ public sealed class User
     [MaxLength(20)]
     public string Role { get; set; } = Roles.User;
 
+    [MaxLength(30)]
+    public string AuthProvider { get; set; } = "local";
+
+    [MaxLength(128)]
+    public string? GoogleId { get; set; }
+
+    [MaxLength(128)]
+    public string? GitHubId { get; set; }
+
     [Column(TypeName = "datetime2")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

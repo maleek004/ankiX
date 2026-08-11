@@ -1,0 +1,51 @@
+import React, { useEffect, useState } from 'react'
+import { useAuth } from '../auth/AuthProvider'
+
+export default function OAuthCallback() {
+  const auth = useAuth()
+  const [status, setStatus] = useState('Authenticating with OAuth provider...')
+
+  useEffect(() => {
+    async function handleCallback() {
+      const params = new URLSearchParams(window.location.search)
+      const code = params.get('code')
+      const error = params.get('error')
+
+      if (error) {
+        setStatus(`OAuth Error: ${error}`)
+        return
+      }
+
+      if (!code) {
+        setStatus('Invalid callback: Authorization code missing.')
+        return
+      }
+
+      try {
+        const redirectUri = `${window.location.origin}/oauth/callback`
+        await auth.oauthLogin('github', { code, redirectUri })
+        window.location.href = '/decks'
+      } catch (err) {
+        setStatus(`Social sign-in failed: ${err.message || err}`)
+      }
+    }
+
+    handleCallback()
+  }, [auth])
+
+  return (
+    <div style={{ maxWidth: 450, margin: '80px auto', textAlign: 'center' }}>
+      <div className="card" style={{ padding: '30px' }}>
+        <h3>Social Sign-In</h3>
+        <p style={{ color: '#666', marginTop: 12 }}>{status}</p>
+        {status.includes('failed') || status.includes('Error') || status.includes('Invalid') ? (
+          <a href="/login" className="btn-primary" style={{ display: 'inline-block', marginTop: 16 }}>
+            Return to Login
+          </a>
+        ) : (
+          <div className="spinner" style={{ marginTop: 20 }}></div>
+        )}
+      </div>
+    </div>
+  )
+}

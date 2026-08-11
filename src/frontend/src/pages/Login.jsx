@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
+import SocialButtons from '../components/SocialButtons'
 
 export default function Login(){
   const auth = useAuth()
@@ -37,8 +38,10 @@ export default function Login(){
             {isLoading ? "Logging in..." : "Log In"}
           </button>
         </form>
+        <SocialButtons mode="login" />
       </div>
     </div>
   )
 }
+
 

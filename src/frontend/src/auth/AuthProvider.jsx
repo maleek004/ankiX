@@ -24,6 +24,15 @@ export function AuthProvider({ children }){
     return data
   }
 
+  const oauthLogin = async (provider, payload) => {
+    const data = await api.oauthLogin(provider, payload)
+    if(data?.user){
+      setUser(data.user)
+      localStorage.setItem('ankix_user', JSON.stringify(data.user))
+    }
+    return data
+  }
+
   const register = async (email, password, displayName) => {
     const data = await api.register(email, password, displayName)
     return data
@@ -37,11 +46,12 @@ export function AuthProvider({ children }){
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, register }}>
+    <AuthContext.Provider value={{ user, login, oauthLogin, logout, register }}>
       {children}
     </AuthContext.Provider>
   )
 }
+
 
 export function useAuth(){
   return useContext(AuthContext)
