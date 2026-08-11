@@ -2,11 +2,14 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import ExerciseRenderer from '../components/ExerciseComponents'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
+import CopyModal from '../components/CopyModal'
 import * as api from '../api'
 
 export default function Deck(){
   const { activeStudyGroup } = useStudyGroup() || {}
   const { id } = useParams()
+  const [copyModalCard, setCopyModalCard] = useState(null)
+
   const [deck, setDeck]           = useState(null)
   const [queue, setQueue]         = useState({ newCount:0, learningCount:0, reviewCount:0, dueCards:[] })
   const [allCards, setAllCards]   = useState([])  // for the edit drawer
@@ -300,6 +303,13 @@ export default function Deck(){
                 <button
                   className="btn-study-tool"
                   style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#0d6efd', color: '#0d6efd' }}
+                  onClick={() => setCopyModalCard(c)}
+                >
+                  📋 Copy
+                </button>
+                <button
+                  className="btn-study-tool"
+                  style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#0d6efd', color: '#0d6efd' }}
                   onClick={() => setLinkerModalCard(c)}
                 >
                   🔗 Link Exercises
@@ -354,16 +364,26 @@ export default function Deck(){
             {/* Front Prompt */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
               <div className="card-prompt" style={{ flex: 1 }}>{currentCard.prompt}</div>
-              {canCreate && (
+              <div style={{ display: 'flex', gap: 6 }}>
                 <button
                   className="btn-study-tool"
                   style={{ fontSize: '0.8rem', padding: '4px 10px', whiteSpace: 'nowrap', borderColor: '#0d6efd', color: '#0d6efd' }}
-                  onClick={() => setLinkerModalCard(currentCard)}
+                  onClick={() => setCopyModalCard(currentCard)}
                 >
-                  🔗 Link Exercises
+                  📋 Copy Card
                 </button>
-              )}
+                {canCreate && (
+                  <button
+                    className="btn-study-tool"
+                    style={{ fontSize: '0.8rem', padding: '4px 10px', whiteSpace: 'nowrap', borderColor: '#0d6efd', color: '#0d6efd' }}
+                    onClick={() => setLinkerModalCard(currentCard)}
+                  >
+                    🔗 Link Exercises
+                  </button>
+                )}
+              </div>
             </div>
+
 
             {/* Micro-coding Editor */}
             {currentCard.type === 'micro-coding' && (
@@ -584,6 +604,18 @@ export default function Deck(){
           onImportSuccess={loadQueue}
         />
       )}
+
+      {/* Copy Card Modal */}
+      <CopyModal
+        isOpen={!!copyModalCard}
+        onClose={() => setCopyModalCard(null)}
+        itemType="card"
+        item={copyModalCard}
+        onSuccess={() => {
+          alert('Card copied to deck successfully!')
+          loadQueue()
+        }}
+      />
     </div>
   )
 }

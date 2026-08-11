@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { globalSearch, getEffectiveDisplayName } from '../api'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import ExercisePracticeModal from './Exercises'
+import CopyModal from '../components/CopyModal'
 
 export default function Search() {
   const { activeStudyGroup } = useStudyGroup() || {}
@@ -12,6 +13,7 @@ export default function Search() {
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState({ decks: [], cards: [], exercises: [], followups: [] })
   const [activePracticeExercise, setActivePracticeExercise] = useState(null)
+  const [copyModalData, setCopyModalData] = useState(null) // { type: 'card'|'exercise', item: obj }
 
   const navigate = useNavigate()
 
@@ -102,10 +104,10 @@ export default function Search() {
           onChange={e => setQuery(e.target.value)}
           autoFocus
           style={{
-            padding: '14px 20px',
+            padding: '12px 18px',
             fontSize: '1.1rem',
             borderRadius: 10,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+            boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
           }}
         />
       </div>
@@ -207,10 +209,8 @@ export default function Search() {
                       borderRadius: 8,
                       display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center',
-                      cursor: 'pointer'
+                      alignItems: 'center'
                     }}
-                    onClick={() => navigate(`/decks/${c.deckId}`)}
                   >
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -229,9 +229,22 @@ export default function Search() {
                       )}
                     </div>
 
-                    <button className="btn-study-tool" style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
-                      Study Card ➔
-                    </button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        className="btn-study-tool"
+                        style={{ fontSize: '0.8rem', padding: '4px 10px', borderColor: '#0d6efd', color: '#0d6efd' }}
+                        onClick={(e) => { e.stopPropagation(); setCopyModalData({ type: 'card', item: c }); }}
+                      >
+                        📋 Copy Card
+                      </button>
+                      <button
+                        className="btn-study-tool"
+                        style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                        onClick={() => navigate(`/decks/${c.deckId}`)}
+                      >
+                        Study Card ➔
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -268,13 +281,22 @@ export default function Search() {
                       {ex.description && <p style={{ margin: 0, fontSize: '0.85rem', color: '#6c757d' }}>{ex.description}</p>}
                     </div>
 
-                    <button
-                      className="btn-primary"
-                      style={{ fontSize: '0.8rem', padding: '6px 14px' }}
-                      onClick={() => setActivePracticeExercise(ex)}
-                    >
-                      ▶ Practice Code
-                    </button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        className="btn-study-tool"
+                        style={{ fontSize: '0.8rem', padding: '4px 10px', borderColor: '#0d6efd', color: '#0d6efd' }}
+                        onClick={(e) => { e.stopPropagation(); setCopyModalData({ type: 'exercise', item: ex }); }}
+                      >
+                        📋 Copy Exercise
+                      </button>
+                      <button
+                        className="btn-primary"
+                        style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+                        onClick={() => setActivePracticeExercise(ex)}
+                      >
+                        ▶ Practice Code
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -341,6 +363,16 @@ export default function Search() {
           onClose={() => setActivePracticeExercise(null)}
         />
       )}
+
+      {/* Copy Modal */}
+      <CopyModal
+        isOpen={!!copyModalData}
+        onClose={() => setCopyModalData(null)}
+        itemType={copyModalData?.type}
+        item={copyModalData?.item}
+        onSuccess={() => alert(`${copyModalData?.type === 'card' ? 'Card' : 'Exercise'} copied successfully!`)}
+      />
     </div>
   )
 }
+

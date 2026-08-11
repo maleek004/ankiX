@@ -103,3 +103,12 @@ public sealed class UpdateExerciseRequest
 
     public string? TestCasesSpec { get; set; }
 }
+
+public sealed class CopyExerciseRequest
+{
+    [Required]
+    public int SourceExerciseId { get; set; }
+
+    public int? TargetStudyGroupId { get; set; }
+}
+

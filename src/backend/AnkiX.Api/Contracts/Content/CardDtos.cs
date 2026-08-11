@@ -41,3 +41,13 @@ public sealed class UpdateCardRequest
 
     public string? ValidationSpec { get; set; }
 }
+
+public sealed class CopyCardRequest
+{
+    [Required]
+    public int SourceCardId { get; set; }
+
+    [Required]
+    public int TargetDeckId { get; set; }
+}
+

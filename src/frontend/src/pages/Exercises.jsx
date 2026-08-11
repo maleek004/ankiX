@@ -15,9 +15,12 @@ import {
   getMyDueExercises
 } from '../api.js'
 import ExerciseRenderer from '../components/ExerciseComponents'
+import CopyModal from '../components/CopyModal'
 
 export default function Exercises() {
   const { activeStudyGroup } = useStudyGroup() || {}
+  const [copyModalItem, setCopyModalItem] = useState(null)
+
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('queue') // 'queue' | 'all'
   const [exercises, setExercises] = useState([])
@@ -386,6 +389,13 @@ export default function Exercises() {
                           Due for Review
                         </span>
                         <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            style={{ padding: '6px 10px', fontSize: '0.8rem', background: '#f8f9fa', color: '#0d6efd', border: '1px solid #cff4fc', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                            onClick={(e) => { e.stopPropagation(); setCopyModalItem(ex); }}
+                            title="Copy exercise to another study group"
+                          >
+                            📋 Copy
+                          </button>
                           {canCreate && (
                             <button
                               style={{ padding: '6px 10px', fontSize: '0.8rem', background: '#fff5f5', color: '#e03131', border: '1px solid #ffc9c9', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
@@ -514,6 +524,13 @@ export default function Exercises() {
                       </button>
 
                       <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          style={{ padding: '6px 10px', fontSize: '0.8rem', background: '#f8f9fa', color: '#0d6efd', border: '1px solid #cff4fc', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                          onClick={(e) => { e.stopPropagation(); setCopyModalItem(ex); }}
+                          title="Copy exercise to another study group"
+                        >
+                          📋 Copy
+                        </button>
                         {canCreate && (
                           <button
                             style={{ padding: '6px 10px', fontSize: '0.8rem', background: '#fff5f5', color: '#e03131', border: '1px solid #ffc9c9', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
@@ -533,6 +550,7 @@ export default function Exercises() {
                 )
               })}
             </div>
+
           )}
         </div>
       )}
@@ -783,6 +801,18 @@ export default function Exercises() {
           </div>
         </div>
       )}
+
+      <CopyModal
+        isOpen={!!copyModalItem}
+        onClose={() => setCopyModalItem(null)}
+        itemType="exercise"
+        item={copyModalItem}
+        onSuccess={() => {
+          alert('Exercise copied successfully!')
+          loadData()
+        }}
+      />
     </div>
   )
 }
+

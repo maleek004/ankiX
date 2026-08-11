@@ -204,6 +204,38 @@ export async function createCard(deckId, prompt, validationSpec, type = 'basic')
   return res.json()
 }
 
+export async function copyCardToDeck(sourceCardId, targetDeckId){
+  const res = await fetch(`${API_BASE}/content/cards/copy`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      sourceCardId: Number(sourceCardId),
+      targetDeckId: Number(targetDeckId)
+    })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to copy card to deck')
+  }
+  return res.json()
+}
+
+export async function copyExerciseToGroup(sourceExerciseId, targetStudyGroupId){
+  const res = await fetch(`${API_BASE}/exercises/copy`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      sourceExerciseId: Number(sourceExerciseId),
+      targetStudyGroupId: targetStudyGroupId ? Number(targetStudyGroupId) : null
+    })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to copy exercise to group')
+  }
+  return res.json()
+}
+
 export async function deleteDeck(id){
   const res = await fetch(`${API_BASE}/content/decks/${id}`,{
     method: 'DELETE',

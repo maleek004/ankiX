@@ -242,6 +242,91 @@ public sealed class ContentController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("cards/copy")]
+    [HttpPost("/api/cards/copy")]
+    [Authorize]
+    public async Task<ActionResult<CardResponse>> CopyCard([FromBody] CopyCardRequest request)
+    {
+        Card? sourceCard = await dbContext.Cards.FirstOrDefaultAsync(c => c.Id == request.SourceCardId);
+        if (sourceCard is null)
+        {
+            return NotFound(new { message = "Source card not found." });
+        }
+
+        Deck? sourceDeck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == sourceCard.DeckId);
+        if (!await CanReadContentAsync(sourceDeck?.StudyGroupId))
+        {
+            return Forbid();
+        }
+
+        Deck? targetDeck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == request.TargetDeckId);
+        if (targetDeck is null)
+        {
+            return NotFound(new { message = "Target deck not found." });
+        }
+
+        if (!await CanManageContentAsync(targetDeck.StudyGroupId))
+        {
+            return Forbid();
+        }
+
+        Card newCard = new Card
+        {
+            DeckId = targetDeck.Id,
+            Type = sourceCard.Type,
+            Prompt = sourceCard.Prompt,
+            ValidationSpec = sourceCard.ValidationSpec,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        dbContext.Cards.Add(newCard);
+        await dbContext.SaveChangesAsync();
+
+        CardResponse response = new CardResponse
+        {
+            Id = newCard.Id,
+            DeckId = newCard.DeckId,
+            Type = newCard.Type,
+            Prompt = newCard.Prompt,
+            ValidationSpec = newCard.ValidationSpec
+        };
+
+        return CreatedAtAction(nameof(DecksController.GetCardsByDeck), "Decks", new { deckId = newCard.DeckId }, response);
+    }
+
+    private async Task<bool> CanReadContentAsync(int? studyGroupId)
+    {
+        if (!studyGroupId.HasValue || studyGroupId.Value <= 0)
+        {
+            return true;
+        }
+
+        if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Contributor))
+        {
+            return true;
+        }
+
+        var group = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == studyGroupId.Value);
+        if (group == null)
+        {
+            return false;
+        }
+
+        if (group.IsPublic)
+        {
+            return true;
+        }
+
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            return false;
+        }
+
+        return await dbContext.StudyGroupMembers.AsNoTracking()
+            .AnyAsync(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId);
+    }
+
     private async Task<bool> CanManageContentAsync(int? studyGroupId)
     {
         if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Contributor))
@@ -270,3 +355,4 @@ public sealed class ContentController : ControllerBase
             || memberRole == StudyGroupRoles.Contributor;
     }
 }
+

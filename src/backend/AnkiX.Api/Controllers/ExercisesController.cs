@@ -821,6 +821,98 @@ public sealed class ExercisesController : ControllerBase
         return Ok(new { message = "Exercises database re-seeded successfully with 5 basic coding challenges and test assertion suites." });
     }
 
+    [HttpPost("copy")]
+    [HttpPost("/api/exercises/copy")]
+    [Authorize]
+    public async Task<ActionResult<ExerciseDetailResponse>> CopyExercise([FromBody] CopyExerciseRequest request)
+    {
+        int userId = 0;
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int.TryParse(userIdClaim, out userId);
+
+        Exercise? sourceExercise = await dbContext.Exercises.FirstOrDefaultAsync(e => e.Id == request.SourceExerciseId);
+        if (sourceExercise is null)
+        {
+            return NotFound(new { message = "Source exercise not found." });
+        }
+
+        if (!await CanReadContentAsync(sourceExercise.StudyGroupId))
+        {
+            return Forbid();
+        }
+
+        if (!await CanManageContentAsync(request.TargetStudyGroupId))
+        {
+            return Forbid();
+        }
+
+        Exercise newExercise = new Exercise
+        {
+            Title = sourceExercise.Title,
+            Description = sourceExercise.Description,
+            Language = sourceExercise.Language,
+            ExerciseType = sourceExercise.ExerciseType,
+            ExerciseSpec = sourceExercise.ExerciseSpec,
+            StarterCode = sourceExercise.StarterCode,
+            SolutionCode = sourceExercise.SolutionCode,
+            TestCasesSpec = sourceExercise.TestCasesSpec,
+            CreatedByUserId = userId > 0 ? userId : sourceExercise.CreatedByUserId,
+            StudyGroupId = request.TargetStudyGroupId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        dbContext.Exercises.Add(newExercise);
+        await dbContext.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetExercise), new { id = newExercise.Id }, new ExerciseDetailResponse
+        {
+            Id = newExercise.Id,
+            Title = newExercise.Title,
+            Description = newExercise.Description,
+            Language = newExercise.Language,
+            ExerciseType = newExercise.ExerciseType,
+            ExerciseSpec = newExercise.ExerciseSpec,
+            StarterCode = newExercise.StarterCode,
+            SolutionCode = newExercise.SolutionCode,
+            TestCasesSpec = newExercise.TestCasesSpec,
+            CreatedByUserId = newExercise.CreatedByUserId,
+            CreatedAt = newExercise.CreatedAt
+        });
+    }
+
+    private async Task<bool> CanReadContentAsync(int? studyGroupId)
+    {
+        if (!studyGroupId.HasValue || studyGroupId.Value <= 0)
+        {
+            return true;
+        }
+
+        if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Contributor))
+        {
+            return true;
+        }
+
+        var group = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == studyGroupId.Value);
+        if (group == null)
+        {
+            return false;
+        }
+
+        if (group.IsPublic)
+        {
+            return true;
+        }
+
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            return false;
+        }
+
+        return await dbContext.StudyGroupMembers.AsNoTracking()
+            .AnyAsync(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId);
+    }
+
     private async Task<bool> CanManageContentAsync(int? studyGroupId)
     {
         if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Contributor))
@@ -849,3 +941,4 @@ public sealed class ExercisesController : ControllerBase
             || memberRole == StudyGroupRoles.Contributor;
     }
 }
+
