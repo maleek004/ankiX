@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 
 function GoogleIcon() {
@@ -20,7 +20,6 @@ function GitHubIcon() {
   )
 }
 
-
 export default function SocialButtons({ mode = 'login' }) {
   const auth = useAuth()
   const [loadingProvider, setLoadingProvider] = useState(null)
@@ -29,6 +28,31 @@ export default function SocialButtons({ mode = 'login' }) {
 
   const githubClientId = import.meta.env.VITE_GITHUB_CLIENT_ID
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+
+  useEffect(() => {
+    if (googleClientId && window.google?.accounts?.id) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: async (response) => {
+            if (response.credential) {
+              setLoadingProvider('google')
+              try {
+                await auth.oauthLogin('google', { idToken: response.credential })
+                window.location.href = '/decks'
+              } catch (err) {
+                alert(`Google sign-in failed: ${err.message || err}`)
+              } finally {
+                setLoadingProvider(null)
+              }
+            }
+          }
+        })
+      } catch (err) {
+        console.warn('Google GIS init error:', err)
+      }
+    }
+  }, [googleClientId, auth])
 
   const handleGitHubLogin = () => {
     if (!githubClientId) {
@@ -46,9 +70,13 @@ export default function SocialButtons({ mode = 'login' }) {
       return
     }
     setLoadingProvider('google')
-    // Trigger Google GIS if window.google is loaded
     if (window.google?.accounts?.id) {
-      window.google.accounts.id.prompt()
+      window.google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          const redirectUri = encodeURIComponent(`${window.location.origin}/oauth/callback`)
+          window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${redirectUri}&response_type=id_token&scope=openid%20email%20profile&nonce=${Date.now()}`
+        }
+      })
     } else {
       setShowPrompt('google')
     }
@@ -104,7 +132,7 @@ export default function SocialButtons({ mode = 'login' }) {
           }}
         >
           <GoogleIcon />
-          <span>Google</span>
+          <span>{loadingProvider === 'google' ? 'Redirecting...' : 'Google'}</span>
         </button>
 
         <button
@@ -129,24 +157,23 @@ export default function SocialButtons({ mode = 'login' }) {
           }}
         >
           <GitHubIcon />
-          <span>GitHub</span>
+          <span>{loadingProvider === 'github' ? 'Redirecting...' : 'GitHub'}</span>
         </button>
-
       </div>
 
       {showPrompt && (
         <div style={{ marginTop: 16, padding: 14, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.85rem' }}>
           <div style={{ fontWeight: 600, color: '#334155', marginBottom: 6 }}>
-            {showPrompt === 'google' ? 'Google OAuth Verification' : 'GitHub OAuth Verification'}
+            {showPrompt === 'google' ? 'Google 1-Click Sign-In Setup' : 'GitHub 1-Click Sign-In Setup'}
           </div>
-          <p style={{ color: '#64748b', margin: '0 0 10px 0' }}>
-            Set <code>VITE_{showPrompt.toUpperCase()}_CLIENT_ID</code> in <code>.env</code> for 1-click authorization, or submit an OAuth token/code directly below:
+          <p style={{ color: '#64748b', margin: '0 0 10px 0', lineHeight: 1.5 }}>
+            To enable instant 1-click authorization without manual tokens, set <code>VITE_{showPrompt.toUpperCase()}_CLIENT_ID</code> in <code>src/frontend/.env.local</code>.
           </p>
           <form onSubmit={submitManualToken} style={{ display: 'flex', gap: 8 }}>
             <input
               type="text"
               className="form-control"
-              placeholder={showPrompt === 'google' ? 'Paste Google ID Token' : 'Paste GitHub Code'}
+              placeholder={showPrompt === 'google' ? 'Paste Google ID Token (Dev Test)' : 'Paste GitHub Code (Dev Test)'}
               value={manualToken}
               onChange={e => setManualToken(e.target.value)}
               style={{ flex: 1, fontSize: '0.8rem' }}
