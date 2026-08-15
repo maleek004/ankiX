@@ -1,7 +1,19 @@
 const API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_BASE_URL || '/api'
 
+async function safeFetch(url, options) {
+  try {
+    return await fetch(url, options)
+  } catch (err) {
+    if (err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+      const targetUrl = url.toString()
+      throw new Error(`Cannot reach backend API at '${targetUrl}'. Please check VITE_API_BASE in Vercel settings (must be HTTPS, e.g. https://your-backend.herokuapp.com/api) and ensure your backend server is awake.`)
+    }
+    throw err
+  }
+}
+
 export async function register(email, password, displayName){
-  const res = await fetch(`${API_BASE}/auth/register`,{
+  const res = await safeFetch(`${API_BASE}/auth/register`,{
     method:'POST',
     headers:{ 'Content-Type':'application/json'},
     body: JSON.stringify({ email, password, displayName: displayName || null })
@@ -14,13 +26,13 @@ export async function register(email, password, displayName){
 }
 
 export async function getAdminUsers(){
-  const res = await fetch(`${API_BASE}/admin/users`, { headers: authHeaders() })
+  const res = await safeFetch(`${API_BASE}/admin/users`, { headers: authHeaders() })
   if(!res.ok) throw new Error('Failed to fetch admin users')
   return res.json()
 }
 
 export async function updateUserRole(userId, role){
-  const res = await fetch(`${API_BASE}/admin/users/${userId}/role`, {
+  const res = await safeFetch(`${API_BASE}/admin/users/${userId}/role`, {
     method: 'PUT',
     headers: authHeaders(),
     body: JSON.stringify({ role })
@@ -33,7 +45,7 @@ export async function updateUserRole(userId, role){
 }
 
 export async function login(email, password){
-  const res = await fetch(`${API_BASE}/auth/login`,{
+  const res = await safeFetch(`${API_BASE}/auth/login`,{
     method:'POST',
     headers:{ 'Content-Type':'application/json'},
     body: JSON.stringify({ email, password })
@@ -43,7 +55,6 @@ export async function login(email, password){
     throw new Error(txt || 'Login failed')
   }
   const data = await res.json()
-  // Backend returns { accessToken, expiresInSeconds, user }
   if(data?.accessToken){
     localStorage.setItem('ankix_token', data.accessToken)
     if(data?.user){
@@ -54,11 +65,12 @@ export async function login(email, password){
 }
 
 export async function oauthLogin(provider, { idToken, code, redirectUri } = {}){
-  const res = await fetch(`${API_BASE}/auth/oauth`,{
+  const res = await safeFetch(`${API_BASE}/auth/oauth`,{
     method:'POST',
     headers:{ 'Content-Type':'application/json'},
     body: JSON.stringify({ provider, idToken, code, redirectUri })
   })
+
   if(!res.ok){
     const txt = await res.text()
     let msg = 'OAuth authentication failed'
