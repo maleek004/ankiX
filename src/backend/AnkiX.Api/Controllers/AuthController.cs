@@ -32,35 +32,44 @@ public sealed class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        string normalizedEmail = request.Email.Trim().ToLowerInvariant();
-        bool emailExists = await dbContext.Users.AnyAsync(user => user.Email == normalizedEmail);
-        if (emailExists)
+        try
         {
-            return Conflict(new { message = "Email already exists." });
+            string normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            await EnsureUserColumnsAsync();
+
+            bool emailExists = await dbContext.Users.AnyAsync(user => user.Email == normalizedEmail);
+            if (emailExists)
+            {
+                return Conflict(new { message = "Email already exists." });
+            }
+
+            string displayName = UserHelper.GetEffectiveDisplayName(request.DisplayName, normalizedEmail);
+
+            User user = new User
+            {
+                Email = normalizedEmail,
+                PasswordHash = passwordService.HashPassword(request.Password),
+                DisplayName = displayName,
+                Role = Roles.User,
+                AuthProvider = "local",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            dbContext.Users.Add(user);
+            await dbContext.SaveChangesAsync();
+
+            return Created(string.Empty, new
+            {
+                userId = user.Id,
+                email = user.Email,
+                displayName = user.DisplayName,
+                role = user.Role
+            });
         }
-
-        string displayName = UserHelper.GetEffectiveDisplayName(request.DisplayName, normalizedEmail);
-
-        User user = new User
+        catch (Exception ex)
         {
-            Email = normalizedEmail,
-            PasswordHash = passwordService.HashPassword(request.Password),
-            DisplayName = displayName,
-            Role = Roles.User,
-            AuthProvider = "local",
-            CreatedAt = DateTime.UtcNow
-        };
-
-        dbContext.Users.Add(user);
-        await dbContext.SaveChangesAsync();
-
-        return Created(string.Empty, new
-        {
-            userId = user.Id,
-            email = user.Email,
-            displayName = user.DisplayName,
-            role = user.Role
-        });
+            return StatusCode(500, new { message = "Registration failure: " + ex.Message });
+        }
     }
 
     [HttpPost("login")]
@@ -69,6 +78,8 @@ public sealed class AuthController : ControllerBase
         try
         {
             string normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            await EnsureUserColumnsAsync();
+
             User? user = await dbContext.Users.FirstOrDefaultAsync(entity => entity.Email == normalizedEmail);
             if (user is null || !passwordService.VerifyPassword(request.Password, user.PasswordHash))
             {
@@ -97,83 +108,122 @@ public sealed class AuthController : ControllerBase
         }
     }
 
-
     [HttpPost("oauth")]
     public async Task<IActionResult> OAuth([FromBody] OAuthLoginRequest request)
     {
-        OAuthUserPayload? payload = await oauthService.VerifyAndExtractPayloadAsync(
-            request.Provider,
-            request.IdToken,
-            request.Code,
-            request.RedirectUri);
-
-        if (payload is null)
+        try
         {
-            return BadRequest(new { message = $"OAuth verification failed for provider '{request.Provider}'." });
-        }
+            OAuthUserPayload? payload = await oauthService.VerifyAndExtractPayloadAsync(
+                request.Provider,
+                request.IdToken,
+                request.Code,
+                request.RedirectUri);
 
-        string normalizedEmail = payload.Email.Trim().ToLowerInvariant();
-        User? user = await dbContext.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail);
-
-        if (user is null)
-        {
-            string displayName = UserHelper.GetEffectiveDisplayName(payload.DisplayName, normalizedEmail);
-            user = new User
+            if (payload is null)
             {
-                Email = normalizedEmail,
-                PasswordHash = string.Empty,
-                DisplayName = displayName,
-                Role = Roles.User,
-                AuthProvider = payload.Provider,
-                GoogleId = payload.Provider == "google" ? payload.SubId : null,
-                GitHubId = payload.Provider == "github" ? payload.SubId : null,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            dbContext.Users.Add(user);
-            await dbContext.SaveChangesAsync();
-        }
-        else
-        {
-            bool modified = false;
-            if (payload.Provider == "google" && string.IsNullOrEmpty(user.GoogleId))
-            {
-                user.GoogleId = payload.SubId;
-                modified = true;
-            }
-            else if (payload.Provider == "github" && string.IsNullOrEmpty(user.GitHubId))
-            {
-                user.GitHubId = payload.SubId;
-                modified = true;
+                return BadRequest(new { message = $"OAuth verification failed for provider '{request.Provider}'." });
             }
 
-            if (user.AuthProvider == "local" || string.IsNullOrEmpty(user.AuthProvider))
-            {
-                user.AuthProvider = payload.Provider;
-                modified = true;
-            }
+            await EnsureUserColumnsAsync();
 
-            if (modified)
+            string normalizedEmail = payload.Email.Trim().ToLowerInvariant();
+            User? user = await dbContext.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+
+            if (user is null)
             {
+                string displayName = UserHelper.GetEffectiveDisplayName(payload.DisplayName, normalizedEmail);
+                user = new User
+                {
+                    Email = normalizedEmail,
+                    PasswordHash = string.Empty,
+                    DisplayName = displayName,
+                    Role = Roles.User,
+                    AuthProvider = payload.Provider,
+                    GoogleId = payload.Provider == "google" ? payload.SubId : null,
+                    GitHubId = payload.Provider == "github" ? payload.SubId : null,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                dbContext.Users.Add(user);
                 await dbContext.SaveChangesAsync();
             }
-        }
-
-        string token = tokenService.CreateToken(user);
-        AuthResponse response = new AuthResponse
-        {
-            AccessToken = token,
-            ExpiresInSeconds = tokenService.GetExpiresInSeconds(),
-            User = new AuthUserResponse
+            else
             {
-                Id = user.Id,
-                Email = user.Email,
-                DisplayName = UserHelper.GetEffectiveDisplayName(user.DisplayName, user.Email),
-                Role = user.Role
-            }
-        };
+                bool modified = false;
+                if (payload.Provider == "google" && string.IsNullOrEmpty(user.GoogleId))
+                {
+                    user.GoogleId = payload.SubId;
+                    modified = true;
+                }
+                else if (payload.Provider == "github" && string.IsNullOrEmpty(user.GitHubId))
+                {
+                    user.GitHubId = payload.SubId;
+                    modified = true;
+                }
 
-        return Ok(response);
+                if (user.AuthProvider == "local" || string.IsNullOrEmpty(user.AuthProvider))
+                {
+                    user.AuthProvider = payload.Provider;
+                    modified = true;
+                }
+
+                if (modified)
+                {
+                    await dbContext.SaveChangesAsync();
+                }
+            }
+
+            string token = tokenService.CreateToken(user);
+            AuthResponse response = new AuthResponse
+            {
+                AccessToken = token,
+                ExpiresInSeconds = tokenService.GetExpiresInSeconds(),
+                User = new AuthUserResponse
+                {
+                    Id = user.Id,
+                    Email = user.Email,
+                    DisplayName = UserHelper.GetEffectiveDisplayName(user.DisplayName, user.Email),
+                    Role = user.Role
+                }
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "OAuth failure: " + ex.Message });
+        }
     }
+
+    private async Task EnsureUserColumnsAsync()
+    {
+        try
+        {
+            if (dbContext.Database.IsSqlServer())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(@"
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'AuthProvider')
+                    BEGIN
+                        ALTER TABLE [dbo].[Users] ADD [AuthProvider] NVARCHAR(30) NOT NULL DEFAULT 'local';
+                    END;
+
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'GoogleId')
+                    BEGIN
+                        ALTER TABLE [dbo].[Users] ADD [GoogleId] NVARCHAR(128) NULL;
+                    END;
+
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'GitHubId')
+                    BEGIN
+                        ALTER TABLE [dbo].[Users] ADD [GitHubId] NVARCHAR(128) NULL;
+                    END;
+                ");
+            }
+        }
+        catch
+        {
+            // Ignore if already present or in-memory database
+        }
+    }
+
 }
 
