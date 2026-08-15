@@ -208,6 +208,33 @@ try
 
             IF NOT EXISTS (
                 SELECT * FROM sys.columns 
+                WHERE object_id = OBJECT_ID(N'[dbo].[Users]') 
+                AND name = N'AuthProvider'
+            )
+            BEGIN
+                ALTER TABLE [Users] ADD [AuthProvider] NVARCHAR(30) NOT NULL DEFAULT 'local';
+            END
+
+            IF NOT EXISTS (
+                SELECT * FROM sys.columns 
+                WHERE object_id = OBJECT_ID(N'[dbo].[Users]') 
+                AND name = N'GoogleId'
+            )
+            BEGIN
+                ALTER TABLE [Users] ADD [GoogleId] NVARCHAR(128) NULL;
+            END
+
+            IF NOT EXISTS (
+                SELECT * FROM sys.columns 
+                WHERE object_id = OBJECT_ID(N'[dbo].[Users]') 
+                AND name = N'GitHubId'
+            )
+            BEGIN
+                ALTER TABLE [Users] ADD [GitHubId] NVARCHAR(128) NULL;
+            END
+
+            IF NOT EXISTS (
+                SELECT * FROM sys.columns 
                 WHERE object_id = OBJECT_ID(N'[dbo].[Exercises]') 
                 AND name = N'ExerciseType'
             )
@@ -215,6 +242,7 @@ try
                 ALTER TABLE [Exercises] ADD [ExerciseType] NVARCHAR(50) NOT NULL DEFAULT 'CodeExecution';
                 ALTER TABLE [Exercises] ADD [ExerciseSpec] NVARCHAR(MAX) NULL;
             END
+
 
         ");
 

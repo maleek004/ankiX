@@ -66,29 +66,37 @@ public sealed class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        string normalizedEmail = request.Email.Trim().ToLowerInvariant();
-        User? user = await dbContext.Users.FirstOrDefaultAsync(entity => entity.Email == normalizedEmail);
-        if (user is null || !passwordService.VerifyPassword(request.Password, user.PasswordHash))
+        try
         {
-            return Unauthorized(new { message = "Invalid credentials." });
-        }
-
-        string token = tokenService.CreateToken(user);
-        AuthResponse response = new AuthResponse
-        {
-            AccessToken = token,
-            ExpiresInSeconds = tokenService.GetExpiresInSeconds(),
-            User = new AuthUserResponse
+            string normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            User? user = await dbContext.Users.FirstOrDefaultAsync(entity => entity.Email == normalizedEmail);
+            if (user is null || !passwordService.VerifyPassword(request.Password, user.PasswordHash))
             {
-                Id = user.Id,
-                Email = user.Email,
-                DisplayName = UserHelper.GetEffectiveDisplayName(user.DisplayName, user.Email),
-                Role = user.Role
+                return Unauthorized(new { message = "Invalid credentials." });
             }
-        };
 
-        return Ok(response);
+            string token = tokenService.CreateToken(user);
+            AuthResponse response = new AuthResponse
+            {
+                AccessToken = token,
+                ExpiresInSeconds = tokenService.GetExpiresInSeconds(),
+                User = new AuthUserResponse
+                {
+                    Id = user.Id,
+                    Email = user.Email,
+                    DisplayName = UserHelper.GetEffectiveDisplayName(user.DisplayName, user.Email),
+                    Role = user.Role
+                }
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Login failure: " + ex.Message });
+        }
     }
+
 
     [HttpPost("oauth")]
     public async Task<IActionResult> OAuth([FromBody] OAuthLoginRequest request)
