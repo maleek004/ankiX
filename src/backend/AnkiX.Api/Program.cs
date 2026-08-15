@@ -104,6 +104,11 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+app.MapGet("/", () => Results.Ok(new { status = "online", service = "AnkiX API", version = "1.0.0" }));
+app.MapGet("/api", () => Results.Ok(new { status = "online", service = "AnkiX API", version = "1.0.0" }));
+app.MapGet("/healthz", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
+
+
 // Always ensure the database schema is up to date on startup using EF Core Migrations.
 try
 {
