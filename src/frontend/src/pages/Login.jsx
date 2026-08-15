@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import SocialButtons from '../components/SocialButtons'
 
@@ -31,13 +32,24 @@ export default function Login(){
             <input className="form-control" type="email" value={email} onChange={e=>setEmail(e.target.value)} required />
           </div>
           <div className="form-group">
-            <label>Password</label>
-            <input className="form-control" type="password" value={password} onChange={e=>setPassword(e.target.value)} required />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ margin: 0 }}>Password</label>
+              <Link to="/forgot-password" style={{ color: '#2563eb', fontSize: '0.85rem', textDecoration: 'none' }}>
+                Forgot password?
+              </Link>
+            </div>
+            <input className="form-control" type="password" value={password} onChange={e=>setPassword(e.target.value)} required style={{ marginTop: 6 }} />
           </div>
           <button disabled={isLoading} type="submit" className="btn-primary" style={{ width: '100%', marginTop: 8 }}>
             {isLoading ? "Logging in..." : "Log In"}
           </button>
         </form>
+        <div style={{ marginTop: 14, textAlign: 'center', fontSize: '0.9rem' }}>
+          Don't have an account?{' '}
+          <Link to="/register" style={{ color: '#2563eb', textDecoration: 'none' }}>
+            Sign up
+          </Link>
+        </div>
         <SocialButtons mode="login" />
       </div>
     </div>

@@ -4,6 +4,7 @@ using AnkiX.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AnkiX.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260815143000_AddPasswordResetAndEmailVerification")]
+    partial class AddPasswordResetAndEmailVerification
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -63,6 +66,9 @@ namespace AnkiX.Api.Migrations
                     b.Property<int>("ExerciseId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime>("LinkedAt")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("CardId", "ExerciseId");
 
                     b.HasIndex("ExerciseId");
@@ -72,11 +78,11 @@ namespace AnkiX.Api.Migrations
 
             modelBuilder.Entity("AnkiX.Api.Models.CardFollowup", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AuthorUserId")
                         .HasColumnType("int");
@@ -87,17 +93,19 @@ namespace AnkiX.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("LinkedCardId")
-                        .HasColumnType("int");
-
                     b.Property<string>("LinkedCardIds")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("QuestionText")
-                        .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.HasKey("Id");
 
@@ -110,28 +118,32 @@ namespace AnkiX.Api.Migrations
 
             modelBuilder.Entity("AnkiX.Api.Models.CardRun", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int>("CardId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("DurationMs")
-                        .HasColumnType("int");
-
-                    b.Property<bool?>("Result")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("ResultDetails")
+                    b.Property<string>("CodeAnswer")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("SubmittedCode")
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ExecutionTimeMs")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Passed")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("RanAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RawOutput")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -160,8 +172,14 @@ namespace AnkiX.Api.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("Description")
+                        .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<int?>("StudyGroupId")
                         .HasColumnType("int");
@@ -189,27 +207,29 @@ namespace AnkiX.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedByUserId")
+                    b.Property<int>("CreatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Description")
+                    b.Property<string>("Explanation")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
-                    b.Property<string>("ExerciseSpec")
+                    b.Property<string>("Hints")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ExerciseType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Language")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<string>("SolutionCode")
+                    b.Property<string>("Options")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Prompt")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SampleSolution")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("StarterCode")
@@ -218,13 +238,18 @@ namespace AnkiX.Api.Migrations
                     b.Property<int?>("StudyGroupId")
                         .HasColumnType("int");
 
-                    b.Property<string>("TestCasesSpec")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ValidationSpec")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -235,17 +260,14 @@ namespace AnkiX.Api.Migrations
 
             modelBuilder.Entity("AnkiX.Api.Models.ExerciseReviewRecord", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("EaseFactor")
-                        .HasColumnType("decimal(4,2)");
+                    b.Property<double>("EaseFactor")
+                        .HasColumnType("float");
 
                     b.Property<int>("ExerciseId")
                         .HasColumnType("int");
@@ -253,21 +275,19 @@ namespace AnkiX.Api.Migrations
                     b.Property<int>("IntervalDays")
                         .HasColumnType("int");
 
-                    b.Property<int>("LearningStep")
-                        .HasColumnType("int");
+                    b.Property<DateTime>("LastReviewedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime>("NextReviewAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Outcome")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
                     b.Property<string>("Phase")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("Repetitions")
+                        .HasColumnType("int");
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");
@@ -281,39 +301,34 @@ namespace AnkiX.Api.Migrations
 
             modelBuilder.Entity("AnkiX.Api.Models.ReviewRecord", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int>("CardId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("EaseFactor")
-                        .HasColumnType("decimal(4,2)");
+                    b.Property<double>("EaseFactor")
+                        .HasColumnType("float");
 
                     b.Property<int>("IntervalDays")
                         .HasColumnType("int");
 
-                    b.Property<int>("LearningStep")
-                        .HasColumnType("int");
+                    b.Property<DateTime>("LastReviewedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime>("NextReviewAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Outcome")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
                     b.Property<string>("Phase")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("Repetitions")
+                        .HasColumnType("int");
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");

@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using AnkiX.Api.Contracts.Auth;
 using AnkiX.Api.Data;
 using AnkiX.Api.Helpers;
@@ -16,17 +17,20 @@ public sealed class AuthController : ControllerBase
     private readonly IPasswordService passwordService;
     private readonly ITokenService tokenService;
     private readonly IOAuthService oauthService;
+    private readonly IEmailService emailService;
 
     public AuthController(
         ApplicationDbContext dbContext,
         IPasswordService passwordService,
         ITokenService tokenService,
-        IOAuthService oauthService)
+        IOAuthService oauthService,
+        IEmailService? emailService = null)
     {
         this.dbContext = dbContext;
         this.passwordService = passwordService;
         this.tokenService = tokenService;
         this.oauthService = oauthService;
+        this.emailService = emailService ?? new EmailService(Microsoft.Extensions.Logging.Abstractions.NullLogger<EmailService>.Instance);
     }
 
     [HttpPost("register")]
@@ -195,6 +199,196 @@ public sealed class AuthController : ControllerBase
         }
     }
 
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.Email))
+            {
+                return BadRequest(new { message = "Email is required." });
+            }
+
+            string normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            await EnsureUserColumnsAsync();
+
+            User? user = await dbContext.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+            if (user is not null)
+            {
+                string token = GenerateSecureToken();
+                user.PasswordResetToken = token;
+                user.PasswordResetExpiresAt = DateTime.UtcNow.AddMinutes(15);
+                await dbContext.SaveChangesAsync();
+
+                string origin = Request.Headers["Origin"].FirstOrDefault()
+                    ?? $"{Request.Scheme}://{Request.Host}";
+                string resetUrl = $"{origin.TrimEnd('/')}/reset-password?token={token}";
+
+                await emailService.SendPasswordResetEmailAsync(user.Email, token, resetUrl);
+            }
+
+            return Ok(new
+            {
+                message = "If the email is registered, a password reset link has been sent."
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Forgot password failure: " + ex.Message });
+        }
+    }
+
+    [HttpPost("verify-reset-token")]
+    public async Task<IActionResult> VerifyResetToken([FromBody] VerifyResetTokenRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.Token))
+            {
+                return BadRequest(new { message = "Token is required." });
+            }
+
+            await EnsureUserColumnsAsync();
+
+            User? user = await dbContext.Users.FirstOrDefaultAsync(u => u.PasswordResetToken == request.Token);
+            if (user is null || user.PasswordResetExpiresAt is null || user.PasswordResetExpiresAt < DateTime.UtcNow)
+            {
+                return BadRequest(new { message = "Reset token is invalid or has expired." });
+            }
+
+            return Ok(new
+            {
+                valid = true,
+                email = user.Email
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Token verification failure: " + ex.Message });
+        }
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.Token))
+            {
+                return BadRequest(new { message = "Reset token is required." });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+            {
+                return BadRequest(new { message = "New password must be at least 8 characters long." });
+            }
+
+            await EnsureUserColumnsAsync();
+
+            User? user = await dbContext.Users.FirstOrDefaultAsync(u => u.PasswordResetToken == request.Token);
+            if (user is null || user.PasswordResetExpiresAt is null || user.PasswordResetExpiresAt < DateTime.UtcNow)
+            {
+                return BadRequest(new { message = "Reset token is invalid or has expired." });
+            }
+
+            user.PasswordHash = passwordService.HashPassword(request.NewPassword);
+            user.PasswordResetToken = null;
+            user.PasswordResetExpiresAt = null;
+
+            await dbContext.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Password has been successfully reset. You may now log in."
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Reset password failure: " + ex.Message });
+        }
+    }
+
+    [HttpPost("send-verification")]
+    public async Task<IActionResult> SendVerification([FromBody] SendVerificationRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.Email))
+            {
+                return BadRequest(new { message = "Email is required." });
+            }
+
+            string normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            await EnsureUserColumnsAsync();
+
+            User? user = await dbContext.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+            if (user is not null && !user.IsEmailVerified)
+            {
+                string token = GenerateSecureToken();
+                user.EmailVerificationToken = token;
+                user.EmailVerificationExpiresAt = DateTime.UtcNow.AddHours(24);
+                await dbContext.SaveChangesAsync();
+
+                string origin = Request.Headers["Origin"].FirstOrDefault()
+                    ?? $"{Request.Scheme}://{Request.Host}";
+                string verifyUrl = $"{origin.TrimEnd('/')}/verify-email?token={token}";
+
+                await emailService.SendEmailVerificationAsync(user.Email, token, verifyUrl);
+            }
+
+            return Ok(new
+            {
+                message = "If the email is registered and unverified, a verification link has been sent."
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Send verification failure: " + ex.Message });
+        }
+    }
+
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.Token))
+            {
+                return BadRequest(new { message = "Verification token is required." });
+            }
+
+            await EnsureUserColumnsAsync();
+
+            User? user = await dbContext.Users.FirstOrDefaultAsync(u => u.EmailVerificationToken == request.Token);
+            if (user is null || user.EmailVerificationExpiresAt is null || user.EmailVerificationExpiresAt < DateTime.UtcNow)
+            {
+                return BadRequest(new { message = "Email verification token is invalid or has expired." });
+            }
+
+            user.IsEmailVerified = true;
+            user.EmailVerificationToken = null;
+            user.EmailVerificationExpiresAt = null;
+
+            await dbContext.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Email has been verified successfully.",
+                isEmailVerified = true
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Email verification failure: " + ex.Message });
+        }
+    }
+
+    private static string GenerateSecureToken()
+    {
+        byte[] bytes = RandomNumberGenerator.GetBytes(32);
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
     private async Task EnsureUserColumnsAsync()
     {
         try
@@ -215,6 +409,31 @@ public sealed class AuthController : ControllerBase
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'GitHubId')
                     BEGIN
                         ALTER TABLE [dbo].[Users] ADD [GitHubId] NVARCHAR(128) NULL;
+                    END;
+
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'PasswordResetToken')
+                    BEGIN
+                        ALTER TABLE [dbo].[Users] ADD [PasswordResetToken] NVARCHAR(256) NULL;
+                    END;
+
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'PasswordResetExpiresAt')
+                    BEGIN
+                        ALTER TABLE [dbo].[Users] ADD [PasswordResetExpiresAt] DATETIME2 NULL;
+                    END;
+
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'IsEmailVerified')
+                    BEGIN
+                        ALTER TABLE [dbo].[Users] ADD [IsEmailVerified] BIT NOT NULL DEFAULT 0;
+                    END;
+
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'EmailVerificationToken')
+                    BEGIN
+                        ALTER TABLE [dbo].[Users] ADD [EmailVerificationToken] NVARCHAR(256) NULL;
+                    END;
+
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'EmailVerificationExpiresAt')
+                    BEGIN
+                        ALTER TABLE [dbo].[Users] ADD [EmailVerificationExpiresAt] DATETIME2 NULL;
                     END;
                 ");
             }

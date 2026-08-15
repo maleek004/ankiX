@@ -25,6 +25,96 @@ export async function register(email, password, displayName){
   return res.json()
 }
 
+export async function forgotPassword(email){
+  const res = await safeFetch(`${API_BASE}/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    let msg = 'Failed to process forgot password request'
+    try {
+      const parsed = JSON.parse(txt)
+      msg = parsed.message || msg
+    } catch {}
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function verifyResetToken(token){
+  const res = await safeFetch(`${API_BASE}/auth/verify-reset-token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    let msg = 'Reset token is invalid or expired'
+    try {
+      const parsed = JSON.parse(txt)
+      msg = parsed.message || msg
+    } catch {}
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function resetPassword(token, newPassword){
+  const res = await safeFetch(`${API_BASE}/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, newPassword })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    let msg = 'Failed to reset password'
+    try {
+      const parsed = JSON.parse(txt)
+      msg = parsed.message || msg
+    } catch {}
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function sendVerificationEmail(email){
+  const res = await safeFetch(`${API_BASE}/auth/send-verification`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    let msg = 'Failed to send verification email'
+    try {
+      const parsed = JSON.parse(txt)
+      msg = parsed.message || msg
+    } catch {}
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function verifyEmail(token){
+  const res = await safeFetch(`${API_BASE}/auth/verify-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    let msg = 'Failed to verify email'
+    try {
+      const parsed = JSON.parse(txt)
+      msg = parsed.message || msg
+    } catch {}
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
 export async function getAdminUsers(){
   const res = await safeFetch(`${API_BASE}/admin/users`, { headers: authHeaders() })
   if(!res.ok) throw new Error('Failed to fetch admin users')
