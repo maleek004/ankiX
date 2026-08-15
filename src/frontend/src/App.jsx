@@ -5,6 +5,7 @@ import { AuthProvider } from './auth/AuthProvider'
 import { StudyGroupProvider } from './studyGroup/StudyGroupProvider'
 import RequireAuth from './auth/RequireAuth'
 import NavBar from './components/NavBar'
+import EmailVerificationBanner from './components/EmailVerificationBanner'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -26,6 +27,7 @@ export default function App(){
         <BrowserRouter>
           <div className="app">
             <NavBar />
+            <EmailVerificationBanner />
             <main className="main-content">
               <Routes>
                 <Route path="/" element={<Home/>} />

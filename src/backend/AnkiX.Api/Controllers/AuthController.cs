@@ -48,6 +48,7 @@ public sealed class AuthController : ControllerBase
             }
 
             string displayName = UserHelper.GetEffectiveDisplayName(request.DisplayName, normalizedEmail);
+            string verificationToken = GenerateSecureToken();
 
             User user = new User
             {
@@ -56,18 +57,35 @@ public sealed class AuthController : ControllerBase
                 DisplayName = displayName,
                 Role = Roles.User,
                 AuthProvider = "local",
+                IsEmailVerified = false,
+                EmailVerificationToken = verificationToken,
+                EmailVerificationExpiresAt = DateTime.UtcNow.AddHours(24),
                 CreatedAt = DateTime.UtcNow
             };
 
             dbContext.Users.Add(user);
             await dbContext.SaveChangesAsync();
 
+            try
+            {
+                string origin = Request.Headers["Origin"].FirstOrDefault()
+                    ?? $"{Request.Scheme}://{Request.Host}";
+                string verifyUrl = $"{origin.TrimEnd('/')}/verify-email?token={verificationToken}";
+                await emailService.SendEmailVerificationAsync(user.Email, verificationToken, verifyUrl);
+            }
+            catch
+            {
+                // Non-blocking for registration completion
+            }
+
             return Created(string.Empty, new
             {
                 userId = user.Id,
                 email = user.Email,
                 displayName = user.DisplayName,
-                role = user.Role
+                role = user.Role,
+                isEmailVerified = user.IsEmailVerified,
+                message = "Registration successful. A verification email has been sent to your address."
             });
         }
         catch (Exception ex)
@@ -100,7 +118,8 @@ public sealed class AuthController : ControllerBase
                     Id = user.Id,
                     Email = user.Email,
                     DisplayName = UserHelper.GetEffectiveDisplayName(user.DisplayName, user.Email),
-                    Role = user.Role
+                    Role = user.Role,
+                    IsEmailVerified = user.IsEmailVerified
                 }
             };
 
@@ -145,6 +164,7 @@ public sealed class AuthController : ControllerBase
                     AuthProvider = payload.Provider,
                     GoogleId = payload.Provider == "google" ? payload.SubId : null,
                     GitHubId = payload.Provider == "github" ? payload.SubId : null,
+                    IsEmailVerified = true,
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -162,6 +182,12 @@ public sealed class AuthController : ControllerBase
                 else if (payload.Provider == "github" && string.IsNullOrEmpty(user.GitHubId))
                 {
                     user.GitHubId = payload.SubId;
+                    modified = true;
+                }
+
+                if (!user.IsEmailVerified)
+                {
+                    user.IsEmailVerified = true;
                     modified = true;
                 }
 
@@ -187,7 +213,8 @@ public sealed class AuthController : ControllerBase
                     Id = user.Id,
                     Email = user.Email,
                     DisplayName = UserHelper.GetEffectiveDisplayName(user.DisplayName, user.Email),
-                    Role = user.Role
+                    Role = user.Role,
+                    IsEmailVerified = user.IsEmailVerified
                 }
             };
 

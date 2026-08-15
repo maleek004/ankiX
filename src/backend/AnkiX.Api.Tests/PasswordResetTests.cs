@@ -411,4 +411,33 @@ public class PasswordResetTests
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
+
+    [Fact]
+    public async Task Register_AutomaticallyGeneratesTokenAndDispatchesEmailVerification()
+    {
+        using var db = CreateInMemoryDbContext();
+        var spyEmail = new TestEmailService();
+        var controller = CreateController(db, emailService: spyEmail);
+
+        var result = await controller.Register(new RegisterRequest
+        {
+            Email = "newbie@ankix.io",
+            Password = "Password123!",
+            DisplayName = "Newbie User"
+        });
+
+        var createdResult = Assert.IsType<CreatedResult>(result);
+        Assert.NotNull(createdResult.Value);
+
+        var user = await db.Users.FirstAsync(u => u.Email == "newbie@ankix.io");
+        Assert.False(user.IsEmailVerified);
+        Assert.NotNull(user.EmailVerificationToken);
+        Assert.NotEmpty(user.EmailVerificationToken);
+        Assert.NotNull(user.EmailVerificationExpiresAt);
+
+        Assert.Single(spyEmail.SentVerificationEmails);
+        var sent = spyEmail.SentVerificationEmails[0];
+        Assert.Equal("newbie@ankix.io", sent.Email);
+        Assert.Equal(user.EmailVerificationToken, sent.Token);
+    }
 }
