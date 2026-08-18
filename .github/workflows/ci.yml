@@ -33,7 +33,7 @@ jobs:
         # Pass a placeholder connection string so the app module loads without a DB.
         # Tests themselves don't hit the database.
         env:
-          ANKIX_DB_CONN: "Server=localhost;Database=ankix_ci;User Id=sa;Password=CI_placeholder!;TrustServerCertificate=True;"
+          ANKIX_DB_CONN: "Host=localhost;Port=5432;Database=ankix_ci;Username=postgres;Password=CI_placeholder!;SSL Mode=Prefer;"
         run: |
           dotnet test src/backend/AnkiX.Api.Tests/AnkiX.Api.Tests.csproj \
             --no-restore \

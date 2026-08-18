@@ -16,6 +16,5 @@ public sealed class Card
 
     public string? ValidationSpec { get; set; }
 
-    [Column(TypeName = "datetime2")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

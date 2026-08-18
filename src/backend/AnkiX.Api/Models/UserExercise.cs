@@ -8,6 +8,5 @@ public sealed class UserExercise
 
     public int ExerciseId { get; set; }
 
-    [Column(TypeName = "datetime2")]
     public DateTime EnrolledAt { get; set; } = DateTime.UtcNow;
 }

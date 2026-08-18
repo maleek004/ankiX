@@ -416,60 +416,9 @@ public sealed class AuthController : ControllerBase
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
-    private async Task EnsureUserColumnsAsync()
+    private Task EnsureUserColumnsAsync()
     {
-        try
-        {
-            if (dbContext.Database.IsSqlServer())
-            {
-                await dbContext.Database.ExecuteSqlRawAsync(@"
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'AuthProvider')
-                    BEGIN
-                        ALTER TABLE [dbo].[Users] ADD [AuthProvider] NVARCHAR(30) NOT NULL DEFAULT 'local';
-                    END;
-
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'GoogleId')
-                    BEGIN
-                        ALTER TABLE [dbo].[Users] ADD [GoogleId] NVARCHAR(128) NULL;
-                    END;
-
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'GitHubId')
-                    BEGIN
-                        ALTER TABLE [dbo].[Users] ADD [GitHubId] NVARCHAR(128) NULL;
-                    END;
-
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'PasswordResetToken')
-                    BEGIN
-                        ALTER TABLE [dbo].[Users] ADD [PasswordResetToken] NVARCHAR(256) NULL;
-                    END;
-
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'PasswordResetExpiresAt')
-                    BEGIN
-                        ALTER TABLE [dbo].[Users] ADD [PasswordResetExpiresAt] DATETIME2 NULL;
-                    END;
-
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'IsEmailVerified')
-                    BEGIN
-                        ALTER TABLE [dbo].[Users] ADD [IsEmailVerified] BIT NOT NULL DEFAULT 0;
-                    END;
-
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'EmailVerificationToken')
-                    BEGIN
-                        ALTER TABLE [dbo].[Users] ADD [EmailVerificationToken] NVARCHAR(256) NULL;
-                    END;
-
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'EmailVerificationExpiresAt')
-                    BEGIN
-                        ALTER TABLE [dbo].[Users] ADD [EmailVerificationExpiresAt] DATETIME2 NULL;
-                    END;
-                ");
-            }
-        }
-        catch
-        {
-            // Ignore if already present or in-memory database
-        }
+        return Task.CompletedTask;
     }
-
 }
 

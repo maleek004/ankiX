@@ -18,6 +18,5 @@ public sealed class CardRun
 
     public int? DurationMs { get; set; }
 
-    [Column(TypeName = "datetime2")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

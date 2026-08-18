@@ -19,10 +19,8 @@ public sealed class ReviewRecord
 
     public int IntervalDays { get; set; }
 
-    [Column(TypeName = "datetime2")]
     public DateTime NextReviewAt { get; set; }
 
-    [Column(TypeName = "datetime2")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>"learning" or "review"</summary>

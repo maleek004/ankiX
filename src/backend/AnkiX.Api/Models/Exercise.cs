@@ -35,6 +35,5 @@ public sealed class Exercise
 
     public int? StudyGroupId { get; set; }
 
-    [Column(TypeName = "datetime2")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

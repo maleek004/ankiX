@@ -30,7 +30,6 @@ public sealed class CardFollowup
     [MaxLength(500)]
     public string? LinkedCardIds { get; set; }
 
-    [Column(TypeName = "datetime2")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public List<int> GetLinkedCardIdList()

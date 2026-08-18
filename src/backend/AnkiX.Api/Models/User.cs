@@ -31,7 +31,6 @@ public sealed class User
     [MaxLength(256)]
     public string? PasswordResetToken { get; set; }
 
-    [Column(TypeName = "datetime2")]
     public DateTime? PasswordResetExpiresAt { get; set; }
 
     public bool IsEmailVerified { get; set; } = false;
@@ -39,9 +38,7 @@ public sealed class User
     [MaxLength(256)]
     public string? EmailVerificationToken { get; set; }
 
-    [Column(TypeName = "datetime2")]
     public DateTime? EmailVerificationExpiresAt { get; set; }
 
-    [Column(TypeName = "datetime2")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

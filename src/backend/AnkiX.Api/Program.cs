@@ -16,26 +16,23 @@ builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, relo
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<ExecutionApiOptions>(builder.Configuration.GetSection(ExecutionApiOptions.SectionName));
 
-// Connection string: prefer ANKIX_DB_CONN env var (for CI/CD and Azure App Service),
+// Connection string: prefer ANKIX_DB_CONN env var (for CI/CD, Supabase, and App Services),
 // fall back to appsettings ConnectionStrings:DefaultConnection.
-string? defaultConnectionString =
+string? rawConnectionString =
     Environment.GetEnvironmentVariable("ANKIX_DB_CONN")
     ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
     ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
-if (string.IsNullOrWhiteSpace(defaultConnectionString))
-{
-    defaultConnectionString = "Server=tcp:ankix.database.windows.net,1433;Initial Catalog=ankixdb;";
-}
+string defaultConnectionString = NormalizePostgresConnectionString(rawConnectionString);
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    options.UseSqlServer(defaultConnectionString, sqlOptions =>
+    options.UseNpgsql(defaultConnectionString, npgsqlOptions =>
     {
-        sqlOptions.EnableRetryOnFailure(
+        npgsqlOptions.EnableRetryOnFailure(
             maxRetryCount: 5,
             maxRetryDelay: TimeSpan.FromSeconds(30),
-            errorNumbersToAdd: null);
+            errorCodesToAdd: null);
     });
     options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
 });
@@ -117,135 +114,6 @@ try
     {
         var startupDb = startupScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         startupDb.Database.Migrate();
-        startupDb.Database.ExecuteSqlRaw(@"
-            IF OBJECT_ID(N'[dbo].[Communities]', N'U') IS NOT NULL AND OBJECT_ID(N'[dbo].[StudyGroups]', N'U') IS NULL
-            BEGIN
-                EXEC sp_rename 'Communities', 'StudyGroups';
-            END
-
-            IF OBJECT_ID(N'[dbo].[CommunityMembers]', N'U') IS NOT NULL AND OBJECT_ID(N'[dbo].[StudyGroupMembers]', N'U') IS NULL
-            BEGIN
-                EXEC sp_rename 'CommunityMembers', 'StudyGroupMembers';
-            END
-
-            IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[StudyGroupMembers]') AND name = N'CommunityId')
-            BEGIN
-                EXEC sp_rename 'StudyGroupMembers.CommunityId', 'StudyGroupId', 'COLUMN';
-            END
-
-            IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Decks]') AND name = N'CommunityId')
-            BEGIN
-                EXEC sp_rename 'Decks.CommunityId', 'StudyGroupId', 'COLUMN';
-            END
-
-            IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Exercises]') AND name = N'CommunityId')
-            BEGIN
-                EXEC sp_rename 'Exercises.CommunityId', 'StudyGroupId', 'COLUMN';
-            END
-
-            IF NOT EXISTS (
-                SELECT * FROM sys.columns 
-                WHERE object_id = OBJECT_ID(N'[dbo].[CardFollowups]') 
-                AND name = N'LinkedCardIds'
-            )
-            BEGIN
-                ALTER TABLE [CardFollowups] ADD [LinkedCardIds] NVARCHAR(500) NULL;
-            END
-
-            IF OBJECT_ID(N'[dbo].[UserExercises]', N'U') IS NULL
-            BEGIN
-                CREATE TABLE [dbo].[UserExercises] (
-                    [UserId] INT NOT NULL,
-                    [ExerciseId] INT NOT NULL,
-                    [EnrolledAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
-                    CONSTRAINT [PK_UserExercises] PRIMARY KEY CLUSTERED ([UserId] ASC, [ExerciseId] ASC)
-                );
-            END
-
-            IF OBJECT_ID(N'[dbo].[StudyGroups]', N'U') IS NULL
-            BEGIN
-                CREATE TABLE [dbo].[StudyGroups] (
-                    [Id] INT IDENTITY(1,1) NOT NULL,
-                    [Name] NVARCHAR(100) NOT NULL,
-                    [Slug] NVARCHAR(100) NOT NULL,
-                    [Description] NVARCHAR(2000) NULL,
-                    [AvatarUrl] NVARCHAR(500) NULL,
-                    [IsPublic] BIT NOT NULL DEFAULT 1,
-                    [CreatedByUserId] INT NOT NULL DEFAULT 1,
-                    [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
-                    CONSTRAINT [PK_StudyGroups] PRIMARY KEY CLUSTERED ([Id] ASC)
-                );
-                CREATE UNIQUE NONCLUSTERED INDEX [IX_StudyGroups_Slug] ON [dbo].[StudyGroups] ([Slug] ASC);
-            END
-
-            IF OBJECT_ID(N'[dbo].[StudyGroupMembers]', N'U') IS NULL
-            BEGIN
-                CREATE TABLE [dbo].[StudyGroupMembers] (
-                    [StudyGroupId] INT NOT NULL,
-                    [UserId] INT NOT NULL,
-                    [Role] NVARCHAR(20) NOT NULL DEFAULT 'Member',
-                    [JoinedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
-                    CONSTRAINT [PK_StudyGroupMembers] PRIMARY KEY CLUSTERED ([StudyGroupId] ASC, [UserId] ASC)
-                );
-            END
-
-            IF NOT EXISTS (
-                SELECT * FROM sys.columns 
-                WHERE object_id = OBJECT_ID(N'[dbo].[Decks]') 
-                AND name = N'StudyGroupId'
-            )
-            BEGIN
-                ALTER TABLE [Decks] ADD [StudyGroupId] INT NULL;
-            END
-
-            IF NOT EXISTS (
-                SELECT * FROM sys.columns 
-                WHERE object_id = OBJECT_ID(N'[dbo].[Exercises]') 
-                AND name = N'StudyGroupId'
-            )
-            BEGIN
-                ALTER TABLE [Exercises] ADD [StudyGroupId] INT NULL;
-            END
-
-            IF NOT EXISTS (
-                SELECT * FROM sys.columns 
-                WHERE object_id = OBJECT_ID(N'[dbo].[Users]') 
-                AND name = N'AuthProvider'
-            )
-            BEGIN
-                ALTER TABLE [Users] ADD [AuthProvider] NVARCHAR(30) NOT NULL DEFAULT 'local';
-            END
-
-            IF NOT EXISTS (
-                SELECT * FROM sys.columns 
-                WHERE object_id = OBJECT_ID(N'[dbo].[Users]') 
-                AND name = N'GoogleId'
-            )
-            BEGIN
-                ALTER TABLE [Users] ADD [GoogleId] NVARCHAR(128) NULL;
-            END
-
-            IF NOT EXISTS (
-                SELECT * FROM sys.columns 
-                WHERE object_id = OBJECT_ID(N'[dbo].[Users]') 
-                AND name = N'GitHubId'
-            )
-            BEGIN
-                ALTER TABLE [Users] ADD [GitHubId] NVARCHAR(128) NULL;
-            END
-
-            IF NOT EXISTS (
-                SELECT * FROM sys.columns 
-                WHERE object_id = OBJECT_ID(N'[dbo].[Exercises]') 
-                AND name = N'ExerciseType'
-            )
-            BEGIN
-                ALTER TABLE [Exercises] ADD [ExerciseType] NVARCHAR(50) NOT NULL DEFAULT 'CodeExecution';
-                ALTER TABLE [Exercises] ADD [ExerciseSpec] NVARCHAR(MAX) NULL;
-            END
-
-
-        ");
 
         var sampleGroup = startupDb.StudyGroups.FirstOrDefault(c => c.Slug == "sample");
         if (sampleGroup == null)
@@ -307,9 +175,6 @@ try
         {
             startupDb.SaveChanges();
         }
-
-        startupDb.Database.ExecuteSql($"UPDATE [Decks] SET [StudyGroupId] = {sampleGroup.Id} WHERE [StudyGroupId] IS NULL OR [StudyGroupId] = 0;");
-        startupDb.Database.ExecuteSql($"UPDATE [Exercises] SET [StudyGroupId] = {sampleGroup.Id} WHERE [StudyGroupId] IS NULL OR [StudyGroupId] = 0;");
 
         if (!startupDb.CardExercises.Any())
         {
@@ -587,3 +452,44 @@ if (shouldSeed)
 }
 
 app.Run();
+
+static string NormalizePostgresConnectionString(string? connectionString)
+{
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        return "Host=localhost;Port=5432;Database=ankixdb;Username=postgres;Password=postgres;";
+    }
+
+    string trimmed = connectionString.Trim();
+    if (trimmed.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+        trimmed.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        try
+        {
+            var uri = new Uri(trimmed);
+            var userInfo = uri.UserInfo.Split(':', 2);
+            var username = userInfo.Length > 0 && !string.IsNullOrEmpty(userInfo[0]) ? Uri.UnescapeDataString(userInfo[0]) : "postgres";
+            var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty;
+            var port = uri.Port > 0 ? uri.Port : 5432;
+            var database = uri.AbsolutePath.TrimStart('/');
+            if (string.IsNullOrEmpty(database)) database = "postgres";
+
+            var builder = new Npgsql.NpgsqlConnectionStringBuilder
+            {
+                Host = uri.Host,
+                Port = port,
+                Database = database,
+                Username = username,
+                Password = password,
+                SslMode = Npgsql.SslMode.Require
+            };
+            return builder.ConnectionString;
+        }
+        catch
+        {
+            return trimmed;
+        }
+    }
+
+    return trimmed;
+}

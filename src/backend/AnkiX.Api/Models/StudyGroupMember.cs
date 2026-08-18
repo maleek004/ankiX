@@ -12,6 +12,5 @@ public sealed class StudyGroupMember
     [MaxLength(20)]
     public string Role { get; set; } = StudyGroupRoles.Member;
 
-    [Column(TypeName = "datetime2")]
     public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
 }
