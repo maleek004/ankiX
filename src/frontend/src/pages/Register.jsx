@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import SocialButtons from '../components/SocialButtons'
+import { isValidEmail } from '../utils/validation'
 
 export default function Register(){
   const [email, setEmail] = useState('')
@@ -9,15 +10,50 @@ export default function Register(){
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [registered, setRegistered] = useState(false)
+  const [emailError, setEmailError] = useState('')
+  const [passwordError, setPasswordError] = useState('')
   const [error, setError] = useState('')
 
   const auth = useAuth()
+
+  const handleEmailChange = (e) => {
+    const val = e.target.value
+    setEmail(val)
+    if (emailError && isValidEmail(val)) {
+      setEmailError('')
+    }
+  }
+
+  const handlePasswordChange = (e) => {
+    const val = e.target.value
+    setPassword(val)
+    if (passwordError && val.length >= 8) {
+      setPasswordError('')
+    }
+  }
+
   const submit = async (e) => {
     e.preventDefault()
-    setIsLoading(true)
     setError('')
+    setEmailError('')
+    setPasswordError('')
+
+    let hasError = false
+    if (!isValidEmail(email)) {
+      setEmailError('Please enter a valid email address (e.g. name@example.com)')
+      hasError = true
+    }
+
+    if (!password || password.length < 8) {
+      setPasswordError('Password must be at least 8 characters long')
+      hasError = true
+    }
+
+    if (hasError) return
+
+    setIsLoading(true)
     try{
-      await auth.register(email, password, displayName)
+      await auth.register(email.trim(), password, displayName.trim())
       setRegistered(true)
     }catch(err){
       setError(err.message || 'Registration failed. Please try again.')
@@ -44,7 +80,7 @@ export default function Register(){
                 🎉 Account created successfully!
               </p>
               <p style={{ color: '#15803d', margin: '8px 0 0 0', fontSize: '0.9rem', lineHeight: 1.5 }}>
-                We've sent a verification link to <strong>{email}</strong>. Please check your inbox to verify your account.
+                We've dispatched a verification link to <strong>{email}</strong>. Please check your inbox (and spam folder) to verify your email.
               </p>
             </div>
             <Link to="/login" className="btn-primary" style={{ display: 'inline-block', textDecoration: 'none', width: '100%', textAlign: 'center', boxSizing: 'border-box' }}>
@@ -67,19 +103,62 @@ export default function Register(){
               </div>
             )}
 
-            <form onSubmit={submit}>
+            <form onSubmit={submit} noValidate>
               <div className="form-group">
                 <label>Display Name</label>
-                <input className="form-control" type="text" placeholder="e.g. Alex Smith" value={displayName} onChange={e=>setDisplayName(e.target.value)} />
+                <input
+                  className="form-control"
+                  type="text"
+                  placeholder="e.g. Alex Smith"
+                  value={displayName}
+                  onChange={e=>setDisplayName(e.target.value)}
+                />
               </div>
+
               <div className="form-group">
                 <label>Email</label>
-                <input className="form-control" type="email" value={email} onChange={e=>setEmail(e.target.value)} required />
+                <input
+                  className="form-control"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={handleEmailChange}
+                  onBlur={() => {
+                    if (email && !isValidEmail(email)) {
+                      setEmailError('Please enter a valid email address (e.g. name@example.com)')
+                    } else {
+                      setEmailError('')
+                    }
+                  }}
+                  style={emailError ? { borderColor: '#ef4444', backgroundColor: '#fff5f5' } : {}}
+                  required
+                />
+                {emailError && (
+                  <div style={{ color: '#dc2626', fontSize: '0.8rem', marginTop: 4, fontWeight: 500 }}>
+                    {emailError}
+                  </div>
+                )}
               </div>
+
               <div className="form-group">
                 <label>Password (min 8 characters)</label>
-                <input className="form-control" type="password" value={password} onChange={e=>setPassword(e.target.value)} required minLength={8} />
+                <input
+                  className="form-control"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={handlePasswordChange}
+                  style={passwordError ? { borderColor: '#ef4444', backgroundColor: '#fff5f5' } : {}}
+                  required
+                  minLength={8}
+                />
+                {passwordError && (
+                  <div style={{ color: '#dc2626', fontSize: '0.8rem', marginTop: 4, fontWeight: 500 }}>
+                    {passwordError}
+                  </div>
+                )}
               </div>
+
               <button disabled={isLoading} type="submit" className="btn-primary" style={{ width: '100%', marginTop: 8 }}>
                 {isLoading ? "Registering..." : "Create Account"}
               </button>
@@ -99,6 +178,3 @@ export default function Register(){
     </div>
   )
 }
-
-
-

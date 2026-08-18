@@ -440,4 +440,76 @@ public class PasswordResetTests
         Assert.Equal("newbie@ankix.io", sent.Email);
         Assert.Equal(user.EmailVerificationToken, sent.Token);
     }
+
+    [Theory]
+    [InlineData("invalid-email")]
+    [InlineData("user@")]
+    [InlineData("@domain.com")]
+    [InlineData("user@domain")]
+    [InlineData("user @domain.com")]
+    [InlineData("user@domain..com")]
+    public async Task Register_InvalidEmailPattern_ReturnsBadRequest(string invalidEmail)
+    {
+        using var db = CreateInMemoryDbContext();
+        var controller = CreateController(db);
+
+        var result = await controller.Register(new RegisterRequest
+        {
+            Email = invalidEmail,
+            Password = "Password123!",
+            DisplayName = "Test"
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Theory]
+    [InlineData("invalid-email")]
+    [InlineData("user@")]
+    [InlineData("user@domain")]
+    public async Task Login_InvalidEmailPattern_ReturnsBadRequest(string invalidEmail)
+    {
+        using var db = CreateInMemoryDbContext();
+        var controller = CreateController(db);
+
+        var result = await controller.Login(new LoginRequest
+        {
+            Email = invalidEmail,
+            Password = "Password123!"
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Theory]
+    [InlineData("not-an-email")]
+    [InlineData("user@domain")]
+    public async Task ForgotPassword_InvalidEmailPattern_ReturnsBadRequest(string invalidEmail)
+    {
+        using var db = CreateInMemoryDbContext();
+        var controller = CreateController(db);
+
+        var result = await controller.ForgotPassword(new ForgotPasswordRequest
+        {
+            Email = invalidEmail
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Theory]
+    [InlineData("not-an-email")]
+    [InlineData("user@domain")]
+    public async Task SendVerification_InvalidEmailPattern_ReturnsBadRequest(string invalidEmail)
+    {
+        using var db = CreateInMemoryDbContext();
+        var controller = CreateController(db);
+
+        var result = await controller.SendVerification(new SendVerificationRequest
+        {
+            Email = invalidEmail
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
 }

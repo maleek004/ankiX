@@ -38,6 +38,11 @@ public sealed class AuthController : ControllerBase
     {
         try
         {
+            if (!EmailValidator.IsValid(request.Email))
+            {
+                return BadRequest(new { message = "Invalid email format. Please provide a valid email address (e.g. name@example.com)." });
+            }
+
             string normalizedEmail = request.Email.Trim().ToLowerInvariant();
             await EnsureUserColumnsAsync();
 
@@ -99,6 +104,11 @@ public sealed class AuthController : ControllerBase
     {
         try
         {
+            if (!EmailValidator.IsValid(request.Email))
+            {
+                return BadRequest(new { message = "Invalid email format. Please provide a valid email address (e.g. name@example.com)." });
+            }
+
             string normalizedEmail = request.Email.Trim().ToLowerInvariant();
             await EnsureUserColumnsAsync();
 
@@ -231,9 +241,9 @@ public sealed class AuthController : ControllerBase
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(request.Email))
+            if (string.IsNullOrWhiteSpace(request.Email) || !EmailValidator.IsValid(request.Email))
             {
-                return BadRequest(new { message = "Email is required." });
+                return BadRequest(new { message = "Invalid email format. Please provide a valid email address (e.g. name@example.com)." });
             }
 
             string normalizedEmail = request.Email.Trim().ToLowerInvariant();
@@ -340,9 +350,9 @@ public sealed class AuthController : ControllerBase
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(request.Email))
+            if (string.IsNullOrWhiteSpace(request.Email) || !EmailValidator.IsValid(request.Email))
             {
-                return BadRequest(new { message = "Email is required." });
+                return BadRequest(new { message = "Invalid email format. Please provide a valid email address (e.g. name@example.com)." });
             }
 
             string normalizedEmail = request.Email.Trim().ToLowerInvariant();

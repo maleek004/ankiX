@@ -9,7 +9,16 @@ export default function EmailVerificationBanner() {
   const [dismissed, setDismissed] = useState(false)
   const [error, setError] = useState('')
 
-  if (!auth?.user || auth.user.isEmailVerified === true || auth.user.IsEmailVerified === true || dismissed) {
+  const isOAuth = (auth?.user?.authProvider && auth.user.authProvider !== 'local') ||
+                  (auth?.user?.AuthProvider && auth.user.AuthProvider !== 'local') ||
+                  Boolean(auth?.user?.googleId || auth?.user?.GoogleId || auth?.user?.gitHubId || auth?.user?.GitHubId)
+
+  const isVerified = auth?.user?.isEmailVerified === true ||
+                     auth?.user?.IsEmailVerified === true ||
+                     auth?.user?.email_verified === 'true' ||
+                     isOAuth
+
+  if (!auth?.user || isVerified || dismissed) {
     return null
   }
 

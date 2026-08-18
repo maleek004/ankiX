@@ -65,12 +65,11 @@ builder.Services
 
 builder.Services.AddAuthorization();
 builder.Services.AddHttpClient<ICodeExecutionService, CodeExecutionService>();
-builder.Services.AddHttpClient<IOAuthService, OAuthService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IReviewSchedulerService, ReviewSchedulerService>();
-builder.Services.AddScoped<IOAuthService, OAuthService>();
-builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddHttpClient<IOAuthService, OAuthService>();
+builder.Services.AddHttpClient<IEmailService, EmailService>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();

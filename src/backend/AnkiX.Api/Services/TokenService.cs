@@ -32,7 +32,8 @@ public sealed class TokenService : ITokenService
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(ClaimTypes.GivenName, displayName),
             new Claim("displayName", displayName),
-            new Claim(ClaimTypes.Role, user.Role)
+            new Claim(ClaimTypes.Role, user.Role),
+            new Claim("isEmailVerified", user.IsEmailVerified.ToString().ToLowerInvariant())
         };
 
         DateTime expiresAt = DateTime.UtcNow.AddMinutes(jwtOptions.ExpiresInMinutes);

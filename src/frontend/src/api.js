@@ -205,7 +205,8 @@ export function getUser(){
     try {
       const u = JSON.parse(storedUser)
       const displayName = getEffectiveDisplayName(u.displayName || u.DisplayName, u.email || u.Email)
-      return { ...u, displayName }
+      const isEmailVerified = u.isEmailVerified ?? u.IsEmailVerified ?? (u.authProvider !== 'local' && u.AuthProvider !== 'local' && (u.authProvider || u.AuthProvider)) ?? false
+      return { ...u, displayName, isEmailVerified }
     } catch {}
   }
   const token = getToken()
@@ -216,8 +217,9 @@ export function getUser(){
       const email = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'] || payload['email']
       const id = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || payload['sub'] || payload['id']
       const rawDisplayName = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname'] || payload['displayName'] || payload['given_name'] || payload['name']
+      const isEmailVerified = payload['isEmailVerified'] === 'true' || payload['email_verified'] === 'true'
       const displayName = getEffectiveDisplayName(rawDisplayName, email)
-      return { id, email, role, displayName }
+      return { id, email, role, displayName, isEmailVerified }
     } catch {}
   }
   return null

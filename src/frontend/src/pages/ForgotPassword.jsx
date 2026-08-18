@@ -1,20 +1,36 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { forgotPassword } from '../api'
+import { isValidEmail } from '../utils/validation'
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [emailError, setEmailError] = useState('')
   const [error, setError] = useState('')
+
+  const handleEmailChange = (e) => {
+    const val = e.target.value
+    setEmail(val)
+    if (emailError && isValidEmail(val)) {
+      setEmailError('')
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setIsLoading(true)
     setError('')
+    setEmailError('')
 
+    if (!isValidEmail(email)) {
+      setEmailError('Please enter a valid email address (e.g. name@example.com)')
+      return
+    }
+
+    setIsLoading(true)
     try {
-      await forgotPassword(email)
+      await forgotPassword(email.trim())
       setSubmitted(true)
     } catch (err) {
       setError(err.message || 'Failed to submit password reset request.')
@@ -49,7 +65,7 @@ export default function ForgotPassword() {
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             {error && (
               <div style={{
                 backgroundColor: '#fef2f2',
@@ -71,9 +87,22 @@ export default function ForgotPassword() {
                 type="email"
                 placeholder="name@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={handleEmailChange}
+                onBlur={() => {
+                  if (email && !isValidEmail(email)) {
+                    setEmailError('Please enter a valid email address (e.g. name@example.com)')
+                  } else {
+                    setEmailError('')
+                  }
+                }}
+                style={emailError ? { borderColor: '#ef4444', backgroundColor: '#fff5f5' } : {}}
                 required
               />
+              {emailError && (
+                <div style={{ color: '#dc2626', fontSize: '0.8rem', marginTop: 4, fontWeight: 500 }}>
+                  {emailError}
+                </div>
+              )}
             </div>
 
             <button
