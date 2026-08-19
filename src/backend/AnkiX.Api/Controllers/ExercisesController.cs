@@ -4,6 +4,7 @@ using AnkiX.Api.Data;
 using AnkiX.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 using AnkiX.Api.Contracts.Study;
@@ -12,7 +13,6 @@ using AnkiX.Api.Services;
 namespace AnkiX.Api.Controllers;
 
 [ApiController]
-[Authorize]
 [Route("api/exercises")]
 public sealed class ExercisesController : ControllerBase
 {
@@ -45,33 +45,66 @@ public sealed class ExercisesController : ControllerBase
         string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         int.TryParse(userIdClaim, out userId);
 
-        List<int> joinedGroupIds = await dbContext.StudyGroupMembers.AsNoTracking()
-            .Where(m => m.UserId == userId)
-            .Select(m => m.StudyGroupId)
-            .ToListAsync();
-
-        var sampleGroupId = await dbContext.StudyGroups.AsNoTracking().Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
-        bool sampleJoined = sampleGroupId > 0 && joinedGroupIds.Contains(sampleGroupId);
-
+        int sampleGroupId = await dbContext.StudyGroups.AsNoTracking().Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
         int? groupId = studyGroupId ?? communityId;
-        if (groupId.HasValue && groupId.Value > 0)
+
+        if (userId == 0)
         {
-            if (!joinedGroupIds.Contains(groupId.Value))
+            // Unauthenticated guest user: only expose exercises from public study groups or global/sample
+            var publicGroupIds = await dbContext.StudyGroups.AsNoTracking()
+                .Where(g => g.IsPublic)
+                .Select(g => g.Id)
+                .ToListAsync();
+
+            if (groupId.HasValue && groupId.Value > 0)
             {
-                return Ok(Array.Empty<ExerciseResponse>());
-            }
-            if (groupId.Value == sampleGroupId || sampleGroupId == 0)
-            {
-                query = query.Where(e => e.StudyGroupId == groupId.Value || e.StudyGroupId == null || e.StudyGroupId == 0);
+                if (!publicGroupIds.Contains(groupId.Value) && groupId.Value != sampleGroupId)
+                {
+                    return Ok(Array.Empty<ExerciseResponse>());
+                }
+
+                if (groupId.Value == sampleGroupId || sampleGroupId == 0)
+                {
+                    query = query.Where(e => e.StudyGroupId == groupId.Value || e.StudyGroupId == null || e.StudyGroupId == 0);
+                }
+                else
+                {
+                    query = query.Where(e => e.StudyGroupId == groupId.Value);
+                }
             }
             else
             {
-                query = query.Where(e => e.StudyGroupId == groupId.Value);
+                query = query.Where(e => (e.StudyGroupId.HasValue && publicGroupIds.Contains(e.StudyGroupId.Value)) || (e.StudyGroupId == null || e.StudyGroupId == 0));
             }
         }
         else
         {
-            query = query.Where(e => (e.StudyGroupId.HasValue && joinedGroupIds.Contains(e.StudyGroupId.Value)) || (sampleJoined && (e.StudyGroupId == null || e.StudyGroupId == 0)));
+            List<int> joinedGroupIds = await dbContext.StudyGroupMembers.AsNoTracking()
+                .Where(m => m.UserId == userId)
+                .Select(m => m.StudyGroupId)
+                .ToListAsync();
+
+            bool sampleJoined = sampleGroupId > 0 && joinedGroupIds.Contains(sampleGroupId);
+
+            if (groupId.HasValue && groupId.Value > 0)
+            {
+                if (!joinedGroupIds.Contains(groupId.Value))
+                {
+                    return Ok(Array.Empty<ExerciseResponse>());
+                }
+                if (groupId.Value == sampleGroupId || sampleGroupId == 0)
+                {
+                    query = query.Where(e => e.StudyGroupId == groupId.Value || e.StudyGroupId == null || e.StudyGroupId == 0);
+                }
+                else
+                {
+                    query = query.Where(e => e.StudyGroupId == groupId.Value);
+                }
+            }
+            else
+            {
+                query = query.Where(e => (e.StudyGroupId.HasValue && joinedGroupIds.Contains(e.StudyGroupId.Value)) || (sampleJoined && (e.StudyGroupId == null || e.StudyGroupId == 0)));
+            }
         }
 
         var rawExercises = await query
@@ -127,6 +160,27 @@ public sealed class ExercisesController : ControllerBase
         if (exercise is null)
         {
             return NotFound(new { message = "Exercise not found." });
+        }
+
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int.TryParse(userIdClaim, out int userId);
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        if (exercise.StudyGroupId.HasValue && exercise.StudyGroupId.Value > 0 && !isSystemAdmin)
+        {
+            var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == exercise.StudyGroupId.Value);
+            if (studyGroup != null && !studyGroup.IsPublic)
+            {
+                if (userId == 0)
+                {
+                    return NotFound(new { message = "Exercise not found." });
+                }
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == exercise.StudyGroupId.Value && m.UserId == userId);
+                if (!isMember)
+                {
+                    return NotFound(new { message = "Exercise not found." });
+                }
+            }
         }
 
         return Ok(new ExerciseDetailResponse
@@ -340,7 +394,69 @@ public sealed class ExercisesController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("public")]
+    public async Task<ActionResult<IEnumerable<ExerciseResponse>>> GetPublicExercises([FromQuery] string? language = null)
+    {
+        var publicGroupIds = await dbContext.StudyGroups.AsNoTracking()
+            .Where(g => g.IsPublic)
+            .Select(g => g.Id)
+            .ToListAsync();
+
+        IQueryable<Exercise> query = dbContext.Exercises.AsNoTracking()
+            .Where(e => (e.StudyGroupId.HasValue && publicGroupIds.Contains(e.StudyGroupId.Value)) || (e.StudyGroupId == null || e.StudyGroupId == 0));
+
+        if (!string.IsNullOrWhiteSpace(language))
+        {
+            string normLang = language.Trim().ToLowerInvariant();
+            query = query.Where(e => e.Language.ToLower() == normLang);
+        }
+
+        var rawExercises = await query
+            .Select(e => new
+            {
+                e.Id,
+                e.Title,
+                e.Description,
+                e.Language,
+                e.ExerciseType,
+                e.ExerciseSpec,
+                e.CreatedByUserId,
+                e.CreatedAt,
+                LinkedCardsCount = dbContext.CardExercises.Count(ce => ce.ExerciseId == e.Id),
+                AverageEaseFactor = dbContext.ExerciseReviewRecords
+                    .Where(r => r.ExerciseId == e.Id)
+                    .Select(r => (double?)r.EaseFactor)
+                    .Average() ?? 2.50,
+                TotalReviewsCount = dbContext.ExerciseReviewRecords
+                    .Count(r => r.ExerciseId == e.Id)
+            })
+            .ToListAsync();
+
+        var exercises = rawExercises
+            .OrderByDescending(e => e.AverageEaseFactor)
+            .ThenByDescending(e => e.CreatedAt)
+            .Select(e => new ExerciseResponse
+            {
+                Id = e.Id,
+                Title = e.Title,
+                Description = e.Description,
+                Language = e.Language,
+                ExerciseType = e.ExerciseType ?? "CodeExecution",
+                ExerciseSpec = e.ExerciseSpec,
+                CreatedByUserId = e.CreatedByUserId,
+                CreatedAt = e.CreatedAt,
+                LinkedCardsCount = e.LinkedCardsCount,
+                AverageEaseFactor = Math.Round(e.AverageEaseFactor, 2),
+                TotalReviewsCount = e.TotalReviewsCount
+            })
+            .ToList();
+
+        return Ok(exercises);
+    }
+
     [HttpPost("{id:int}/run")]
+    [HttpPost("{id:int}/run-ephemeral")]
+    [EnableRateLimiting("GuestExecutionPolicy")]
     public async Task<ActionResult<CodeRunResponse>> RunExercise(
         [FromRoute] int id,
         [FromBody] CodeRunRequest request,
@@ -355,6 +471,27 @@ public sealed class ExercisesController : ControllerBase
             return NotFound(new { message = "Exercise not found." });
         }
 
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int.TryParse(userIdClaim, out int userId);
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        if (exercise.StudyGroupId.HasValue && exercise.StudyGroupId.Value > 0 && !isSystemAdmin)
+        {
+            var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == exercise.StudyGroupId.Value);
+            if (studyGroup != null && !studyGroup.IsPublic)
+            {
+                if (userId == 0)
+                {
+                    return NotFound(new { message = "Exercise not found." });
+                }
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == exercise.StudyGroupId.Value && m.UserId == userId);
+                if (!isMember)
+                {
+                    return NotFound(new { message = "Exercise not found." });
+                }
+            }
+        }
+
         string type = exercise.ExerciseType ?? "CodeExecution";
         if (type.Equals("MultipleChoice", StringComparison.OrdinalIgnoreCase))
         {
@@ -364,7 +501,7 @@ public sealed class ExercisesController : ControllerBase
             {
                 using var doc = System.Text.Json.JsonDocument.Parse(exercise.ExerciseSpec ?? "{}");
                 int correctIdx = doc.RootElement.GetProperty("correctIndex").GetInt32();
-                if (int.TryParse(request.SubmittedCode.Trim(), out int submittedIdx) && submittedIdx == correctIdx)
+                if (int.TryParse(request.SubmittedCode?.Trim() ?? "", out int submittedIdx) && submittedIdx == correctIdx)
                 {
                     passed = true;
                     details = "Correct choice selected!";

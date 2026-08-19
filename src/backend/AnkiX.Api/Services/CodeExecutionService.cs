@@ -250,13 +250,37 @@ public sealed class CodeExecutionService : ICodeExecutionService
                 return new CodeExecutionResult { Passed = false, DurationMs = 0, Details = $"Failed to start process '{cmd}'." };
             }
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cts.Token);
 
-            string stdout = await proc.StandardOutput.ReadToEndAsync(linkedCts.Token);
-            string stderr = await proc.StandardError.ReadToEndAsync(linkedCts.Token);
+            string stdout = string.Empty;
+            string stderr = string.Empty;
 
-            await proc.WaitForExitAsync(linkedCts.Token);
+            try
+            {
+                stdout = await proc.StandardOutput.ReadToEndAsync(linkedCts.Token);
+                stderr = await proc.StandardError.ReadToEndAsync(linkedCts.Token);
+                await proc.WaitForExitAsync(linkedCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try
+                {
+                    if (!proc.HasExited)
+                    {
+                        proc.Kill(entireProcessTree: true);
+                    }
+                }
+                catch { }
+
+                return new CodeExecutionResult
+                {
+                    Passed = false,
+                    DurationMs = 3000,
+                    Details = "Execution timed out (3s sandbox CPU limit exceeded)."
+                };
+            }
+
             watch.Stop();
 
             bool success = proc.ExitCode == 0 && string.IsNullOrWhiteSpace(stderr);
@@ -270,10 +294,6 @@ public sealed class CodeExecutionService : ICodeExecutionService
                 DurationMs = (int)watch.ElapsedMilliseconds,
                 Details = details
             };
-        }
-        catch (OperationCanceledException)
-        {
-            return new CodeExecutionResult { Passed = false, DurationMs = 5000, Details = "Execution timed out (5s limit exceeded)." };
         }
         catch (Exception ex)
         {

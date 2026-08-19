@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
+import AuthModal from '../components/AuthModal'
 import { getStudyGroups, createStudyGroup, joinStudyGroup, getStudyGroupMembers, updateStudyGroupMemberRole, addStudyGroupMember, getEffectiveDisplayName } from '../api'
 
 export default function StudyGroups() {
@@ -11,6 +12,7 @@ export default function StudyGroups() {
   const [studyGroups, setStudyGroups] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [authModalConfig, setAuthModalConfig] = useState({ isOpen: false, title: '', subtitle: '', intent: null })
   const [createForm, setCreateForm] = useState({ name: '', slug: '', description: '', isPublic: true })
   const [actionLoading, setActionLoading] = useState(false)
   const [managingMembersStudyGroup, setManagingMembersStudyGroup] = useState(null)
@@ -150,15 +152,24 @@ export default function StudyGroups() {
             Select a study group to access its decks and exercises.
           </p>
         </div>
-        {token && (
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn btn-primary"
-            style={{ padding: '0.5rem 1.25rem' }}
-          >
-            ➕ Create Study Group
-          </button>
-        )}
+        <button
+          onClick={() => {
+            if (token) {
+              setShowCreateModal(true)
+            } else {
+              setAuthModalConfig({
+                isOpen: true,
+                title: 'Create a Study Group',
+                subtitle: 'Sign in or register in seconds to create and manage your own public or private study groups.',
+                intent: { returnUrl: '/study-groups', action: 'create_group' }
+              })
+            }
+          }}
+          className="btn btn-primary"
+          style={{ padding: '0.5rem 1.25rem' }}
+        >
+          ➕ Create Study Group
+        </button>
       </div>
 
       {/* Study Groups Grid */}
@@ -183,7 +194,7 @@ export default function StudyGroups() {
                 transition: 'box-shadow 0.2s, transform 0.2s',
                 cursor: 'pointer'
               }}
-              onClick={() => c.userRole ? enterStudyGroup(c) : null}
+              onClick={() => enterStudyGroup(c)}
               onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(99,102,241,0.13)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
               onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none' }}
             >
@@ -242,6 +253,31 @@ export default function StudyGroups() {
                       </button>
                     )}
                   </>
+                ) : !token ? (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className="btn btn-primary"
+                      style={{ flex: 1, padding: '0.5rem', fontSize: '0.85rem' }}
+                      onClick={(e) => { e.stopPropagation(); enterStudyGroup(c) }}
+                    >
+                      Browse Decks →
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ flex: 1, padding: '0.5rem', fontSize: '0.85rem' }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setAuthModalConfig({
+                          isOpen: true,
+                          title: `Join ${c.name}`,
+                          subtitle: 'Sign in or register to join this study group, sync your SRS reviews, and track daily learning streaks.',
+                          intent: { returnUrl: '/study-groups', action: 'join', slug: c.slug }
+                        })
+                      }}
+                    >
+                      Join Group
+                    </button>
+                  </div>
                 ) : (
                   <button
                     className="btn btn-secondary"
@@ -257,6 +293,11 @@ export default function StudyGroups() {
           ))}
         </div>
       )}
+
+      <AuthModal
+        {...authModalConfig}
+        onClose={() => setAuthModalConfig(prev => ({ ...prev, isOpen: false }))}
+      />
 
       {/* Create Study Group Modal */}
       {showCreateModal && (

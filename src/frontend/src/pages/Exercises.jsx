@@ -16,13 +16,18 @@ import {
 } from '../api.js'
 import ExerciseRenderer from '../components/ExerciseComponents'
 import CopyModal from '../components/CopyModal'
+import AuthModal from '../components/AuthModal'
 
 export default function Exercises() {
   const { activeStudyGroup } = useStudyGroup() || {}
   const [copyModalItem, setCopyModalItem] = useState(null)
+  const [authModalConfig, setAuthModalConfig] = useState({ isOpen: false, title: '', subtitle: '', intent: null })
+
+  const token = localStorage.getItem('ankix_token')
+  const isGuest = !token
 
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('queue') // 'queue' | 'all'
+  const [activeTab, setActiveTab] = useState(isGuest ? 'all' : 'queue') // 'queue' | 'all'
   const [exercises, setExercises] = useState([])
   const [dueQueue, setDueQueue] = useState([])
   const [enrolledIds, setEnrolledIds] = useState(new Set())
@@ -65,18 +70,25 @@ export default function Exercises() {
   const [queueIndex, setQueueIndex] = useState(0)
 
   const loadData = async () => {
-    if (!activeStudyGroup) { navigate('/study-groups'); return }
     setLoading(true)
     try {
       setCanCreate(canCreateContent(activeStudyGroup?.role))
-      const [allEx, collectionIds, dueEx] = await Promise.all([
-        getExercises(activeLang, activeStudyGroup?.id),
-        getMyCollectionExerciseIds(),
-        getMyDueExercises(activeStudyGroup?.id)
-      ])
-      setExercises(allEx || [])
-      setEnrolledIds(new Set(collectionIds || []))
-      setDueQueue(dueEx || [])
+      if (isGuest) {
+        const allEx = await getExercises(activeLang, activeStudyGroup?.id)
+        setExercises(allEx || [])
+        setEnrolledIds(new Set())
+        setDueQueue([])
+        setActiveTab('all')
+      } else {
+        const [allEx, collectionIds, dueEx] = await Promise.all([
+          getExercises(activeLang, activeStudyGroup?.id).catch(() => []),
+          getMyCollectionExerciseIds().catch(() => []),
+          getMyDueExercises(activeStudyGroup?.id).catch(() => [])
+        ])
+        setExercises(allEx || [])
+        setEnrolledIds(new Set(collectionIds || []))
+        setDueQueue(dueEx || [])
+      }
     } catch (err) {
       console.warn('Could not load exercise data:', err.message || err)
     } finally {
@@ -90,6 +102,15 @@ export default function Exercises() {
 
   const handleToggleEnroll = async (exId, e) => {
     if (e) e.stopPropagation()
+    if (isGuest) {
+      setAuthModalConfig({
+        isOpen: true,
+        title: 'Save Exercise to Your Collection',
+        subtitle: 'Sign in or register to add exercises to your personal study queue and track spaced repetition reviews.',
+        intent: { returnUrl: '/exercises', action: 'enroll' }
+      })
+      return
+    }
     const isEnrolled = enrolledIds.has(exId)
     setEnrollingId(exId)
     try {
@@ -220,6 +241,10 @@ export default function Exercises() {
 
   const handleRateExercise = async (outcome) => {
     if (!activeExercise) return
+    if (isGuest) {
+      setActiveExercise(null)
+      return
+    }
     setSubmittingReview(true)
     try {
       await submitExerciseReview(activeExercise.id, outcome)
@@ -267,11 +292,24 @@ export default function Exercises() {
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
-          {canCreate && (
+          {canCreate ? (
             <button className="btn-primary" onClick={() => setShowAddForm(true)} style={{ padding: '8px 16px', fontSize: '0.9rem' }}>
               + Add New Exercise
             </button>
-          )}
+          ) : isGuest ? (
+            <button
+              className="btn-primary"
+              onClick={() => setAuthModalConfig({
+                isOpen: true,
+                title: 'Create Interactive Exercises',
+                subtitle: 'Sign in or create a free account to author coding exercises, multiple choice questions, and test suites.',
+                intent: { returnUrl: '/exercises', action: 'create_exercise' }
+              })}
+              style={{ padding: '8px 16px', fontSize: '0.9rem' }}
+            >
+              + Add New Exercise
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -811,6 +849,11 @@ export default function Exercises() {
           alert('Exercise copied successfully!')
           loadData()
         }}
+      />
+
+      <AuthModal
+        {...authModalConfig}
+        onClose={() => setAuthModalConfig(prev => ({ ...prev, isOpen: false }))}
       />
     </div>
   )

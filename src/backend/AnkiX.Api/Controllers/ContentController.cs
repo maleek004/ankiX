@@ -169,12 +169,53 @@ public sealed class ContentController : ControllerBase
 
     [HttpGet("cards/{cardId:int}")]
     [HttpGet("/api/cards/{cardId:int}")]
+    [AllowAnonymous]
     public async Task<ActionResult<CardResponse>> GetCard([FromRoute] int cardId)
     {
         Card? card = await dbContext.Cards.FirstOrDefaultAsync(entity => entity.Id == cardId);
         if (card is null)
         {
             return NotFound(new { message = "Card not found." });
+        }
+
+        Deck? deck = await dbContext.Decks.AsNoTracking().FirstOrDefaultAsync(d => d.Id == card.DeckId);
+        if (deck is null)
+        {
+            return NotFound(new { message = "Card not found." });
+        }
+
+        int userId = 0;
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(userIdClaim, out int parsedId))
+        {
+            userId = parsedId;
+        }
+
+        bool isSuperAdmin = User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.Admin);
+        if (deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0)
+        {
+            var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(c => c.Id == deck.StudyGroupId.Value);
+            if (studyGroup is not null && !studyGroup.IsPublic && !isSuperAdmin)
+            {
+                if (userId == 0)
+                {
+                    return NotFound(new { message = "Card not found." });
+                }
+
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(cm => cm.StudyGroupId == studyGroup.Id && cm.UserId == userId);
+                if (!isMember)
+                {
+                    return NotFound(new { message = "Card not found." });
+                }
+            }
+        }
+        else
+        {
+            var sampleGroupId = await dbContext.StudyGroups.AsNoTracking().Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
+            if (userId == 0 && (sampleGroupId == 0 || deck.StudyGroupId != sampleGroupId))
+            {
+                return NotFound(new { message = "Card not found." });
+            }
         }
 
         return Ok(new CardResponse
@@ -189,12 +230,30 @@ public sealed class ContentController : ControllerBase
 
     [HttpGet("cards")]
     [HttpGet("/api/cards")]
+    [AllowAnonymous]
     public async Task<ActionResult<IEnumerable<CardResponse>>> GetAllCards([FromQuery] int? studyGroupId = null)
     {
+        int userId = 0;
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(userIdClaim, out int parsedId))
+        {
+            userId = parsedId;
+        }
+
+        bool isSuperAdmin = User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.Admin);
+        var sampleGroupId = await dbContext.StudyGroups.AsNoTracking().Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
+
         var decksQuery = dbContext.Decks.AsQueryable();
         if (studyGroupId.HasValue && studyGroupId.Value > 0)
         {
-            var sampleGroupId = await dbContext.StudyGroups.AsNoTracking().Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
+            var targetGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(c => c.Id == studyGroupId.Value);
+            if (targetGroup is not null && !targetGroup.IsPublic && !isSuperAdmin)
+            {
+                if (userId == 0) return Ok(Array.Empty<CardResponse>());
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(cm => cm.StudyGroupId == targetGroup.Id && cm.UserId == userId);
+                if (!isMember) return Ok(Array.Empty<CardResponse>());
+            }
+
             if (studyGroupId.Value == sampleGroupId || sampleGroupId == 0)
             {
                 decksQuery = decksQuery.Where(deck => deck.StudyGroupId == studyGroupId.Value || deck.StudyGroupId == null || deck.StudyGroupId == 0);
@@ -203,6 +262,12 @@ public sealed class ContentController : ControllerBase
             {
                 decksQuery = decksQuery.Where(deck => deck.StudyGroupId == studyGroupId.Value);
             }
+        }
+        else if (userId == 0)
+        {
+            var publicGroupIds = await dbContext.StudyGroups.AsNoTracking().Where(c => c.IsPublic).Select(c => c.Id).ToListAsync();
+            decksQuery = decksQuery.Where(deck => (deck.StudyGroupId.HasValue && publicGroupIds.Contains(deck.StudyGroupId.Value))
+                                               || (sampleGroupId > 0 && deck.StudyGroupId == sampleGroupId));
         }
 
         List<int> deckIds = await decksQuery.Select(d => d.Id).ToListAsync();

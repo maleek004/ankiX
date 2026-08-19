@@ -39,14 +39,22 @@ export default function NavBar(){
                 <li><Link to="/exercises" className="nav-link">Exercises</Link></li>
               </>
             ) : auth?.user ? (
-              <li><Link to="/study-groups" className="nav-link">👥 Study Groups</Link></li>
-            ) : null}
+              <>
+                <li><Link to="/study-groups" className="nav-link">👥 Study Groups</Link></li>
+                <li><Link to="/decks" className="nav-link">Decks</Link></li>
+                <li><Link to="/exercises" className="nav-link">Exercises</Link></li>
+              </>
+            ) : (
+              <>
+                <li><Link to="/study-groups" className="nav-link">👥 Study Groups</Link></li>
+                <li><Link to="/decks" className="nav-link">Decks</Link></li>
+                <li><Link to="/exercises" className="nav-link">Exercises</Link></li>
+              </>
+            )}
             {auth?.user?.role === 'Admin' && (
               <li><Link to="/admin/users" className="nav-link">👥 Users</Link></li>
             )}
-            {auth?.user && (
-              <li><Link to="/search" className="nav-link">🔍 Search</Link></li>
-            )}
+            <li><Link to="/search" className="nav-link">🔍 Search</Link></li>
           </ul>
         </nav>
       </div>
@@ -59,6 +67,7 @@ export default function NavBar(){
           </>
         ) : (
           <>
+            <span style={{ fontSize: '0.75rem', background: '#f1f5f9', color: '#64748b', padding: '3px 8px', borderRadius: 12, fontWeight: 600 }}>Guest</span>
             <Link to="/login" className="nav-link">Log In</Link>
             <Link to="/register" className="nav-link">Account</Link>
           </>

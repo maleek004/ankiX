@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
+import { resolvePostLoginRedirect } from '../utils/intent'
 
 function GoogleIcon() {
   return (
@@ -39,7 +40,7 @@ export default function SocialButtons({ mode = 'login' }) {
               setLoadingProvider('google')
               try {
                 await auth.oauthLogin('google', { idToken: response.credential })
-                window.location.href = '/decks'
+                window.location.href = resolvePostLoginRedirect('/decks')
               } catch (err) {
                 alert(`Google sign-in failed: ${err.message || err}`)
               } finally {
@@ -92,7 +93,7 @@ export default function SocialButtons({ mode = 'login' }) {
       } else {
         await auth.oauthLogin('github', { code: manualToken.trim(), redirectUri: `${window.location.origin}/oauth/callback` })
       }
-      window.location.href = '/decks'
+      window.location.href = resolvePostLoginRedirect('/decks')
     } catch (err) {
       alert(`OAuth Login Failed: ${err.message || err}`)
     } finally {

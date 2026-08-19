@@ -3,12 +3,17 @@ import { useParams, Link } from 'react-router-dom'
 import ExerciseRenderer from '../components/ExerciseComponents'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import CopyModal from '../components/CopyModal'
+import AuthModal from '../components/AuthModal'
 import * as api from '../api'
 
 export default function Deck(){
   const { activeStudyGroup } = useStudyGroup() || {}
   const { id } = useParams()
   const [copyModalCard, setCopyModalCard] = useState(null)
+  const [authModalConfig, setAuthModalConfig] = useState({ isOpen: false, title: '', subtitle: '', intent: null })
+
+  const token = localStorage.getItem('ankix_token')
+  const isGuest = !token
 
   const [deck, setDeck]           = useState(null)
   const [queue, setQueue]         = useState({ newCount:0, learningCount:0, reviewCount:0, dueCards:[] })
@@ -95,6 +100,9 @@ export default function Deck(){
     loadQueue()
   }, [id, loadQueue, activeStudyGroup?.role])
 
+  const dueCards   = isGuest ? (allCards || []) : (queue.dueCards || [])
+  const currentCard = dueCards[currentIndex]
+
   // Reset followup panel and fetch linked exercises whenever the card changes
   useEffect(() => {
     setShowFollowups(false)
@@ -103,16 +111,13 @@ export default function Deck(){
     setNewQuestion('')
     setLinkedExercises([])
 
-    const currentCardId = queue?.dueCards?.[currentIndex]?.id
+    const currentCardId = dueCards?.[currentIndex]?.id
     if (currentCardId) {
       api.getCardExercises(currentCardId)
         .then(exs => setLinkedExercises(exs || []))
         .catch(() => setLinkedExercises([]))
     }
-  }, [currentIndex, queue])
-
-  const dueCards   = queue.dueCards || []
-  const currentCard = dueCards[currentIndex]
+  }, [currentIndex, dueCards])
 
   // ── Followups ─────────────────────────────────────────────────────────────
   const loadFollowups = useCallback(async (cardId) => {
@@ -144,6 +149,15 @@ export default function Deck(){
   const handleSubmitFollowup = async (e) => {
     e.preventDefault()
     if (!newQuestion.trim() || !currentCard) return
+    if (isGuest) {
+      setAuthModalConfig({
+        isOpen: true,
+        title: 'Sign In to Post Follow-Up Questions',
+        subtitle: 'Create a free account or sign in to ask questions on flashcards and join community discussions.',
+        intent: { returnUrl: `/decks/${id}`, action: 'followup' }
+      })
+      return
+    }
     setSubmittingFollowup(true)
     try {
       const created = await api.addFollowup(currentCard.id, newQuestion.trim())
@@ -157,9 +171,20 @@ export default function Deck(){
   }
 
   // ── Rating ────────────────────────────────────────────────────────────────
-  // After rating: advance to next card. If we finish the queue, reload it —
-  // learning cards may have come back due (1-min or 10-min intervals elapsed).
+  // After rating: advance to next card. In guest mode, ratings are ephemeral without SM-2 sync.
   const rateCard = async (outcome) => {
+    if (isGuest) {
+      const nextIndex = currentIndex + 1
+      if (nextIndex >= dueCards.length) {
+        setCurrentIndex(dueCards.length)
+      } else {
+        setCurrentIndex(nextIndex)
+        setShowAnswer(false)
+        setUserCode('')
+      }
+      return
+    }
+
     setSubmittingRating(true)
     try {
       await api.submitReview(currentCard.id, outcome)
@@ -339,22 +364,51 @@ export default function Deck(){
         </div>
       ) : dueCards.length === 0 || currentIndex >= dueCards.length ? (
         <div className="empty-state">
-          <h2>🎉 All done!</h2>
-          <p style={{ fontSize: '1.1rem', color: '#495057' }}>
-            No cards due right now. Check back soon — learning cards reappear in minutes!
+          <h2>🎉 {isGuest ? 'Deck Preview Completed!' : 'All done!'}</h2>
+          <p style={{ fontSize: '1.1rem', color: '#495057', maxWidth: 500, margin: '8px auto 20px' }}>
+            {isGuest
+              ? `You have previewed all ${allCards.length} cards in this deck. In Guest Mode, review ratings and spaced repetition intervals are not saved.`
+              : 'No cards due right now. Check back soon — learning cards reappear in minutes!'}
           </p>
-          <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-              <button className="btn-primary" onClick={loadQueue}>🔄 Sync & Check Due Cards</button>
-              <button 
-                className="btn-study-tool" 
-                style={{ color: '#dc3545', borderColor: '#dc3545' }} 
-                disabled={isResetting}
-                onClick={handleResetProgress}
-              >
-                {isResetting ? 'Resetting...' : '⚠️ Reset Progress (Move Cards to New)'}
-              </button>
-            </div>
+          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+            {isGuest ? (
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  className="btn-primary"
+                  style={{ padding: '10px 22px', fontSize: '0.95rem' }}
+                  onClick={() => setAuthModalConfig({
+                    isOpen: true,
+                    title: 'Activate Full Spaced Repetition (SM-2)',
+                    subtitle: 'Create a free account to track review logs, schedule cards with SM-2, and maintain daily learning streaks.',
+                    intent: { returnUrl: `/decks/${id}`, action: 'study_deck' }
+                  })}
+                >
+                  🚀 Unlock SM-2 & Streaks Free
+                </button>
+                <button
+                  className="btn-study-tool"
+                  onClick={() => {
+                    setCurrentIndex(0)
+                    setShowAnswer(false)
+                    setUserCode('')
+                  }}
+                >
+                  🔄 Restart Preview
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button className="btn-primary" onClick={loadQueue}>🔄 Sync & Check Due Cards</button>
+                <button 
+                  className="btn-study-tool" 
+                  style={{ color: '#dc3545', borderColor: '#dc3545' }} 
+                  disabled={isResetting}
+                  onClick={handleResetProgress}
+                >
+                  {isResetting ? 'Resetting...' : '⚠️ Reset Progress (Move Cards to New)'}
+                </button>
+              </div>
+            )}
             <Link to="/decks" className="btn-study-tool" style={{ textDecoration: 'none' }}>Return to Decks</Link>
           </div>
         </div>
@@ -615,6 +669,11 @@ export default function Deck(){
           alert('Card copied to deck successfully!')
           loadQueue()
         }}
+      />
+
+      <AuthModal
+        {...authModalConfig}
+        onClose={() => setAuthModalConfig(prev => ({ ...prev, isOpen: false }))}
       />
     </div>
   )

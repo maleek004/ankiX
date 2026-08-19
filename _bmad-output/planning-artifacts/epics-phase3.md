@@ -32,6 +32,10 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 | **FR25** | Health probe endpoints (`GET /healthz`) & Load Balancer setup | Epic 9 (Story 9.1) |
 | **FR26** | Redis distributed caching for SRS queues & sessions | Epic 9 (Story 9.2) |
 | **FR27** | Isolated Docker worker pool for code execution | Epic 9 (Story 9.3) |
+| **FR29** | Anonymous public study groups & decks discovery | Epic 10 (Story 10.1) |
+| **FR30** | Ephemeral flashcard review & sandbox code execution | Epic 10 (Story 10.2) |
+| **FR31** | Contextual OAuth sign-up gating & intent preservation | Epic 10 (Story 10.3) |
+| **FR32** | Anonymous guest execution rate limiting & resource guards | Epic 10 (Story 10.4) |
 
 ---
 
@@ -42,6 +46,7 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 * **Epic 7: Modernized UI/UX Design System & Workspace** (FR20, FR21, FR22)
 * **Epic 8: Spaced Repetition Analytics & Gamification** (FR23, FR24)
 * **Epic 9: High-Availability Infrastructure & Execution Isolation** (FR25, FR26, FR27)
+* **Epic 10: Anonymous Guest Access & Ephemeral Discovery Funnel** (FR29, FR30, FR31, FR32)
 
 ---
 
@@ -247,3 +252,75 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
   * **Given** a code run submission,  
     **When** processed by `CodeExecutionService`,  
     **Then** execution is dispatched to a containerized sandbox with memory (128MB max), CPU execution timeout (3s max), and disabled network access.
+
+---
+
+### Epic 10: Anonymous Guest Access & Ephemeral Discovery Funnel
+
+#### Story 10.1: Public Study Groups & Decks Discovery for Unregistered Guests
+**As an** unregistered visitor,  
+**I want to** search and browse public study groups, decks, and cards without creating an account,  
+**So that** I can evaluate AnkiX content and curriculum before registering.  
+
+* **Acceptance Criteria:**
+  * **Given** an unauthenticated visitor,  
+    **When** requesting `GET /api/study-groups/public` or `GET /api/decks/public`,  
+    **Then** the API returns public groups and decks with card counts and descriptions (`[AllowAnonymous]`).
+  * **Given** an unauthenticated visitor,  
+    **When** browsing or searching study groups,  
+    **Then** private and invite-only study groups are strictly excluded from the query results.
+  * **Given** an unauthenticated request to a private group endpoint (`GET /api/study-groups/{id}`),  
+    **When** requested,  
+    **Then** the API returns `404 Not Found` or `401 Unauthorized` without leaking group metadata.
+  * **Given** the frontend public explore/catalog view,  
+    **When** viewed in guest mode,  
+    **Then** public content renders with a subtle "Guest Mode — Explore & Preview" top banner.
+
+#### Story 10.2: Ephemeral Flashcard Preview & Sandbox Code Execution
+**As an** unregistered visitor,  
+**I want to** flip flashcards and run test suites on public coding exercises in an ephemeral sandbox,  
+**So that** I can experience the interactive study workflow without persisting database state.  
+
+* **Acceptance Criteria:**
+  * **Given** an unauthenticated visitor previewing a public deck,  
+    **When** stepping through flashcards,  
+    **Then** cards render in sequential preview mode and no review attempts (`POST /api/reviews`) or SM-2 interval calculations are dispatched or stored in the database.
+  * **Given** an unauthenticated visitor solving a public coding exercise,  
+    **When** clicking "Run Code",  
+    **Then** the solution executes against the sandbox runner via ephemeral endpoint (`POST /api/exercises/{id}/run-ephemeral`) and returns test assertion output to the UI without saving an execution log to PostgreSQL.
+  * **Given** an unauthenticated request to authenticated mutation endpoints (`POST /api/reviews`, `POST /api/cards/{id}/follow-ups`),  
+    **When** sent,  
+    **Then** the API rejects the request with `401 Unauthorized`.
+
+#### Story 10.3: Contextual Auth Modals & Intent-Preserving Sign-Up Gating
+**As an** unregistered visitor,  
+**I want** clear, contextual sign-up prompts when attempting gated actions,  
+**So that** I understand the benefits of an account and can sign up with one click without losing my place.  
+
+* **Acceptance Criteria:**
+  * **Given** an unregistered visitor on a study group or card view,  
+    **When** clicking "Join Study Group", "Ask Follow-up", or "Save Progress / Start Spaced Repetition",  
+    **Then** an authentication modal appears explaining the value proposition (e.g., *"Sign in with Google or GitHub to join study groups and activate the SM-2 Spaced Repetition engine"*).
+  * **Given** a user authenticating via OAuth or registration through the modal,  
+    **When** login completes,  
+    **Then** the application redirects the user back to their active card or completes the intended join action seamlessly.
+  * **Given** an unregistered visitor viewing a card with community follow-up discussions,  
+    **When** opened,  
+    **Then** all existing follow-up questions and verified solutions render in read-only mode with the question submission form prompting sign-up.
+
+#### Story 10.4: Guest IP Sliding-Window Rate Limiting & Resource Guards
+**As a** platform operator,  
+**I want to** enforce sliding-window IP rate limiting on anonymous code runs and apply strict execution resource caps,  
+**So that** guest traffic cannot exhaust runner container pools or abuse sandbox resources.  
+
+* **Acceptance Criteria:**
+  * **Given** an anonymous IP address submitting ephemeral code runs,  
+    **When** request volume exceeds 10 runs within a 10-minute sliding window,  
+    **Then** the API responds with `429 Too Many Requests` and a standard `Retry-After` header.
+  * **Given** any ephemeral guest execution request,  
+    **When** processed in the Docker sandbox,  
+    **Then** execution is constrained to a 3-second CPU timeout, 128MB RAM limit, and isolated network namespace.
+  * **Given** an authenticated user session,  
+    **When** running code exercises,  
+    **Then** their user-tier quota applies independently of guest IP limits.
+

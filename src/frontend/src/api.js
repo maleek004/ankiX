@@ -196,7 +196,20 @@ export function getEffectiveDisplayName(displayName, email) {
 }
 
 export function getToken(){
-  return localStorage.getItem('ankix_token')
+  const token = localStorage.getItem('ankix_token')
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    if (payload && payload.exp) {
+      const now = Math.floor(Date.now() / 1000)
+      if (payload.exp < now) {
+        localStorage.removeItem('ankix_token')
+        localStorage.removeItem('ankix_user')
+        return null
+      }
+    }
+  } catch {}
+  return token
 }
 
 export function getUser(){
@@ -259,9 +272,18 @@ function authHeaders(){
   }
 }
 
+export function optionalAuthHeaders(){
+  const token = getToken()
+  const headers = { 'Content-Type': 'application/json' }
+  if(token){
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  return headers
+}
+
 export async function getDecks(studyGroupId = null){
   const query = studyGroupId ? `?studyGroupId=${studyGroupId}` : ''
-  const res = await fetch(`${API_BASE}/decks${query}`, { headers: authHeaders() })
+  const res = await fetch(`${API_BASE}/decks${query}`, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Failed to fetch decks')
   return res.json()
 }
@@ -282,26 +304,26 @@ export async function createDeck(title, description = '', studyGroupId = null){
 }
 
 export async function getDeck(id){
-  const res = await fetch(`${API_BASE}/decks/${id}`, { headers: authHeaders() })
+  const res = await fetch(`${API_BASE}/decks/${id}`, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Failed to fetch deck')
   return res.json()
 }
 
 export async function getCards(deckId){
-  const res = await fetch(`${API_BASE}/decks/${deckId}/cards`, { headers: authHeaders() })
+  const res = await fetch(`${API_BASE}/decks/${deckId}/cards`, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Failed to fetch cards')
   return res.json()
 }
 
 export async function getCard(cardId){
-  const res = await fetch(`${API_BASE}/cards/${cardId}`, { headers: authHeaders() })
+  const res = await fetch(`${API_BASE}/cards/${cardId}`, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Failed to fetch card')
   return res.json()
 }
 
 export async function getAllCards(studyGroupId = null){
   const query = studyGroupId ? `?studyGroupId=${studyGroupId}` : ''
-  const res = await fetch(`${API_BASE}/cards${query}`, { headers: authHeaders() })
+  const res = await fetch(`${API_BASE}/cards${query}`, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Failed to fetch all cards')
   return res.json()
 }
@@ -403,7 +425,7 @@ export async function submitReview(cardId, outcome){
 }
 
 export async function getFollowups(cardId){
-  const res = await fetch(`${API_BASE}/cards/${cardId}/followups`, { headers: authHeaders() })
+  const res = await fetch(`${API_BASE}/cards/${cardId}/followups`, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Failed to fetch followups')
   return res.json()
 }
@@ -457,13 +479,13 @@ export async function getExercises(language = '', studyGroupId = null){
   if (language) params.push(`language=${encodeURIComponent(language)}`)
   if (studyGroupId) params.push(`studyGroupId=${studyGroupId}`)
   const query = params.length ? `?${params.join('&')}` : ''
-  const res = await fetch(`${API_BASE}/exercises${query}`, { headers: authHeaders() })
+  const res = await fetch(`${API_BASE}/exercises${query}`, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Failed to fetch exercises')
   return res.json()
 }
 
 export async function getExercise(id){
-  const res = await fetch(`${API_BASE}/exercises/${id}`, { headers: authHeaders() })
+  const res = await fetch(`${API_BASE}/exercises/${id}`, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Failed to fetch exercise details')
   return res.json()
 }
@@ -494,7 +516,7 @@ export async function deleteExercise(id){
 }
 
 export async function getCardExercises(cardId){
-  const res = await fetch(`${API_BASE}/cards/${cardId}/exercises`, { headers: authHeaders() })
+  const res = await fetch(`${API_BASE}/cards/${cardId}/exercises`, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Failed to fetch card exercises')
   return res.json()
 }
@@ -524,9 +546,11 @@ export async function unlinkCardExercise(cardId, exerciseId){
 }
 
 export async function runCardCode(cardId, submittedCode, language = 'csharp'){
-  const res = await fetch(`${API_BASE}/cards/${cardId}/run`,{
+  const token = getToken()
+  const endpoint = token ? `${API_BASE}/cards/${cardId}/run` : `${API_BASE}/cards/${cardId}/run-ephemeral`
+  const res = await fetch(endpoint,{
     method: 'POST',
-    headers: authHeaders(),
+    headers: optionalAuthHeaders(),
     body: JSON.stringify({ submittedCode, language })
   })
   if(!res.ok){
@@ -537,9 +561,11 @@ export async function runCardCode(cardId, submittedCode, language = 'csharp'){
 }
 
 export async function runExerciseCode(exerciseId, submittedCode, language = 'csharp'){
-  const res = await fetch(`${API_BASE}/exercises/${exerciseId}/run`,{
+  const token = getToken()
+  const endpoint = token ? `${API_BASE}/exercises/${exerciseId}/run` : `${API_BASE}/exercises/${exerciseId}/run-ephemeral`
+  const res = await fetch(endpoint,{
     method: 'POST',
-    headers: authHeaders(),
+    headers: optionalAuthHeaders(),
     body: JSON.stringify({ submittedCode, language })
   })
   if(!res.ok){
@@ -595,7 +621,7 @@ export async function globalSearch(query, studyGroupId = null){
   if(studyGroupId) {
     url += `&studyGroupId=${encodeURIComponent(studyGroupId)}`
   }
-  const res = await fetch(url, { headers: authHeaders() })
+  const res = await fetch(url, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Global search failed')
   return res.json()
 }
@@ -665,14 +691,40 @@ export async function importCardsText(deckId, content, format = 'csv'){
 }
 
 export async function getStudyGroups(){
-  const res = await fetch(`${API_BASE}/study-groups`, { headers: authHeaders() })
+  const res = await fetch(`${API_BASE}/study-groups`, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Failed to fetch study groups')
   return res.json()
 }
 export const getCommunities = getStudyGroups
 
+export async function getPublicStudyGroups(){
+  const res = await fetch(`${API_BASE}/study-groups/public`, { headers: optionalAuthHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch public study groups')
+  return res.json()
+}
+export const getPublicCommunities = getPublicStudyGroups
+
+export async function getPublicDecks(){
+  const res = await fetch(`${API_BASE}/decks/public`, { headers: optionalAuthHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch public decks')
+  return res.json()
+}
+
+export async function getDeckPreview(deckId){
+  const res = await fetch(`${API_BASE}/decks/${deckId}/preview`, { headers: optionalAuthHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch deck preview')
+  return res.json()
+}
+
+export async function getPublicExercises(language = ''){
+  const query = language ? `?language=${encodeURIComponent(language)}` : ''
+  const res = await fetch(`${API_BASE}/exercises/public${query}`, { headers: optionalAuthHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch public exercises')
+  return res.json()
+}
+
 export async function getStudyGroupBySlug(slug){
-  const res = await fetch(`${API_BASE}/study-groups/${slug}`, { headers: authHeaders() })
+  const res = await fetch(`${API_BASE}/study-groups/${slug}`, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Failed to fetch study group')
   return res.json()
 }
@@ -719,7 +771,7 @@ export async function leaveStudyGroup(slug){
 export const leaveCommunity = leaveStudyGroup
 
 export async function getStudyGroupMembers(slug){
-  const res = await fetch(`${API_BASE}/study-groups/${slug}/members`, { headers: authHeaders() })
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/members`, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Failed to fetch study group members')
   return res.json()
 }

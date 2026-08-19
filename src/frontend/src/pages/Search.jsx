@@ -43,19 +43,24 @@ export default function Search() {
   const totalFollowups = results.followups?.length || 0
   const totalResults = totalDecks + totalCards + totalExercises + totalFollowups
 
+  const token = localStorage.getItem('ankix_token')
+  const isGuest = !token
+
   return (
     <div style={{ maxWidth: 960, margin: '30px auto', padding: '0 16px' }}>
       {/* Search Header */}
       <div style={{ textAlign: 'center', marginBottom: 24 }}>
         <h2 style={{ fontSize: '1.8rem', fontWeight: 700, margin: 0 }}>🔍 Platform Search</h2>
         <p style={{ color: '#6c757d', fontSize: '0.95rem', marginTop: 4 }}>
-          {searchScope === 'current' && activeStudyGroup
-            ? `Searching strictly within "${activeStudyGroup.name}"`
-            : `Searching across all study groups you have joined`}
+          {isGuest
+            ? 'Searching across all public study groups, decks, and exercises'
+            : (searchScope === 'current' && activeStudyGroup
+                ? `Searching strictly within "${activeStudyGroup.name}"`
+                : 'Searching across all study groups you have joined')}
         </p>
 
         {/* Scope selector toggle if activeStudyGroup is set */}
-        {activeStudyGroup && (
+        {!isGuest && activeStudyGroup && (
           <div style={{ display: 'inline-flex', gap: 6, marginTop: 10, background: '#f1f5f9', padding: 4, borderRadius: 8 }}>
             <button
               className="btn"

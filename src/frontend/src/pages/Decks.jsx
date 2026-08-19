@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import { getDecks, createDeck, deleteDeck, canCreateContent } from '../api.js'
+import AuthModal from '../components/AuthModal'
 
 export default function Decks(){
   const { activeStudyGroup } = useStudyGroup() || {}
@@ -15,16 +16,17 @@ export default function Decks(){
   const [activeDropdown, setActiveDropdown] = useState(null)
   const [isCreating, setIsCreating] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [authModalConfig, setAuthModalConfig] = useState({ isOpen: false, title: '', subtitle: '', intent: null })
+
+  const token = localStorage.getItem('ankix_token')
+  const isGuest = !token
 
   useEffect(() => {
-    if (!activeStudyGroup) {
-      navigate('/study-groups')
-      return
-    }
     let mounted = true
     setLoading(true)
     setCanCreate(canCreateContent(activeStudyGroup?.role))
-    getDecks(activeStudyGroup.id)
+    const groupId = activeStudyGroup ? activeStudyGroup.id : null
+    getDecks(groupId)
       .then(data => {
         if (!mounted) return
         setDecks(data || [])
@@ -37,11 +39,20 @@ export default function Decks(){
         if (mounted) setLoading(false)
       })
     return () => { mounted = false }
-  }, [activeStudyGroup?.id, activeStudyGroup?.role, navigate])
+  }, [activeStudyGroup?.id, activeStudyGroup?.role])
 
   const create = async (e) => {
     e.preventDefault()
     if (!newTitle.trim()) return
+    if (isGuest) {
+      setAuthModalConfig({
+        isOpen: true,
+        title: 'Create Flashcard Decks',
+        subtitle: 'Sign in or register to create flashcard decks, add code prompts, and organize study materials.',
+        intent: { returnUrl: '/decks', action: 'create_deck' }
+      })
+      return
+    }
     setIsCreating(true)
     try {
       const d = await createDeck(newTitle, newDescription, activeStudyGroup?.id)
@@ -57,6 +68,15 @@ export default function Decks(){
   }
 
   const handleDeleteDeck = async (id) => {
+    if (isGuest) {
+      setAuthModalConfig({
+        isOpen: true,
+        title: 'Manage Flashcard Decks',
+        subtitle: 'Sign in to manage and delete your flashcard decks.',
+        intent: { returnUrl: '/decks', action: 'manage' }
+      })
+      return
+    }
     if (!confirm('Are you sure you want to delete this deck?')) return
     setDeletingId(id)
     try {
@@ -69,21 +89,32 @@ export default function Decks(){
     }
   }
 
-
-  if (!activeStudyGroup) return null
-
   return (
     <div>
       <div className="decks-header-bar">
-        <h2 style={{ margin: 0, fontWeight: 500, fontSize: '1.5rem' }}>Decks</h2>
-        {canCreate && (
+        <h2 style={{ margin: 0, fontWeight: 500, fontSize: '1.5rem' }}>
+          {activeStudyGroup ? `Decks: ${activeStudyGroup.name}` : 'Public Flashcard Decks'}
+        </h2>
+        {canCreate ? (
           <button 
             className="btn-primary" 
             onClick={() => setShowAddForm(!showAddForm)}
           >
             {showAddForm ? 'Cancel' : '+ Add Deck'}
           </button>
-        )}
+        ) : isGuest ? (
+          <button
+            className="btn-primary"
+            onClick={() => setAuthModalConfig({
+              isOpen: true,
+              title: 'Create Flashcard Decks',
+              subtitle: 'Sign in or register to create flashcard decks, add code prompts, and organize study materials.',
+              intent: { returnUrl: '/decks', action: 'create_deck' }
+            })}
+          >
+            + Add Deck
+          </button>
+        ) : null}
       </div>
 
       {showAddForm && canCreate && (
@@ -122,7 +153,7 @@ export default function Decks(){
       {loading ? (
         <div className="empty-state">Fetching decks...</div>
       ) : decks.length === 0 ? (
-        <div className="empty-state">No decks in this study group yet. Create one to get started!</div>
+        <div className="empty-state">No decks available. Check out Study Groups to explore content!</div>
       ) : (
         <table className="decks-table">
           <tbody>
@@ -148,9 +179,11 @@ export default function Decks(){
                     {activeDropdown === d.id && (
                       <div className="dropdown-menu">
                         <Link to={`/decks/${d.id}`} className="dropdown-item">Study</Link>
-                        <button className="dropdown-item" disabled={deletingId === d.id} onClick={() => handleDeleteDeck(d.id)}>
-                          {deletingId === d.id ? 'Deleting...' : 'Delete'}
-                        </button>
+                        {!isGuest && (
+                          <button className="dropdown-item" disabled={deletingId === d.id} onClick={() => handleDeleteDeck(d.id)}>
+                            {deletingId === d.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -160,6 +193,11 @@ export default function Decks(){
           </tbody>
         </table>
       )}
+
+      <AuthModal
+        {...authModalConfig}
+        onClose={() => setAuthModalConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 }

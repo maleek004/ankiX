@@ -10,7 +10,6 @@ using System.Security.Claims;
 namespace AnkiX.Api.Controllers;
 
 [ApiController]
-[Authorize]
 [Route("api/cards/{cardId:int}/followups")]
 public sealed class FollowupsController : ControllerBase
 {
@@ -25,10 +24,32 @@ public sealed class FollowupsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<FollowupResponse>>> GetFollowups([FromRoute] int cardId)
     {
-        bool cardExists = await dbContext.Cards.AnyAsync(c => c.Id == cardId);
-        if (!cardExists)
+        var card = await dbContext.Cards.AsNoTracking().FirstOrDefaultAsync(c => c.Id == cardId);
+        if (card == null)
         {
             return NotFound(new { message = "Card not found." });
+        }
+
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int.TryParse(userIdClaim, out int userId);
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        var deck = await dbContext.Decks.AsNoTracking().FirstOrDefaultAsync(d => d.Id == card.DeckId);
+        if (deck != null && deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0 && !isSystemAdmin)
+        {
+            var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == deck.StudyGroupId.Value);
+            if (studyGroup != null && !studyGroup.IsPublic)
+            {
+                if (userId == 0)
+                {
+                    return NotFound(new { message = "Card not found." });
+                }
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == deck.StudyGroupId.Value && m.UserId == userId);
+                if (!isMember)
+                {
+                    return NotFound(new { message = "Card not found." });
+                }
+            }
         }
 
         List<CardFollowup> followups = await dbContext.CardFollowups
@@ -70,6 +91,7 @@ public sealed class FollowupsController : ControllerBase
 
     /// <summary>Adds a follow-up question to a card. Any authenticated user may post.</summary>
     [HttpPost]
+    [Authorize]
     public async Task<ActionResult<FollowupResponse>> CreateFollowup(
         [FromRoute] int cardId,
         [FromBody] CreateFollowupRequest request)

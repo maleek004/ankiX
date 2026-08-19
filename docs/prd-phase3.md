@@ -18,6 +18,7 @@ Key focus areas for Phase 3:
 4. **Modern Design System & UI Overhaul:** Migration from emojis to a vector icon system (`lucide-react`), Monaco Code Editor integration, and a theme engine.
 5. **Study Analytics & Gamification:** GitHub-style activity heatmaps, retention tracking, and daily study streaks.
 6. **Infrastructure & Scalability:** Load balancer health probes, Redis queue caching, and isolated container execution pools.
+7. **Anonymous Guest Browsing & Ephemeral Discovery:** Zero-friction unauthenticated browsing of public study groups, decks, and sandbox code exercises without upfront registration to maximize adoption and reach.
 
 > [!NOTE]
 > **Explicit Scope Boundary:** Multi-language execution additions (Rust, TypeScript, Java) and multi-test-case diff viewer UI are explicitly deferred to Phase 4.
@@ -28,6 +29,7 @@ Key focus areas for Phase 3:
 
 | Role | Access Scope | Primary Actions |
 |---|---|---|
+| **Unregistered / Guest User** | Public Study Groups & Public Decks only | Browse public catalog, ephemeral flashcard previews, ephemeral code exercise test runs (no DB records/SM-2), view existing card follow-ups. |
 | **Learner (User)** | Personal study & joined Study Groups | OAuth login, study decks, run exercises, receive notifications, view study heatmaps. |
 | **Contributor** | Personal & authorized Study Groups | All Learner actions + author decks/cards/exercises, receive notifications on card follow-ups. |
 | **Study Group Admin** | Scope-restricted to specific Study Group | All Contributor actions + invite members by email, manage group deck assignments & permissions. |
@@ -41,6 +43,12 @@ Key focus areas for Phase 3:
 * **FR13:** Users can register and log in using **Google OAuth2** and **GitHub OAuth2** social credentials.
 * **FR14:** System links OAuth identities to existing email accounts or provisions new learner accounts automatically.
 * **FR28:** Users can request a password reset via email (`POST /api/auth/forgot-password`) and submit a cryptographically secure, time-limited token to update their password (`POST /api/auth/reset-password`).
+
+### Anonymous Guest Access & Ephemeral Discovery Funnel
+* **FR29:** Unregistered visitors can browse, search, and preview public study groups, public decks, cards, and standalone exercises. Private study groups remain strictly invisible to guest sessions at the query level.
+* **FR30:** Unregistered visitors can flip cards and execute code exercises in ephemeral client sessions without SM-2 spaced repetition calculations, review log persistence, or streak recording.
+* **FR31:** Gated actions (joining study groups, posting follow-up questions, creating decks/cards, saving spaced repetition progress) trigger contextual OAuth/login modals that preserve user intent.
+* **FR32:** Anonymous code execution requests are protected by IP-based sliding window rate limiting (e.g. max 10 runs per 10 minutes per IP) to prevent worker pool resource exhaustion.
 
 ### In-App Notification Center
 * **FR15:** The platform dispatches in-app notifications to card creators and group admins when a new follow-up question is posted to a card.
@@ -77,6 +85,7 @@ Key focus areas for Phase 3:
 * **NFR13 (Notification Latency):** In-app notification delivery must occur within 500ms of event dispatch.
 * **NFR14 (Scalability):** Backend API statelessness must support horizontal scaling behind NGINX / Azure Application Gateway load balancers.
 * **NFR15 (Sandbox Isolation):** Containerized execution workers must operate in isolated bridge networks without outbound internet access.
+* **NFR16 (Guest Abuse Prevention & Privacy):** Unauthenticated requests cannot access any private group or user data, and guest code executions are capped at 10 runs / 10 minutes per IP with strict sandbox timeout limits ($< 3\text{s}$).
 
 ---
 
@@ -85,5 +94,6 @@ Key focus areas for Phase 3:
 | Success Metric | Target | Counter-Metric | Risk Mitigation |
 |---|---|---|---|
 | **Social Login Adoption** | $\ge 60\%$ of new sign-ups via Google/GitHub | Duplicate accounts created with different emails | Account linking prompt upon duplicate email detection |
+| **Guest-to-Learner Conversion** | $\ge 15\%$ of active guest explorers sign up | Anonymous runner resource exhaustion / bot spam | IP sliding-window rate limiting & sandbox execution quotas |
 | **Notification Engagement** | $\ge 40\%$ click-through on follow-up resolution notifications | Notification fatigue / spam complaints | Per-user notification preferences & mark-all-read controls |
 | **P95 Queue Latency** | $< 50\text{ms}$ with Redis caching | Cache invalidation staleness on card updates | Event-driven cache purging on card/review mutations |

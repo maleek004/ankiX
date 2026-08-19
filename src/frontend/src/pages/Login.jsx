@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import SocialButtons from '../components/SocialButtons'
 import { isValidEmail } from '../utils/validation'
+import { resolvePostLoginRedirect } from '../utils/intent'
 
 export default function Login(){
   const auth = useAuth()
@@ -33,7 +34,7 @@ export default function Login(){
     setIsLoading(true)
     try{
       await auth.login(email.trim(), password)
-      window.location.href = '/decks'
+      window.location.href = resolvePostLoginRedirect('/decks')
     }catch(err){
       setErrorMessage(err.message || 'Login failed. Please check your credentials.')
     }finally{

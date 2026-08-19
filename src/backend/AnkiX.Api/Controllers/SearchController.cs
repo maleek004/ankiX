@@ -56,7 +56,6 @@ public sealed class GlobalSearchResponse
 }
 
 [ApiController]
-[Authorize]
 [Route("api/search")]
 public sealed class SearchController : ControllerBase
 {
@@ -68,7 +67,7 @@ public sealed class SearchController : ControllerBase
     }
 
     /// <summary>
-    /// Performs keyword search across Decks, Cards, Exercises, and Followups scoped strictly to study groups joined by the user.
+    /// Performs keyword search across Decks, Cards, Exercises, and Followups scoped strictly to study groups joined by the user (or public study groups for guests).
     /// Optionally filters to a specific studyGroupId if provided.
     /// </summary>
     [HttpGet]
@@ -83,33 +82,54 @@ public sealed class SearchController : ControllerBase
         }
 
         string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!int.TryParse(userIdClaim, out int userId))
-        {
-            return Unauthorized();
-        }
+        int.TryParse(userIdClaim, out int userId);
 
         int? targetGroupId = studyGroupId ?? communityId;
-
-        // Retrieve all study group IDs that the authenticated user has joined
-        List<int> joinedGroupIds = await dbContext.StudyGroupMembers.AsNoTracking()
-            .Where(m => m.UserId == userId)
-            .Select(m => m.StudyGroupId)
-            .ToListAsync();
-
         List<int> scopedGroupIds;
-        if (targetGroupId.HasValue && targetGroupId.Value > 0)
+
+        if (userId == 0)
         {
-            // If searching within a specific study group, user MUST be a member of that study group
-            if (!joinedGroupIds.Contains(targetGroupId.Value))
+            // Unauthenticated guest: search scoped only to public study groups
+            var publicGroupIds = await dbContext.StudyGroups.AsNoTracking()
+                .Where(g => g.IsPublic)
+                .Select(g => g.Id)
+                .ToListAsync();
+
+            if (targetGroupId.HasValue && targetGroupId.Value > 0)
             {
-                return Ok(response);
+                if (!publicGroupIds.Contains(targetGroupId.Value))
+                {
+                    return Ok(response);
+                }
+                scopedGroupIds = new List<int> { targetGroupId.Value };
             }
-            scopedGroupIds = new List<int> { targetGroupId.Value };
+            else
+            {
+                scopedGroupIds = publicGroupIds;
+            }
         }
         else
         {
-            // Global search -> scope only to study groups joined by the user
-            scopedGroupIds = joinedGroupIds;
+            // Retrieve all study group IDs that the authenticated user has joined
+            List<int> joinedGroupIds = await dbContext.StudyGroupMembers.AsNoTracking()
+                .Where(m => m.UserId == userId)
+                .Select(m => m.StudyGroupId)
+                .ToListAsync();
+
+            if (targetGroupId.HasValue && targetGroupId.Value > 0)
+            {
+                // If searching within a specific study group, user MUST be a member of that study group
+                if (!joinedGroupIds.Contains(targetGroupId.Value))
+                {
+                    return Ok(response);
+                }
+                scopedGroupIds = new List<int> { targetGroupId.Value };
+            }
+            else
+            {
+                // Global search -> scope only to study groups joined by the user
+                scopedGroupIds = joinedGroupIds;
+            }
         }
 
         if (scopedGroupIds.Count == 0)

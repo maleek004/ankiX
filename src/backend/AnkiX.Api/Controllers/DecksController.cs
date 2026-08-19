@@ -9,7 +9,6 @@ using Microsoft.EntityFrameworkCore;
 namespace AnkiX.Api.Controllers;
 
 [ApiController]
-[Authorize]
 [Route("api/decks")]
 public sealed class DecksController : ControllerBase
 {
@@ -28,37 +27,70 @@ public sealed class DecksController : ControllerBase
         int.TryParse(userIdClaim, out userId);
 
         DateTime now = DateTime.UtcNow;
-
-        List<int> joinedGroupIds = await dbContext.StudyGroupMembers.AsNoTracking()
-            .Where(m => m.UserId == userId)
-            .Select(m => m.StudyGroupId)
-            .ToListAsync();
-
-        var sampleGroupId = await dbContext.StudyGroups.AsNoTracking().Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
-        bool sampleJoined = sampleGroupId > 0 && joinedGroupIds.Contains(sampleGroupId);
+        int sampleGroupId = await dbContext.StudyGroups.AsNoTracking().Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
 
         int? groupId = studyGroupId ?? communityId;
-
         var decksQuery = dbContext.Decks.AsQueryable();
-        if (groupId.HasValue && groupId.Value > 0)
-        {
-            if (!joinedGroupIds.Contains(groupId.Value))
-            {
-                return Ok(Array.Empty<DeckResponse>());
-            }
 
-            if (groupId.Value == sampleGroupId || sampleGroupId == 0)
+        if (userId == 0)
+        {
+            // Unauthenticated guest user: only expose decks in public study groups or global/sample decks
+            var publicGroupIds = await dbContext.StudyGroups.AsNoTracking()
+                .Where(g => g.IsPublic)
+                .Select(g => g.Id)
+                .ToListAsync();
+
+            if (groupId.HasValue && groupId.Value > 0)
             {
-                decksQuery = decksQuery.Where(deck => deck.StudyGroupId == groupId.Value || deck.StudyGroupId == null || deck.StudyGroupId == 0);
+                if (!publicGroupIds.Contains(groupId.Value) && groupId.Value != sampleGroupId)
+                {
+                    return Ok(Array.Empty<DeckResponse>());
+                }
+
+                if (groupId.Value == sampleGroupId || sampleGroupId == 0)
+                {
+                    decksQuery = decksQuery.Where(deck => deck.StudyGroupId == groupId.Value || deck.StudyGroupId == null || deck.StudyGroupId == 0);
+                }
+                else
+                {
+                    decksQuery = decksQuery.Where(deck => deck.StudyGroupId == groupId.Value);
+                }
             }
             else
             {
-                decksQuery = decksQuery.Where(deck => deck.StudyGroupId == groupId.Value);
+                decksQuery = decksQuery.Where(deck => (deck.StudyGroupId.HasValue && publicGroupIds.Contains(deck.StudyGroupId.Value)) || (deck.StudyGroupId == null || deck.StudyGroupId == 0));
             }
         }
         else
         {
-            decksQuery = decksQuery.Where(deck => (deck.StudyGroupId.HasValue && joinedGroupIds.Contains(deck.StudyGroupId.Value)) || (sampleJoined && (deck.StudyGroupId == null || deck.StudyGroupId == 0)));
+            // Authenticated user: joined groups + sample/global
+            List<int> joinedGroupIds = await dbContext.StudyGroupMembers.AsNoTracking()
+                .Where(m => m.UserId == userId)
+                .Select(m => m.StudyGroupId)
+                .ToListAsync();
+
+            bool sampleJoined = sampleGroupId > 0 && joinedGroupIds.Contains(sampleGroupId);
+
+            if (groupId.HasValue && groupId.Value > 0)
+            {
+                if (!joinedGroupIds.Contains(groupId.Value))
+                {
+                    return Ok(Array.Empty<DeckResponse>());
+                }
+
+                if (groupId.Value == sampleGroupId || sampleGroupId == 0)
+                {
+                    decksQuery = decksQuery.Where(deck => deck.StudyGroupId == groupId.Value || deck.StudyGroupId == null || deck.StudyGroupId == 0);
+                }
+                else
+                {
+                    decksQuery = decksQuery.Where(deck => deck.StudyGroupId == groupId.Value);
+                }
+            }
+            else
+            {
+                decksQuery = decksQuery.Where(deck => (deck.StudyGroupId.HasValue && joinedGroupIds.Contains(deck.StudyGroupId.Value)) || (sampleJoined && (deck.StudyGroupId == null || deck.StudyGroupId == 0)));
+            }
         }
 
         var rawDecks = await decksQuery
@@ -74,11 +106,11 @@ public sealed class DecksController : ControllerBase
                     .Select(c => new
                     {
                         c.Id,
-                        LatestReview = dbContext.ReviewRecords
+                        LatestReview = userId > 0 ? dbContext.ReviewRecords
                             .Where(r => r.CardId == c.Id && r.UserId == userId)
                             .OrderByDescending(r => r.CreatedAt)
                             .Select(r => new { r.NextReviewAt })
-                            .FirstOrDefault()
+                            .FirstOrDefault() : null
                     })
                     .ToList()
             })
@@ -121,13 +153,113 @@ public sealed class DecksController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("public")]
+    public async Task<ActionResult<IEnumerable<DeckResponse>>> GetPublicDecks()
+    {
+        var publicGroupIds = await dbContext.StudyGroups.AsNoTracking()
+            .Where(g => g.IsPublic)
+            .Select(g => g.Id)
+            .ToListAsync();
+
+        var decks = await dbContext.Decks.AsNoTracking()
+            .Where(deck => (deck.StudyGroupId.HasValue && publicGroupIds.Contains(deck.StudyGroupId.Value)) || (deck.StudyGroupId == null || deck.StudyGroupId == 0))
+            .OrderBy(deck => deck.Title)
+            .Select(deck => new DeckResponse
+            {
+                Id = deck.Id,
+                Title = deck.Title,
+                Description = deck.Description,
+                CreatedByUserId = deck.CreatedByUserId,
+                DueCount = 0,
+                LearnCount = dbContext.Cards.Count(c => c.DeckId == deck.Id)
+            })
+            .ToListAsync();
+
+        return Ok(decks);
+    }
+
+    [HttpGet("{deckId:int}/preview")]
+    public async Task<ActionResult<object>> GetDeckPreview([FromRoute] int deckId)
+    {
+        var deck = await dbContext.Decks.AsNoTracking().FirstOrDefaultAsync(d => d.Id == deckId);
+        if (deck == null)
+        {
+            return NotFound(new { message = "Deck not found." });
+        }
+
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int.TryParse(userIdClaim, out int userId);
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        if (deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0 && !isSystemAdmin)
+        {
+            var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == deck.StudyGroupId.Value);
+            if (studyGroup != null && !studyGroup.IsPublic)
+            {
+                if (userId == 0)
+                {
+                    return NotFound(new { message = "Deck not found." });
+                }
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == deck.StudyGroupId.Value && m.UserId == userId);
+                if (!isMember)
+                {
+                    return NotFound(new { message = "Deck not found." });
+                }
+            }
+        }
+
+        var cards = await dbContext.Cards.AsNoTracking()
+            .Where(c => c.DeckId == deckId)
+            .OrderBy(c => c.Id)
+            .Select(c => new CardResponse
+            {
+                Id = c.Id,
+                DeckId = c.DeckId,
+                Type = c.Type,
+                Prompt = c.Prompt,
+                ValidationSpec = c.ValidationSpec
+            })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            deck.Id,
+            deck.Title,
+            deck.Description,
+            deck.StudyGroupId,
+            TotalCards = cards.Count,
+            Cards = cards
+        });
+    }
+
     [HttpGet("{deckId:int}/cards")]
     public async Task<ActionResult<IEnumerable<CardResponse>>> GetCardsByDeck([FromRoute] int deckId)
     {
-        bool deckExists = await dbContext.Decks.AnyAsync(deck => deck.Id == deckId);
-        if (!deckExists)
+        var deck = await dbContext.Decks.AsNoTracking().FirstOrDefaultAsync(d => d.Id == deckId);
+        if (deck == null)
         {
             return NotFound(new { message = "Deck not found." });
+        }
+
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int.TryParse(userIdClaim, out int userId);
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        if (deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0 && !isSystemAdmin)
+        {
+            var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == deck.StudyGroupId.Value);
+            if (studyGroup != null && !studyGroup.IsPublic)
+            {
+                if (userId == 0)
+                {
+                    return NotFound(new { message = "Deck not found." });
+                }
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == deck.StudyGroupId.Value && m.UserId == userId);
+                if (!isMember)
+                {
+                    return NotFound(new { message = "Deck not found." });
+                }
+            }
         }
 
         List<CardResponse> cards = await dbContext.Cards
@@ -147,6 +279,7 @@ public sealed class DecksController : ControllerBase
     }
 
     [HttpPost("{deckId:int}/reset")]
+    [Authorize]
     public async Task<IActionResult> ResetDeckProgress([FromRoute] int deckId)
     {
         string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);

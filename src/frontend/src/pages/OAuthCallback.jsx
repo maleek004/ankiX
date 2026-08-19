@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
+import { resolvePostLoginRedirect } from '../utils/intent'
 
 export default function OAuthCallback() {
   const auth = useAuth()
@@ -7,24 +8,32 @@ export default function OAuthCallback() {
 
   useEffect(() => {
     async function handleCallback() {
-      const params = new URLSearchParams(window.location.search)
-      const code = params.get('code')
-      const error = params.get('error')
+      const searchParams = new URLSearchParams(window.location.search)
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+
+      const code = searchParams.get('code') || hashParams.get('code')
+      const idToken = searchParams.get('id_token') || hashParams.get('id_token')
+      const error = searchParams.get('error') || hashParams.get('error')
+      const errorDesc = searchParams.get('error_description') || hashParams.get('error_description')
 
       if (error) {
-        setStatus(`OAuth Error: ${error}`)
+        setStatus(`OAuth Error: ${errorDesc || error}`)
         return
       }
 
-      if (!code) {
-        setStatus('Invalid callback: Authorization code missing.')
+      if (!code && !idToken) {
+        setStatus('Invalid callback: Authorization code or identity token missing.')
         return
       }
 
       try {
         const redirectUri = `${window.location.origin}/oauth/callback`
-        await auth.oauthLogin('github', { code, redirectUri })
-        window.location.href = '/decks'
+        if (idToken) {
+          await auth.oauthLogin('google', { idToken })
+        } else {
+          await auth.oauthLogin('github', { code, redirectUri })
+        }
+        window.location.href = resolvePostLoginRedirect('/decks')
       } catch (err) {
         setStatus(`Social sign-in failed: ${err.message || err}`)
       }

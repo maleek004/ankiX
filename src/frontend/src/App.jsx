@@ -5,6 +5,7 @@ import { AuthProvider } from './auth/AuthProvider'
 import { StudyGroupProvider } from './studyGroup/StudyGroupProvider'
 import RequireAuth from './auth/RequireAuth'
 import NavBar from './components/NavBar'
+import GuestBanner from './components/GuestBanner'
 import EmailVerificationBanner from './components/EmailVerificationBanner'
 import Home from './pages/Home'
 import Login from './pages/Login'
@@ -26,6 +27,7 @@ export default function App(){
       <StudyGroupProvider>
         <BrowserRouter>
           <div className="app">
+            <GuestBanner />
             <NavBar />
             <EmailVerificationBanner />
             <main className="main-content">
@@ -37,13 +39,13 @@ export default function App(){
                 <Route path="/reset-password" element={<ResetPassword/>} />
                 <Route path="/verify-email" element={<VerifyEmail/>} />
                 <Route path="/oauth/callback" element={<OAuthCallback/>} />
-                <Route path="/study-groups" element={<RequireAuth><StudyGroups/></RequireAuth>} />
+                <Route path="/study-groups" element={<StudyGroups/>} />
 
                 <Route path="/communities" element={<Navigate to="/study-groups" replace />} />
-                <Route path="/search" element={<RequireAuth><Search/></RequireAuth>} />
-                <Route path="/decks" element={<RequireAuth><Decks/></RequireAuth>} />
-                <Route path="/decks/:id" element={<RequireAuth><Deck/></RequireAuth>} />
-                <Route path="/exercises" element={<RequireAuth><Exercises/></RequireAuth>} />
+                <Route path="/search" element={<Search/>} />
+                <Route path="/decks" element={<Decks/>} />
+                <Route path="/decks/:id" element={<Deck/>} />
+                <Route path="/exercises" element={<Exercises/>} />
                 <Route path="/admin/users" element={<RequireAuth><AdminUsers/></RequireAuth>} />
               </Routes>
             </main>

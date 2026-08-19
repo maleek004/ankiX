@@ -5,6 +5,7 @@ using AnkiX.Api.Models;
 using AnkiX.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace AnkiX.Api.Controllers;
@@ -67,6 +68,61 @@ public sealed class CardRunsController : ControllerBase
         return Ok(new CodeRunResponse
         {
             RunId = run.Id,
+            Result = execResult.Passed ? "PASS" : "FAIL",
+            Passed = execResult.Passed,
+            DurationMs = execResult.DurationMs,
+            Details = execResult.Details
+        });
+    }
+
+    [HttpPost("/api/cards/{cardId:int}/run-ephemeral")]
+    [AllowAnonymous]
+    [EnableRateLimiting("GuestExecutionPolicy")]
+    public async Task<ActionResult<CodeRunResponse>> RunCardCodeEphemeral(
+        [FromRoute] int cardId,
+        [FromBody] CodeRunRequest request,
+        CancellationToken cancellationToken)
+    {
+        Card? card = await dbContext.Cards
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == cardId, cancellationToken);
+
+        if (card is null)
+        {
+            return NotFound(new { message = "Card not found." });
+        }
+
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int.TryParse(userIdClaim, out int userId);
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        var deck = await dbContext.Decks.AsNoTracking().FirstOrDefaultAsync(d => d.Id == card.DeckId, cancellationToken);
+        if (deck != null && deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0 && !isSystemAdmin)
+        {
+            var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == deck.StudyGroupId.Value, cancellationToken);
+            if (studyGroup != null && !studyGroup.IsPublic)
+            {
+                if (userId == 0)
+                {
+                    return NotFound(new { message = "Card not found." });
+                }
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == deck.StudyGroupId.Value && m.UserId == userId, cancellationToken);
+                if (!isMember)
+                {
+                    return NotFound(new { message = "Card not found." });
+                }
+            }
+        }
+
+        CodeExecutionResult execResult = await codeExecutionService.ExecuteAsync(
+            request.SubmittedCode,
+            request.Language,
+            card.ValidationSpec,
+            cancellationToken);
+
+        return Ok(new CodeRunResponse
+        {
+            RunId = 0,
             Result = execResult.Passed ? "PASS" : "FAIL",
             Passed = execResult.Passed,
             DurationMs = execResult.DurationMs,

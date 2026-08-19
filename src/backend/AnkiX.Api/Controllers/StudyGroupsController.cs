@@ -70,6 +70,53 @@ public sealed class StudyGroupsController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("public")]
+    public async Task<ActionResult<IEnumerable<StudyGroupResponse>>> GetPublicStudyGroups()
+    {
+        var studyGroups = await dbContext.StudyGroups.AsNoTracking().Where(c => c.IsPublic).ToListAsync();
+        var memberCounts = await dbContext.StudyGroupMembers.AsNoTracking()
+            .GroupBy(m => m.StudyGroupId)
+            .Select(g => new { StudyGroupId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.StudyGroupId, x => x.Count);
+
+        int sampleGroupId = await dbContext.StudyGroups.Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
+
+        var deckCounts = await dbContext.Decks.AsNoTracking()
+            .GroupBy(d => d.StudyGroupId.HasValue && d.StudyGroupId.Value > 0 ? d.StudyGroupId.Value : sampleGroupId)
+            .Select(g => new { StudyGroupId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.StudyGroupId, x => x.Count);
+
+        var exerciseCounts = await dbContext.Exercises.AsNoTracking()
+            .GroupBy(e => e.StudyGroupId.HasValue && e.StudyGroupId.Value > 0 ? e.StudyGroupId.Value : sampleGroupId)
+            .Select(g => new { StudyGroupId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.StudyGroupId, x => x.Count);
+
+        int? currentUserId = GetCurrentUserId();
+        var userMemberships = currentUserId.HasValue
+            ? await dbContext.StudyGroupMembers.AsNoTracking()
+                .Where(m => m.UserId == currentUserId.Value)
+                .ToDictionaryAsync(m => m.StudyGroupId, m => m.Role)
+            : new Dictionary<int, string>();
+
+        var response = studyGroups.Select(c => new StudyGroupResponse
+        {
+            Id = c.Id,
+            Name = c.Name,
+            Slug = c.Slug,
+            Description = c.Description,
+            AvatarUrl = c.AvatarUrl,
+            IsPublic = c.IsPublic,
+            MemberCount = memberCounts.TryGetValue(c.Id, out int mCount) ? mCount : 0,
+            DeckCount = deckCounts.TryGetValue(c.Id, out int dCount) ? dCount : 0,
+            ExerciseCount = exerciseCounts.TryGetValue(c.Id, out int eCount) ? eCount : 0,
+            UserRole = userMemberships.TryGetValue(c.Id, out string? role) ? role : null,
+            CreatedByUserId = c.CreatedByUserId,
+            CreatedAt = c.CreatedAt
+        });
+
+        return Ok(response);
+    }
+
     [HttpGet("{slug}")]
     public async Task<ActionResult<StudyGroupResponse>> GetStudyGroupBySlug(string slug)
     {
@@ -79,6 +126,21 @@ public sealed class StudyGroupsController : ControllerBase
         if (studyGroup == null) return NotFound("Study group not found.");
 
         int? currentUserId = GetCurrentUserId();
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        if (!studyGroup.IsPublic && !isSystemAdmin)
+        {
+            if (!currentUserId.HasValue)
+            {
+                return NotFound("Study group not found.");
+            }
+            bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId.Value);
+            if (!isMember)
+            {
+                return NotFound("Study group not found.");
+            }
+        }
+
         int sampleGroupId = await dbContext.StudyGroups.Where(c => c.Slug == "sample").Select(c => c.Id).FirstOrDefaultAsync();
         bool isSample = studyGroup.Id == sampleGroupId;
 
@@ -241,6 +303,24 @@ public sealed class StudyGroupsController : ControllerBase
         var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
         if (studyGroup == null) return NotFound("Study group not found.");
 
+        int? currentUserId = GetCurrentUserId();
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        if (!studyGroup.IsPublic && !isSystemAdmin)
+        {
+            if (!currentUserId.HasValue)
+            {
+                return NotFound("Study group not found.");
+            }
+            bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId.Value);
+            if (!isMember)
+            {
+                return NotFound("Study group not found.");
+            }
+        }
+
+        bool canViewPii = isSystemAdmin || (currentUserId.HasValue && await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId.Value));
+
         var members = await (from cm in dbContext.StudyGroupMembers.AsNoTracking()
                              join u in dbContext.Users.AsNoTracking() on cm.UserId equals u.Id
                              where cm.StudyGroupId == studyGroup.Id
@@ -248,7 +328,7 @@ public sealed class StudyGroupsController : ControllerBase
                              {
                                  UserId = u.Id,
                                  DisplayName = u.DisplayName,
-                                 Email = u.Email,
+                                 Email = canViewPii ? u.Email : string.Empty,
                                  Role = cm.Role,
                                  JoinedAt = cm.JoinedAt
                              }).ToListAsync();

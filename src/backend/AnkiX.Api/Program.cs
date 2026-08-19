@@ -1,9 +1,12 @@
+using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using AnkiX.Api.Data;
 using AnkiX.Api.Models;
 using AnkiX.Api.Options;
 using AnkiX.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -71,6 +74,63 @@ builder.Services.AddScoped<IReviewSchedulerService, ReviewSchedulerService>();
 builder.Services.AddHttpClient<IOAuthService, OAuthService>();
 builder.Services.AddHttpClient<IEmailService, EmailService>();
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+        }
+        else
+        {
+            context.HttpContext.Response.Headers.RetryAfter = "600";
+        }
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            message = "Rate limit exceeded for code execution. Please wait before retrying, or sign in to unlock full quotas."
+        }, cancellationToken: token);
+    };
+
+    options.AddPolicy("GuestExecutionPolicy", httpContext =>
+    {
+        if (httpContext.User.Identity?.IsAuthenticated == true)
+        {
+            string userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "auth_user";
+            return RateLimitPartition.GetSlidingWindowLimiter(
+                partitionKey: $"auth_{userId}",
+                factory: _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 60,
+                    Window = TimeSpan.FromMinutes(10),
+                    SegmentsPerWindow = 5,
+                    QueueLimit = 0
+                });
+        }
+
+        string clientIp = httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim()
+            ?? "unknown_guest";
+
+        return RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: $"guest_{clientIp}",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(10),
+                SegmentsPerWindow = 5,
+                QueueLimit = 0
+            });
+    });
+});
+
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddCors(options =>
@@ -86,6 +146,8 @@ builder.Services.AddCors(options =>
 
 WebApplication app = builder.Build();
 
+app.UseForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -99,6 +161,7 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
 
 app.MapGet("/", () => Results.Ok(new { status = "online", service = "AnkiX API", version = "1.0.0" }));
