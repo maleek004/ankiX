@@ -12,5 +12,12 @@ public sealed class StudyGroupMember
     [MaxLength(20)]
     public string Role { get; set; } = StudyGroupRoles.Member;
 
+    [MaxLength(20)]
+    public string Status { get; set; } = StudyGroupMemberStatus.Active;
+
     public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+
+    public DateTime? RequestedAt { get; set; }
+
+    public int? InvitedByUserId { get; set; }
 }

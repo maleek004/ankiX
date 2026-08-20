@@ -19,7 +19,15 @@ public sealed class StudyGroup
     [MaxLength(500)]
     public string? AvatarUrl { get; set; }
 
-    public bool IsPublic { get; set; } = true;
+    [MaxLength(20)]
+    public string Privacy { get; set; } = StudyGroupPrivacy.Public;
+
+    [NotMapped]
+    public bool IsPublic
+    {
+        get => Privacy == StudyGroupPrivacy.Public;
+        set => Privacy = value ? StudyGroupPrivacy.Public : StudyGroupPrivacy.Private;
+    }
 
     public int CreatedByUserId { get; set; }
 

@@ -36,7 +36,7 @@ public sealed class DecksController : ControllerBase
         {
             // Unauthenticated guest user: only expose decks in public study groups or global/sample decks
             var publicGroupIds = await dbContext.StudyGroups.AsNoTracking()
-                .Where(g => g.IsPublic)
+                .Where(g => g.Privacy == StudyGroupPrivacy.Public)
                 .Select(g => g.Id)
                 .ToListAsync();
 
@@ -63,9 +63,9 @@ public sealed class DecksController : ControllerBase
         }
         else
         {
-            // Authenticated user: joined groups + sample/global
+            // Authenticated user: joined groups (active) + sample/global
             List<int> joinedGroupIds = await dbContext.StudyGroupMembers.AsNoTracking()
-                .Where(m => m.UserId == userId)
+                .Where(m => m.UserId == userId && m.Status == StudyGroupMemberStatus.Active)
                 .Select(m => m.StudyGroupId)
                 .ToListAsync();
 
@@ -157,7 +157,7 @@ public sealed class DecksController : ControllerBase
     public async Task<ActionResult<IEnumerable<DeckResponse>>> GetPublicDecks()
     {
         var publicGroupIds = await dbContext.StudyGroups.AsNoTracking()
-            .Where(g => g.IsPublic)
+            .Where(g => g.Privacy == StudyGroupPrivacy.Public)
             .Select(g => g.Id)
             .ToListAsync();
 
@@ -194,13 +194,13 @@ public sealed class DecksController : ControllerBase
         if (deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0 && !isSystemAdmin)
         {
             var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == deck.StudyGroupId.Value);
-            if (studyGroup != null && !studyGroup.IsPublic)
+            if (studyGroup != null && studyGroup.Privacy != StudyGroupPrivacy.Public)
             {
                 if (userId == 0)
                 {
                     return NotFound(new { message = "Deck not found." });
                 }
-                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == deck.StudyGroupId.Value && m.UserId == userId);
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == deck.StudyGroupId.Value && m.UserId == userId && m.Status == StudyGroupMemberStatus.Active);
                 if (!isMember)
                 {
                     return NotFound(new { message = "Deck not found." });
@@ -248,13 +248,13 @@ public sealed class DecksController : ControllerBase
         if (deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0 && !isSystemAdmin)
         {
             var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == deck.StudyGroupId.Value);
-            if (studyGroup != null && !studyGroup.IsPublic)
+            if (studyGroup != null && studyGroup.Privacy != StudyGroupPrivacy.Public)
             {
                 if (userId == 0)
                 {
                     return NotFound(new { message = "Deck not found." });
                 }
-                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == deck.StudyGroupId.Value && m.UserId == userId);
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == deck.StudyGroupId.Value && m.UserId == userId && m.Status == StudyGroupMemberStatus.Active);
                 if (!isMember)
                 {
                     return NotFound(new { message = "Deck not found." });

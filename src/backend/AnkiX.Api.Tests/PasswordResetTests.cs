@@ -16,6 +16,7 @@ public sealed class TestEmailService : IEmailService
 {
     public List<(string Email, string Token, string Url)> SentResetEmails { get; } = new();
     public List<(string Email, string Token, string Url)> SentVerificationEmails { get; } = new();
+    public List<(string Email, string GroupName, string Inviter, string Url)> SentGroupInvitations { get; } = new();
 
     public Task SendPasswordResetEmailAsync(string recipientEmail, string resetToken, string resetUrl)
     {
@@ -26,6 +27,12 @@ public sealed class TestEmailService : IEmailService
     public Task SendEmailVerificationAsync(string recipientEmail, string verificationToken, string verificationUrl)
     {
         SentVerificationEmails.Add((recipientEmail, verificationToken, verificationUrl));
+        return Task.CompletedTask;
+    }
+
+    public Task SendStudyGroupInvitationAsync(string recipientEmail, string groupName, string inviterDisplayName, string groupUrl)
+    {
+        SentGroupInvitations.Add((recipientEmail, groupName, inviterDisplayName, groupUrl));
         return Task.CompletedTask;
     }
 }

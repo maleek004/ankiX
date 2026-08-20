@@ -50,9 +50,8 @@ public sealed class ExercisesController : ControllerBase
 
         if (userId == 0)
         {
-            // Unauthenticated guest user: only expose exercises from public study groups or global/sample
             var publicGroupIds = await dbContext.StudyGroups.AsNoTracking()
-                .Where(g => g.IsPublic)
+                .Where(g => g.Privacy == StudyGroupPrivacy.Public)
                 .Select(g => g.Id)
                 .ToListAsync();
 
@@ -80,7 +79,7 @@ public sealed class ExercisesController : ControllerBase
         else
         {
             List<int> joinedGroupIds = await dbContext.StudyGroupMembers.AsNoTracking()
-                .Where(m => m.UserId == userId)
+                .Where(m => m.UserId == userId && m.Status == StudyGroupMemberStatus.Active)
                 .Select(m => m.StudyGroupId)
                 .ToListAsync();
 
@@ -169,13 +168,13 @@ public sealed class ExercisesController : ControllerBase
         if (exercise.StudyGroupId.HasValue && exercise.StudyGroupId.Value > 0 && !isSystemAdmin)
         {
             var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == exercise.StudyGroupId.Value);
-            if (studyGroup != null && !studyGroup.IsPublic)
+            if (studyGroup != null && studyGroup.Privacy != StudyGroupPrivacy.Public)
             {
                 if (userId == 0)
                 {
                     return NotFound(new { message = "Exercise not found." });
                 }
-                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == exercise.StudyGroupId.Value && m.UserId == userId);
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == exercise.StudyGroupId.Value && m.UserId == userId && m.Status == StudyGroupMemberStatus.Active);
                 if (!isMember)
                 {
                     return NotFound(new { message = "Exercise not found." });
@@ -398,7 +397,7 @@ public sealed class ExercisesController : ControllerBase
     public async Task<ActionResult<IEnumerable<ExerciseResponse>>> GetPublicExercises([FromQuery] string? language = null)
     {
         var publicGroupIds = await dbContext.StudyGroups.AsNoTracking()
-            .Where(g => g.IsPublic)
+            .Where(g => g.Privacy == StudyGroupPrivacy.Public)
             .Select(g => g.Id)
             .ToListAsync();
 
@@ -478,13 +477,13 @@ public sealed class ExercisesController : ControllerBase
         if (exercise.StudyGroupId.HasValue && exercise.StudyGroupId.Value > 0 && !isSystemAdmin)
         {
             var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == exercise.StudyGroupId.Value);
-            if (studyGroup != null && !studyGroup.IsPublic)
+            if (studyGroup != null && studyGroup.Privacy != StudyGroupPrivacy.Public)
             {
                 if (userId == 0)
                 {
                     return NotFound(new { message = "Exercise not found." });
                 }
-                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == exercise.StudyGroupId.Value && m.UserId == userId);
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == exercise.StudyGroupId.Value && m.UserId == userId && m.Status == StudyGroupMemberStatus.Active);
                 if (!isMember)
                 {
                     return NotFound(new { message = "Exercise not found." });
@@ -772,7 +771,7 @@ public sealed class ExercisesController : ControllerBase
         }
 
         List<int> joinedGroupIds = await dbContext.StudyGroupMembers.AsNoTracking()
-            .Where(m => m.UserId == userId)
+            .Where(m => m.UserId == userId && m.Status == StudyGroupMemberStatus.Active)
             .Select(m => m.StudyGroupId)
             .ToListAsync();
 
@@ -1035,7 +1034,7 @@ public sealed class ExercisesController : ControllerBase
             return false;
         }
 
-        if (group.IsPublic)
+        if (group.Privacy == StudyGroupPrivacy.Public)
         {
             return true;
         }
@@ -1047,7 +1046,7 @@ public sealed class ExercisesController : ControllerBase
         }
 
         return await dbContext.StudyGroupMembers.AsNoTracking()
-            .AnyAsync(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId);
+            .AnyAsync(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId && m.Status == StudyGroupMemberStatus.Active);
     }
 
     private async Task<bool> CanManageContentAsync(int? studyGroupId)
@@ -1069,7 +1068,7 @@ public sealed class ExercisesController : ControllerBase
         }
 
         string? memberRole = await dbContext.StudyGroupMembers
-            .Where(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId)
+            .Where(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId && m.Status == StudyGroupMemberStatus.Active)
             .Select(m => m.Role)
             .FirstOrDefaultAsync();
 

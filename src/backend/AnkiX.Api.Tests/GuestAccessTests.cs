@@ -33,12 +33,13 @@ public class GuestAccessTests
     }
 
     [Fact]
-    public async Task StudyGroups_GetStudyGroups_AnonymousUserSeesOnlyPublicGroups()
+    public async Task StudyGroups_GetStudyGroups_AnonymousUserSeesPublicAndPrivate_HidesLocked()
     {
         using var db = CreateInMemoryDbContext();
         db.StudyGroups.AddRange(
-            new StudyGroup { Id = 1, Name = "Public Algorithm Group", Slug = "public-algo", IsPublic = true, CreatedByUserId = 1, CreatedAt = DateTime.UtcNow },
-            new StudyGroup { Id = 2, Name = "Secret Private Team", Slug = "private-team", IsPublic = false, CreatedByUserId = 2, CreatedAt = DateTime.UtcNow }
+            new StudyGroup { Id = 1, Name = "Public Algorithm Group", Slug = "public-algo", Privacy = StudyGroupPrivacy.Public, CreatedByUserId = 1, CreatedAt = DateTime.UtcNow },
+            new StudyGroup { Id = 2, Name = "Moderated Private Team", Slug = "private-team", Privacy = StudyGroupPrivacy.Private, CreatedByUserId = 2, CreatedAt = DateTime.UtcNow },
+            new StudyGroup { Id = 3, Name = "Secret Locked Team", Slug = "locked-team", Privacy = StudyGroupPrivacy.Locked, CreatedByUserId = 3, CreatedAt = DateTime.UtcNow }
         );
         await db.SaveChangesAsync();
 
@@ -51,17 +52,20 @@ public class GuestAccessTests
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var groups = Assert.IsAssignableFrom<IEnumerable<StudyGroupResponse>>(okResult.Value).ToList();
 
-        Assert.Single(groups);
-        Assert.Equal("public-algo", groups[0].Slug);
+        Assert.Equal(2, groups.Count);
+        Assert.Contains(groups, g => g.Slug == "public-algo");
+        Assert.Contains(groups, g => g.Slug == "private-team");
+        Assert.DoesNotContain(groups, g => g.Slug == "locked-team");
     }
 
     [Fact]
-    public async Task StudyGroups_GetStudyGroupBySlug_AnonymousUserCannotAccessPrivateGroup()
+    public async Task StudyGroups_GetStudyGroupBySlug_AnonymousUserCannotAccessLockedGroup()
     {
         using var db = CreateInMemoryDbContext();
         db.StudyGroups.AddRange(
-            new StudyGroup { Id = 1, Name = "Public Group", Slug = "public-group", IsPublic = true, CreatedByUserId = 1, CreatedAt = DateTime.UtcNow },
-            new StudyGroup { Id = 2, Name = "Private Group", Slug = "private-group", IsPublic = false, CreatedByUserId = 2, CreatedAt = DateTime.UtcNow }
+            new StudyGroup { Id = 1, Name = "Public Group", Slug = "public-group", Privacy = StudyGroupPrivacy.Public, CreatedByUserId = 1, CreatedAt = DateTime.UtcNow },
+            new StudyGroup { Id = 2, Name = "Private Group", Slug = "private-group", Privacy = StudyGroupPrivacy.Private, CreatedByUserId = 2, CreatedAt = DateTime.UtcNow },
+            new StudyGroup { Id = 3, Name = "Locked Group", Slug = "locked-group", Privacy = StudyGroupPrivacy.Locked, CreatedByUserId = 3, CreatedAt = DateTime.UtcNow }
         );
         await db.SaveChangesAsync();
 
@@ -74,7 +78,10 @@ public class GuestAccessTests
         Assert.IsType<OkObjectResult>(publicResult.Result);
 
         var privateResult = await controller.GetStudyGroupBySlug("private-group");
-        Assert.IsType<NotFoundObjectResult>(privateResult.Result);
+        Assert.IsType<OkObjectResult>(privateResult.Result);
+
+        var lockedResult = await controller.GetStudyGroupBySlug("locked-group");
+        Assert.IsType<NotFoundObjectResult>(lockedResult.Result);
     }
 
     [Fact]

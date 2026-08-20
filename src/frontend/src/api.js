@@ -843,3 +843,112 @@ export async function addStudyGroupMember(slug, email, role = 'Member'){
   return res.json()
 }
 export const addCommunityMember = addStudyGroupMember
+
+export async function requestStudyGroupAccess(slug){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/request-access`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to submit join request')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function getStudyGroupJoinRequests(slug){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/requests`, {
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to fetch join requests')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function approveStudyGroupJoinRequest(slug, targetUserId){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/requests/${targetUserId}/approve`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to approve join request')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function rejectStudyGroupJoinRequest(slug, targetUserId){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/requests/${targetUserId}/reject`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to reject join request')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function inviteStudyGroupMember(slug, email, role = 'Member'){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/invite`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ email, role })
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to send invitation')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function getMyStudyGroupInvitations(){
+  const res = await fetch(`${API_BASE}/study-groups/my-invitations`, {
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to fetch invitations')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function acceptStudyGroupInvitation(slug){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/invitations/accept`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to accept invitation')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function declineStudyGroupInvitation(slug){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/invitations/decline`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to decline invitation')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function updateStudyGroupPrivacy(slug, privacy){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/privacy`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ privacy })
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to update study group privacy')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+

@@ -185,7 +185,7 @@ try
                 Name = "Sample Study Group",
                 Slug = "sample",
                 Description = "Official AnkiX Sample Study Group containing starter decks, flashcards, and multi-modal exercises.",
-                IsPublic = true,
+                Privacy = StudyGroupPrivacy.Public,
                 CreatedByUserId = 1,
                 CreatedAt = DateTime.UtcNow
             };
@@ -200,7 +200,7 @@ try
                 Name = "Global Learning Commons",
                 Slug = "global",
                 Description = "The default public study group for all AnkiX flashcards and coding challenges.",
-                IsPublic = true,
+                Privacy = StudyGroupPrivacy.Public,
                 CreatedByUserId = 1,
                 CreatedAt = DateTime.UtcNow
             });
@@ -214,7 +214,7 @@ try
                 Name = "Software Engineering & Paradigms",
                 Slug = "software-engineering",
                 Description = "Master OOP, Design Patterns, SOLID principles, and multi-language programming.",
-                IsPublic = true,
+                Privacy = StudyGroupPrivacy.Public,
                 CreatedByUserId = 1,
                 CreatedAt = DateTime.UtcNow
             });
@@ -302,7 +302,7 @@ if (shouldSeed)
             Name = "Sample Study Group",
             Slug = "sample",
             Description = "Official AnkiX Sample Study Group containing starter decks, flashcards, and multi-modal exercises.",
-            IsPublic = true,
+            Privacy = StudyGroupPrivacy.Public,
             CreatedByUserId = 1,
             CreatedAt = DateTime.UtcNow
         };
@@ -318,7 +318,7 @@ if (shouldSeed)
             Name = "Global Learning Commons",
             Slug = "global",
             Description = "The default public study group for all AnkiX flashcards and coding challenges.",
-            IsPublic = true,
+            Privacy = StudyGroupPrivacy.Public,
             CreatedByUserId = 1,
             CreatedAt = DateTime.UtcNow
         };
@@ -334,7 +334,7 @@ if (shouldSeed)
             Name = "Software Engineering & Paradigms",
             Slug = "software-engineering",
             Description = "Master OOP, Design Patterns, SOLID principles, and multi-language programming.",
-            IsPublic = true,
+            Privacy = StudyGroupPrivacy.Public,
             CreatedByUserId = 1,
             CreatedAt = DateTime.UtcNow
         };

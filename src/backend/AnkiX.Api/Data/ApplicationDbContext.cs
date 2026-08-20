@@ -46,6 +46,12 @@ public sealed class ApplicationDbContext : DbContext
         modelBuilder.Entity<StudyGroupMember>()
             .HasKey(sgm => new { sgm.StudyGroupId, sgm.UserId });
 
+        modelBuilder.Entity<StudyGroupMember>()
+            .HasIndex(sgm => new { sgm.StudyGroupId, sgm.Status });
+
+        modelBuilder.Entity<StudyGroupMember>()
+            .HasIndex(sgm => new { sgm.UserId, sgm.Status });
+
         modelBuilder.Entity<Deck>()
             .HasIndex(d => d.StudyGroupId);
 

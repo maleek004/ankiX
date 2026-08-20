@@ -91,7 +91,7 @@ public sealed class SearchController : ControllerBase
         {
             // Unauthenticated guest: search scoped only to public study groups
             var publicGroupIds = await dbContext.StudyGroups.AsNoTracking()
-                .Where(g => g.IsPublic)
+                .Where(g => g.Privacy == StudyGroupPrivacy.Public)
                 .Select(g => g.Id)
                 .ToListAsync();
 
@@ -110,9 +110,9 @@ public sealed class SearchController : ControllerBase
         }
         else
         {
-            // Retrieve all study group IDs that the authenticated user has joined
+            // Retrieve all study group IDs that the authenticated user has active membership in
             List<int> joinedGroupIds = await dbContext.StudyGroupMembers.AsNoTracking()
-                .Where(m => m.UserId == userId)
+                .Where(m => m.UserId == userId && m.Status == StudyGroupMemberStatus.Active)
                 .Select(m => m.StudyGroupId)
                 .ToListAsync();
 
