@@ -25,15 +25,21 @@ export default function Deck(){
   const [userCode, setUserCode]         = useState('')
 
   const [loading, setLoading]           = useState(true)
-  const [isAddingCard, setIsAddingCard] = useState(false)
-  const [deletingCardId, setDeletingCardId] = useState(null)
   const [isResetting, setIsResetting]   = useState(false)
   const [submittingRating, setSubmittingRating] = useState(false)
+  const [deletingCardId, setDeletingCardId] = useState(null)
 
-  // Edit / Admin mode toggle
-  const [isEditing, setIsEditing]           = useState(false)
-  const [prompt, setPrompt]                 = useState('')
-  const [answer, setAnswer]                 = useState('')
+  // Add Card Drawer state
+  const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false)
+  const [newPrompt, setNewPrompt]             = useState('')
+  const [newAnswer, setNewAnswer]             = useState('')
+  const [isAddingCard, setIsAddingCard]       = useState(false)
+
+  // Inline Edit Current Card state
+  const [isEditingCurrent, setIsEditingCurrent] = useState(false)
+  const [editPrompt, setEditPrompt]             = useState('')
+  const [editAnswer, setEditAnswer]             = useState('')
+  const [isSavingEdit, setIsSavingEdit]         = useState(false)
 
   // Followups & Linked Exercises
   const [showFollowups, setShowFollowups]             = useState(false)
@@ -108,6 +114,7 @@ export default function Deck(){
   useEffect(() => {
     setShowFollowups(false)
     setShowLinkedExercises(false)
+    setIsEditingCurrent(false)
     setFollowups([])
     setNewQuestion('')
     setLinkedExercises([])
@@ -206,30 +213,78 @@ export default function Deck(){
     }
   }
 
-  // ── Edit Drawer ───────────────────────────────────────────────────────────
-  const addCard = async (e) => {
-    e.preventDefault()
-    if(!prompt.trim() || !answer.trim()) return
-    setIsAddingCard(true)
-    try{
-      const c = await api.createCard(id, prompt.trim(), answer.trim(), 'basic')
-      setAllCards(prev => [...prev, c])
-      setPrompt(''); setAnswer('');
-      alert('Card added!')
-      await loadQueue() // refresh queue counts
-    }catch(err){ alert('Create card failed: ' + (err.message || err)) }
-    finally { setIsAddingCard(false) }
+  // ── Card Edit & Management ────────────────────────────────────────────────
+  const handleStartEdit = () => {
+    if (!currentCard) return
+    setEditPrompt(currentCard.prompt || '')
+    setEditAnswer(currentCard.answer || currentCard.validationSpec || '')
+    setIsEditingCurrent(true)
   }
 
-  const removeCard = async (cardId) => {
-    if(!confirm('Delete card?')) return
+  const handleCancelEdit = () => {
+    setIsEditingCurrent(false)
+    if (currentCard) {
+      setEditPrompt(currentCard.prompt || '')
+      setEditAnswer(currentCard.answer || currentCard.validationSpec || '')
+    }
+  }
+
+  const handleSaveEdit = async (e) => {
+    if (e) e.preventDefault()
+    if (!currentCard || !editPrompt.trim() || !editAnswer.trim()) return
+    setIsSavingEdit(true)
+    try {
+      await api.updateCard(currentCard.id, editPrompt.trim(), editAnswer.trim(), currentCard.type || 'basic')
+      const updated = { ...currentCard, prompt: editPrompt.trim(), answer: editAnswer.trim() }
+      setAllCards(prev => prev.map(c => c.id === currentCard.id ? updated : c))
+      setQueue(prev => ({
+        ...prev,
+        dueCards: (prev.dueCards || []).map(c => c.id === currentCard.id ? updated : c)
+      }))
+      setIsEditingCurrent(false)
+    } catch (err) {
+      alert('Update card failed: ' + (err.message || err))
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
+  const handleAddCard = async (e) => {
+    e.preventDefault()
+    if (!newPrompt.trim() || !newAnswer.trim()) return
+    setIsAddingCard(true)
+    try {
+      const c = await api.createCard(id, newPrompt.trim(), newAnswer.trim(), 'basic')
+      setAllCards(prev => [...prev, c])
+      setNewPrompt('')
+      setNewAnswer('')
+      await loadQueue() // refresh queue counts
+    } catch (err) {
+      alert('Create card failed: ' + (err.message || err))
+    } finally {
+      setIsAddingCard(false)
+    }
+  }
+
+  const handleDeleteCurrentCard = async () => {
+    if (!currentCard) return
+    if (!confirm('Are you sure you want to delete this card?')) return
+    const cardId = currentCard.id
     setDeletingCardId(cardId)
-    try{
+    try {
       await api.deleteCard(id, cardId)
       setAllCards(prev => prev.filter(c => c.id !== cardId))
+      setQueue(prev => ({
+        ...prev,
+        dueCards: (prev.dueCards || []).filter(c => c.id !== cardId)
+      }))
+      setIsEditingCurrent(false)
       await loadQueue()
-    }catch(err){ alert('Delete failed: ' + (err.message || err)) }
-    finally { setDeletingCardId(null) }
+    } catch (err) {
+      alert('Delete failed: ' + (err.message || err))
+    } finally {
+      setDeletingCardId(null)
+    }
   }
 
   // Compute display label for each rating button's next-interval hint
@@ -275,16 +330,29 @@ export default function Deck(){
         <div className="study-toolbar-left">
           {canCreate && (
             <>
-              <button className="btn-study-tool" onClick={() => setIsEditing(!isEditing)}>
-                {isEditing ? 'Close Edit' : 'Edit'}
+              {currentCard && (
+                <button
+                  className="btn-study-tool"
+                  onClick={() => isEditingCurrent ? handleCancelEdit() : handleStartEdit()}
+                >
+                  {isEditingCurrent ? 'Cancel Edit' : 'Edit'}
+                </button>
+              )}
+              <button
+                className="btn-study-tool"
+                onClick={() => setIsAddDrawerOpen(prev => !prev)}
+              >
+                {isAddDrawerOpen ? 'Close Add' : '+ Add Card'}
               </button>
-              <button className="btn-study-tool" onClick={() => setIsEditing(true)}>+</button>
-              <button className="btn-study-tool" style={{ fontWeight: 600, color: '#0d6efd', borderColor: '#0d6efd' }} onClick={() => setShowImportModal(true)}>
+              <button
+                className="btn-study-tool"
+                style={{ fontWeight: 600, color: '#0d6efd', borderColor: '#0d6efd' }}
+                onClick={() => setShowImportModal(true)}
+              >
                 📥 Import Cards
               </button>
             </>
           )}
-          <button className="btn-study-tool" onClick={() => alert('Deck limits option')}>Limits</button>
         </div>
         <div className="study-counts-right">
           {/* Blue = new, Red = learning, Green = review — live from backend */}
@@ -296,91 +364,50 @@ export default function Deck(){
         </div>
       </div>
 
-      {/* Edit Drawer */}
-      {isEditing && (
+      {/* Add Card Drawer */}
+      {isAddDrawerOpen && canCreate && (
         <div className="form-card" style={{ marginBottom: 24 }}>
-          <h3 style={{ marginTop: 0 }}>Add New Card to Deck</h3>
-          <form onSubmit={addCard}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h3 style={{ margin: 0 }}>Add New Card to Deck</h3>
+            <button
+              type="button"
+              className="btn-study-tool"
+              style={{ fontSize: '0.8rem', padding: '2px 8px' }}
+              onClick={() => setIsAddDrawerOpen(false)}
+            >
+              ✕ Close
+            </button>
+          </div>
+          <form onSubmit={handleAddCard}>
             <MarkdownField
               label="Question / Prompt"
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
+              value={newPrompt}
+              onChange={e => setNewPrompt(e.target.value)}
               placeholder="Type card question or prompt using Markdown (supports ```code, **bold**, etc.)..."
               required
               rows={3}
             />
             <MarkdownField
               label="Answer"
-              value={answer}
-              onChange={e => setAnswer(e.target.value)}
+              value={newAnswer}
+              onChange={e => setNewAnswer(e.target.value)}
               placeholder="Type answer in Markdown with syntax-highlighted code blocks, explanations, etc..."
               required
               rows={4}
             />
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={isAddingCard || !prompt.trim() || !answer.trim()}
-            >
-              {isAddingCard ? 'Adding Card...' : 'Add Flashcard'}
-            </button>
-          </form>
-
-          <h4 style={{ marginTop: 24, marginBottom: 12 }}>Existing Cards ({allCards.length})</h4>
-          <ul style={{ paddingLeft: 0, listStyle: 'none' }}>
-            {allCards.map(c => (
-              <li
-                key={c.id}
-                style={{
-                  marginBottom: 12,
-                  padding: 12,
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  gap: 12
-                }}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={isAddingCard || !newPrompt.trim() || !newAnswer.trim()}
               >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>
-                    <MarkdownViewer content={c.prompt} />
-                  </div>
-                  {(c.answer || c.validationSpec) && (
-                    <div style={{ fontSize: '0.85rem', color: '#4b5563', borderTop: '1px dashed #e5e7eb', paddingTop: 6, marginTop: 6 }}>
-                      <span style={{ fontWeight: 600, color: '#6b7280' }}>Answer:</span>
-                      <MarkdownViewer content={c.answer || c.validationSpec} />
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button
-                    className="btn-study-tool"
-                    style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#0d6efd', color: '#0d6efd' }}
-                    onClick={() => setCopyModalCard(c)}
-                  >
-                    📋 Copy
-                  </button>
-                  <button
-                    className="btn-study-tool"
-                    style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#0d6efd', color: '#0d6efd' }}
-                    onClick={() => setLinkerModalCard(c)}
-                  >
-                    🔗 Link
-                  </button>
-                  <button
-                    style={{ color: '#dc3545', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem' }}
-                    disabled={deletingCardId === c.id}
-                    onClick={() => removeCard(c.id)}
-                  >
-                    {deletingCardId === c.id ? '[Deleting...]' : '[Delete]'}
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+                {isAddingCard ? 'Adding Card...' : 'Add Flashcard'}
+              </button>
+              <span style={{ fontSize: '0.85rem', color: '#6c757d' }}>
+                Form stays open for rapid card entry.
+              </span>
+            </div>
+          </form>
         </div>
       )}
 
@@ -392,7 +419,7 @@ export default function Deck(){
       ) : allCards.length === 0 ? (
         <div className="empty-state">
           <h3>No cards in this deck yet.</h3>
-          <p>Click <strong>Edit</strong> above or the <strong>+</strong> button to add cards!</p>
+          <p>Click the <strong>+ Add Card</strong> button above to add cards!</p>
         </div>
       ) : dueCards.length === 0 || currentIndex >= dueCards.length ? (
         <div className="empty-state">
@@ -446,190 +473,263 @@ export default function Deck(){
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-          <div className="card-viewer-area">
-            {/* Front Prompt */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-              <div className="card-prompt" style={{ flex: 1 }}>
-                <MarkdownViewer content={currentCard.prompt} />
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
+          {isEditingCurrent ? (
+            <div className="form-card" style={{ width: '100%', maxWidth: 750, margin: '0 auto 24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <h3 style={{ margin: 0 }}>Edit Flashcard</h3>
                 <button
+                  type="button"
                   className="btn-study-tool"
-                  style={{ fontSize: '0.8rem', padding: '4px 10px', whiteSpace: 'nowrap', borderColor: '#0d6efd', color: '#0d6efd' }}
-                  onClick={() => setCopyModalCard(currentCard)}
+                  style={{ fontSize: '0.8rem', padding: '2px 8px' }}
+                  onClick={handleCancelEdit}
                 >
-                  📋 Copy Card
+                  ✕ Cancel
                 </button>
-                {canCreate && (
+              </div>
+              <form onSubmit={handleSaveEdit}>
+                <MarkdownField
+                  label="Question / Prompt"
+                  value={editPrompt}
+                  onChange={e => setEditPrompt(e.target.value)}
+                  placeholder="Type card question or prompt using Markdown..."
+                  required
+                  rows={3}
+                />
+                <MarkdownField
+                  label="Answer"
+                  value={editAnswer}
+                  onChange={e => setEditAnswer(e.target.value)}
+                  placeholder="Type answer in Markdown..."
+                  required
+                  rows={4}
+                />
+                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={isSavingEdit || !editPrompt.trim() || !editAnswer.trim()}
+                  >
+                    {isSavingEdit ? 'Saving...' : '💾 Save Changes'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-study-tool"
+                    onClick={handleCancelEdit}
+                    disabled={isSavingEdit}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <div className="card-viewer-area">
+              {/* Front Prompt */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, width: '100%' }}>
+                <div className="card-prompt" style={{ flex: 1 }}>
+                  <MarkdownViewer content={currentCard.prompt} />
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+                  {canCreate && (
+                    <button
+                      className="btn-study-tool"
+                      style={{ fontSize: '0.8rem', padding: '4px 10px', whiteSpace: 'nowrap' }}
+                      onClick={handleStartEdit}
+                    >
+                      ✏️ Edit
+                    </button>
+                  )}
                   <button
                     className="btn-study-tool"
                     style={{ fontSize: '0.8rem', padding: '4px 10px', whiteSpace: 'nowrap', borderColor: '#0d6efd', color: '#0d6efd' }}
-                    onClick={() => setLinkerModalCard(currentCard)}
+                    onClick={() => setCopyModalCard(currentCard)}
                   >
-                    🔗 Link Exercises
+                    📋 Copy Card
                   </button>
-                )}
-              </div>
-            </div>
-
-            {/* Answer Section — revealed after Show Answer */}
-            {showAnswer && (
-              <>
-                <hr className="card-divider" />
-                <div className="card-answer">
-                  <MarkdownViewer content={currentCard.answer || currentCard.validationSpec || 'Correct answer verified.'} />
-                </div>
-
-                {/* ── Followups & Linked Exercises Toggles (Only visible after answer is shown) ── */}
-                <div className="followups-wrapper">
-                  <div className="followups-header">
-                    <button className="btn-followups-toggle" onClick={handleToggleFollowups}>
-                      {showFollowups ? '▲ Hide Follow-ups' : '▼ Follow-ups'}
-                      {followups.length > 0 && !showFollowups && (
-                        <span className="followups-badge">{followups.length}</span>
-                      )}
-                    </button>
-
-                    {linkedExercises.length > 0 && (
-                      <button className="btn-followups-toggle" onClick={handleToggleLinkedExercises}>
-                        {showLinkedExercises ? '▲ Hide Linked Exercises' : '▼ Linked Exercises'}
-                        {!showLinkedExercises && (
-                          <span className="followups-badge">{linkedExercises.length}</span>
-                        )}
+                  {canCreate && (
+                    <>
+                      <button
+                        className="btn-study-tool"
+                        style={{ fontSize: '0.8rem', padding: '4px 10px', whiteSpace: 'nowrap', borderColor: '#0d6efd', color: '#0d6efd' }}
+                        onClick={() => setLinkerModalCard(currentCard)}
+                      >
+                        🔗 Link Exercises
                       </button>
-                    )}
+                      <button
+                        className="btn-study-tool"
+                        style={{ fontSize: '0.8rem', padding: '4px 10px', whiteSpace: 'nowrap', borderColor: '#dc3545', color: '#dc3545' }}
+                        disabled={deletingCardId === currentCard.id}
+                        onClick={handleDeleteCurrentCard}
+                      >
+                        {deletingCardId === currentCard.id ? 'Deleting...' : '🗑️ Delete'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Answer Section — revealed after Show Answer */}
+              {showAnswer && (
+                <>
+                  <hr className="card-divider" />
+                  <div className="card-answer">
+                    <MarkdownViewer content={currentCard.answer || currentCard.validationSpec || 'Correct answer verified.'} />
                   </div>
 
-                  {showFollowups && (
-                    <div className="followups-panel">
-                      <form className="followup-form" onSubmit={handleSubmitFollowup}>
-                        <input
-                          className="form-control followup-input"
-                          placeholder="A question this card sparked in your mind..."
-                          value={newQuestion}
-                          onChange={e => setNewQuestion(e.target.value)}
-                          disabled={submittingFollowup}
-                        />
-                        <button
-                          type="submit"
-                          className="btn-primary"
-                          disabled={submittingFollowup || !newQuestion.trim()}
-                        >
-                          {submittingFollowup ? 'Posting...' : 'Ask'}
+                  {/* ── Followups & Linked Exercises Toggles (Only visible after answer is shown) ── */}
+                  <div className="followups-wrapper">
+                    <div className="followups-header">
+                      <button className="btn-followups-toggle" onClick={handleToggleFollowups}>
+                        {showFollowups ? '▲ Hide Follow-ups' : '▼ Follow-ups'}
+                        {followups.length > 0 && !showFollowups && (
+                          <span className="followups-badge">{followups.length}</span>
+                        )}
+                      </button>
+
+                      {linkedExercises.length > 0 && (
+                        <button className="btn-followups-toggle" onClick={handleToggleLinkedExercises}>
+                          {showLinkedExercises ? '▲ Hide Linked Exercises' : '▼ Linked Exercises'}
+                          {!showLinkedExercises && (
+                            <span className="followups-badge">{linkedExercises.length}</span>
+                          )}
                         </button>
-                      </form>
+                      )}
+                    </div>
 
-                      {followupsLoading ? (
-                        <p className="followups-loading">Loading follow-ups...</p>
-                      ) : followups.length === 0 ? (
-                        <p className="followups-empty">No follow-ups yet. Be the first to ask!</p>
-                      ) : (
+                    {showFollowups && (
+                      <div className="followups-panel">
+                        <form className="followup-form" onSubmit={handleSubmitFollowup}>
+                          <input
+                            className="form-control followup-input"
+                            placeholder="A question this card sparked in your mind..."
+                            value={newQuestion}
+                            onChange={e => setNewQuestion(e.target.value)}
+                            disabled={submittingFollowup}
+                          />
+                          <button
+                            type="submit"
+                            className="btn-primary"
+                            disabled={submittingFollowup || !newQuestion.trim()}
+                          >
+                            {submittingFollowup ? 'Posting...' : 'Ask'}
+                          </button>
+                        </form>
+
+                        {followupsLoading ? (
+                          <p className="followups-loading">Loading follow-ups...</p>
+                        ) : followups.length === 0 ? (
+                          <p className="followups-empty">No follow-ups yet. Be the first to ask!</p>
+                        ) : (
+                          <ul className="followups-list">
+                            {followups.map(f => (
+                              <li key={f.id} className="followup-item">
+                                <div className="followup-meta">
+                                  <span className="followup-author">{api.getEffectiveDisplayName(f.authorDisplayName, f.authorDisplayName)}</span>
+                                  <span className="followup-date">
+                                    {new Date(f.createdAt).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                <p className="followup-text">{f.questionText}</p>
+                                <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                  {(f.linkedCardIds?.length > 0 || f.linkedCardId) && (
+                                    <button
+                                      className="btn-study-tool"
+                                      style={{
+                                        fontSize: '0.8rem',
+                                        fontWeight: 600,
+                                        color: '#198754',
+                                        borderColor: '#198754',
+                                        background: '#f8fff9',
+                                        cursor: 'pointer',
+                                        padding: '2px 8px'
+                                      }}
+                                      onClick={() => handleOpenLinkedCards(f)}
+                                    >
+                                      ✓ Answered by {(f.linkedCardIds?.length || 1)} card{(f.linkedCardIds?.length > 1) ? 's' : ''} ➔
+                                    </button>
+                                  )}
+
+                                  {canCreate && (
+                                    <button
+                                      className="btn-study-tool"
+                                      style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#0d6efd', color: '#0d6efd' }}
+                                      onClick={() => setConvertingFollowup(f)}
+                                    >
+                                      + Answer with Card 🎴
+                                    </button>
+                                  )}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+
+                    {showLinkedExercises && (
+                      <div className="followups-panel">
                         <ul className="followups-list">
-                          {followups.map(f => (
-                            <li key={f.id} className="followup-item">
-                              <div className="followup-meta">
-                                <span className="followup-author">{api.getEffectiveDisplayName(f.authorDisplayName, f.authorDisplayName)}</span>
-                                <span className="followup-date">
-                                  {new Date(f.createdAt).toLocaleDateString()}
-                                </span>
-                              </div>
-                              <p className="followup-text">{f.questionText}</p>
-                              <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                                {(f.linkedCardIds?.length > 0 || f.linkedCardId) && (
-                                  <button
-                                    className="btn-study-tool"
-                                    style={{
-                                      fontSize: '0.8rem',
-                                      fontWeight: 600,
-                                      color: '#198754',
-                                      borderColor: '#198754',
-                                      background: '#f8fff9',
-                                      cursor: 'pointer',
-                                      padding: '2px 8px'
-                                    }}
-                                    onClick={() => handleOpenLinkedCards(f)}
-                                  >
-                                    ✓ Answered by {(f.linkedCardIds?.length || 1)} card{(f.linkedCardIds?.length > 1) ? 's' : ''} ➔
-                                  </button>
-                                )}
-
-                                {canCreate && (
-                                  <button
-                                    className="btn-study-tool"
-                                    style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#0d6efd', color: '#0d6efd' }}
-                                    onClick={() => setConvertingFollowup(f)}
-                                  >
-                                    + Answer with Card 🎴
-                                  </button>
+                          {linkedExercises.map((ex, idx) => (
+                            <li key={ex.id} className="followup-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                  <strong style={{ fontSize: '0.95rem', color: '#212529' }}>⚡ {ex.title}</strong>
+                                  {ex.language && (
+                                    <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 4, background: '#e7f5ff', color: '#0d6efd', fontWeight: 600 }}>
+                                      {ex.language}
+                                    </span>
+                                  )}
+                                </div>
+                                {ex.description && (
+                                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#6c757d' }}>{ex.description}</p>
                                 )}
                               </div>
+                              <button
+                                className="btn-study-tool"
+                                style={{ fontSize: '0.8rem', padding: '4px 12px', color: '#0d6efd', borderColor: '#0d6efd', fontWeight: 600, whiteSpace: 'nowrap' }}
+                                onClick={() => setActivePracticeModal({ exercises: linkedExercises, initialIndex: idx })}
+                              >
+                                ▶ Practice ➔
+                              </button>
                             </li>
                           ))}
                         </ul>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
-                  {showLinkedExercises && (
-                    <div className="followups-panel">
-                      <ul className="followups-list">
-                        {linkedExercises.map((ex, idx) => (
-                          <li key={ex.id} className="followup-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                <strong style={{ fontSize: '0.95rem', color: '#212529' }}>⚡ {ex.title}</strong>
-                                {ex.language && (
-                                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 4, background: '#e7f5ff', color: '#0d6efd', fontWeight: 600 }}>
-                                    {ex.language}
-                                  </span>
-                                )}
-                              </div>
-                              {ex.description && (
-                                <p style={{ margin: 0, fontSize: '0.85rem', color: '#6c757d' }}>{ex.description}</p>
-                              )}
-                            </div>
-                            <button
-                              className="btn-study-tool"
-                              style={{ fontSize: '0.8rem', padding: '4px 12px', color: '#0d6efd', borderColor: '#0d6efd', fontWeight: 600, whiteSpace: 'nowrap' }}
-                              onClick={() => setActivePracticeModal({ exercises: linkedExercises, initialIndex: idx })}
-                            >
-                              ▶ Practice ➔
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+          {!isEditingCurrent && (
+            <div className="study-bottom-bar">
+              {!showAnswer ? (
+                <button className="btn-show-answer" onClick={() => setShowAnswer(true)}>
+                  Show Answer
+                </button>
+              ) : (
+                <div className="rating-buttons-group">
+                  <div className="rating-col">
+                    <span className="rating-interval">&lt;1m</span>
+                    <button className="btn-rating again" disabled={submittingRating} onClick={() => rateCard('Again')}>Again</button>
+                  </div>
+                  <div className="rating-col">
+                    <span className="rating-interval">&lt;1m</span>
+                    <button className="btn-rating" disabled={submittingRating} onClick={() => rateCard('Hard')}>Hard</button>
+                  </div>
+                  <div className="rating-col">
+                    <span className="rating-interval">&lt;10m</span>
+                    <button className="btn-rating" disabled={submittingRating} onClick={() => rateCard('Good')}>Good</button>
+                  </div>
+                  <div className="rating-col">
+                    <span className="rating-interval">1d+</span>
+                    <button className="btn-rating" disabled={submittingRating} onClick={() => rateCard('Easy')}>Easy</button>
+                  </div>
                 </div>
-              </>
-            )}
-          </div>
-          <div className="study-bottom-bar">
-            {!showAnswer ? (
-              <button className="btn-show-answer" onClick={() => setShowAnswer(true)}>
-                Show Answer
-              </button>
-            ) : (
-              <div className="rating-buttons-group">
-                <div className="rating-col">
-                  <span className="rating-interval">&lt;1m</span>
-                  <button className="btn-rating again" disabled={submittingRating} onClick={() => rateCard('Again')}>Again</button>
-                </div>
-                <div className="rating-col">
-                  <span className="rating-interval">&lt;1m</span>
-                  <button className="btn-rating" disabled={submittingRating} onClick={() => rateCard('Hard')}>Hard</button>
-                </div>
-                <div className="rating-col">
-                  <span className="rating-interval">&lt;10m</span>
-                  <button className="btn-rating" disabled={submittingRating} onClick={() => rateCard('Good')}>Good</button>
-                </div>
-                <div className="rating-col">
-                  <span className="rating-interval">1d+</span>
-                  <button className="btn-rating" disabled={submittingRating} onClick={() => rateCard('Easy')}>Easy</button>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

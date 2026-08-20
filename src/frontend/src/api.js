@@ -355,6 +355,32 @@ export async function createCard(deckId, prompt, answer, type = 'basic'){
   return res.json()
 }
 
+export async function updateCard(cardId, prompt, answer, type = 'basic'){
+  let p = prompt
+  let a = answer
+  let t = type
+  if (typeof prompt === 'object' && prompt !== null) {
+    p = prompt.prompt
+    a = prompt.answer || prompt.validationSpec
+    t = prompt.type
+  }
+  const cardType = t || 'basic'
+  const res = await fetch(`${API_BASE}/content/cards/${cardId}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      type: cardType,
+      prompt: p,
+      answer: a
+    })
+  })
+  if(!res.ok){
+    const txt = await res.text()
+    throw new Error(txt || 'Failed to update card')
+  }
+  return true
+}
+
 export async function copyCardToDeck(sourceCardId, targetDeckId){
   const res = await fetch(`${API_BASE}/content/cards/copy`, {
     method: 'POST',

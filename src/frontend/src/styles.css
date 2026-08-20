@@ -247,14 +247,17 @@ main.main-content {
   font-weight: 600;
 }
 
-/* Center Card Prompt & Answer Area */
+/* Center Card Container with Left-Aligned Text Content */
 .card-viewer-area {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
+  max-width: 750px;
+  width: 100%;
+  margin: 0 auto;
   padding: 40px 20px;
   min-height: 280px;
 }
@@ -263,8 +266,10 @@ main.main-content {
   font-size: 1.4rem;
   font-weight: 500;
   color: #1a1a1a;
+  width: 100%;
   max-width: 750px;
   margin-bottom: 20px;
+  text-align: left;
 }
 
 .card-divider {
@@ -278,8 +283,10 @@ main.main-content {
 .card-answer {
   font-size: 1.25rem;
   color: #212529;
+  width: 100%;
   max-width: 750px;
   margin-top: 10px;
+  text-align: left;
 }
 
 .code-box {
