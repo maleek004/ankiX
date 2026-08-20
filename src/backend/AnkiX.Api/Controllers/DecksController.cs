@@ -322,6 +322,15 @@ public sealed class DecksController : ControllerBase
             return NotFound(new { message = "Deck not found." });
         }
 
+        if (deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0)
+        {
+            bool isFrozen = await dbContext.StudyGroups.AsNoTracking().AnyAsync(g => g.Id == deck.StudyGroupId.Value && g.IsFrozen);
+            if (isFrozen)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Cards cannot be imported.");
+            }
+        }
+
         if (file is null || file.Length == 0)
         {
             return BadRequest(new { message = "Please provide a valid file to import." });
@@ -345,6 +354,15 @@ public sealed class DecksController : ControllerBase
         if (deck is null)
         {
             return NotFound(new { message = "Deck not found." });
+        }
+
+        if (deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0)
+        {
+            bool isFrozen = await dbContext.StudyGroups.AsNoTracking().AnyAsync(g => g.Id == deck.StudyGroupId.Value && g.IsFrozen);
+            if (isFrozen)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Cards cannot be imported.");
+            }
         }
 
         if (string.IsNullOrWhiteSpace(request.Content))

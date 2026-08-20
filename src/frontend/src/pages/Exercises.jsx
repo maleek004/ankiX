@@ -72,7 +72,7 @@ export default function Exercises() {
   const loadData = async () => {
     setLoading(true)
     try {
-      setCanCreate(canCreateContent(activeStudyGroup?.role))
+      setCanCreate(Boolean(!activeStudyGroup?.isFrozen && canCreateContent(activeStudyGroup?.role)))
       if (isGuest) {
         const allEx = await getExercises(activeLang, activeStudyGroup?.id)
         setExercises(allEx || [])
@@ -296,7 +296,7 @@ export default function Exercises() {
             <button className="btn-primary" onClick={() => setShowAddForm(true)} style={{ padding: '8px 16px', fontSize: '0.9rem' }}>
               + Add New Exercise
             </button>
-          ) : isGuest ? (
+          ) : isGuest && !activeStudyGroup?.isFrozen ? (
             <button
               className="btn-primary"
               onClick={() => setAuthModalConfig({
@@ -312,6 +312,17 @@ export default function Exercises() {
           ) : null}
         </div>
       </div>
+
+      {activeStudyGroup?.isFrozen && (
+        <div style={{
+          background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8,
+          padding: '0.75rem 1rem', marginBottom: 20, color: '#0369a1', fontSize: '0.85rem',
+          display: 'flex', alignItems: 'center', gap: 8
+        }}>
+          <span>❄️</span>
+          <span>Study group <strong>{activeStudyGroup.name}</strong> is currently <strong>frozen in read-only mode</strong>. You can practice existing exercises, but creating new exercises and modifying content are disabled.</span>
+        </div>
+      )}
 
       {/* Main Tabs */}
       <div style={{ display: 'flex', borderBottom: '2px solid #dee2e6', marginBottom: 20 }}>

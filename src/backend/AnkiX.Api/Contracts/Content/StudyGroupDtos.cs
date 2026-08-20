@@ -56,6 +56,10 @@ public sealed class StudyGroupResponse
 
     public int CreatedByUserId { get; set; }
 
+    public bool IsFrozen { get; set; }
+
+    public DateTime? FrozenAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }
 
@@ -127,3 +131,10 @@ public sealed class InviteStudyGroupMemberRequest
 
     public string Role { get; set; } = StudyGroupRoles.Member;
 }
+
+public sealed class TransferOwnershipRequest
+{
+    [Required]
+    public int NewOwnerUserId { get; set; }
+}
+

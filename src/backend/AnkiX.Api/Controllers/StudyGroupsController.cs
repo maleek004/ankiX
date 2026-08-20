@@ -109,6 +109,8 @@ public sealed class StudyGroupsController : ControllerBase
                 UserMembershipStatus = status,
                 PendingRequestCount = isOwnerOrAdmin && pendingCounts.TryGetValue(c.Id, out int pCount) ? pCount : 0,
                 CreatedByUserId = c.CreatedByUserId,
+                IsFrozen = c.IsFrozen,
+                FrozenAt = c.FrozenAt,
                 CreatedAt = c.CreatedAt
             };
         });
@@ -164,6 +166,8 @@ public sealed class StudyGroupsController : ControllerBase
             UserMembershipStatus = userMemberships.ContainsKey(c.Id) ? StudyGroupMemberStatus.Active : null,
             PendingRequestCount = 0,
             CreatedByUserId = c.CreatedByUserId,
+            IsFrozen = c.IsFrozen,
+            FrozenAt = c.FrozenAt,
             CreatedAt = c.CreatedAt
         });
 
@@ -227,6 +231,8 @@ public sealed class StudyGroupsController : ControllerBase
             UserMembershipStatus = userMembership?.Status,
             PendingRequestCount = pendingRequestCount,
             CreatedByUserId = studyGroup.CreatedByUserId,
+            IsFrozen = studyGroup.IsFrozen,
+            FrozenAt = studyGroup.FrozenAt,
             CreatedAt = studyGroup.CreatedAt
         });
     }
@@ -270,6 +276,7 @@ public sealed class StudyGroupsController : ControllerBase
             AvatarUrl = request.AvatarUrl?.Trim(),
             Privacy = privacy,
             CreatedByUserId = userId,
+            IsFrozen = false,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -305,6 +312,8 @@ public sealed class StudyGroupsController : ControllerBase
             UserMembershipStatus = StudyGroupMemberStatus.Active,
             PendingRequestCount = 0,
             CreatedByUserId = userId,
+            IsFrozen = false,
+            FrozenAt = null,
             CreatedAt = studyGroup.CreatedAt
         });
     }
@@ -315,6 +324,11 @@ public sealed class StudyGroupsController : ControllerBase
     {
         var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
         if (studyGroup == null) return NotFound("Study group not found.");
+
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. New members cannot join.");
+        }
 
         if (studyGroup.Privacy == StudyGroupPrivacy.Locked)
         {
@@ -364,6 +378,11 @@ public sealed class StudyGroupsController : ControllerBase
     {
         var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
         if (studyGroup == null) return NotFound("Study group not found.");
+
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Join requests are disabled.");
+        }
 
         if (studyGroup.Privacy == StudyGroupPrivacy.Locked)
         {
@@ -457,6 +476,11 @@ public sealed class StudyGroupsController : ControllerBase
         var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
         if (studyGroup == null) return NotFound("Study group not found.");
 
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Requests cannot be approved.");
+        }
+
         int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
 
@@ -491,6 +515,11 @@ public sealed class StudyGroupsController : ControllerBase
     {
         var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
         if (studyGroup == null) return NotFound("Study group not found.");
+
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Requests cannot be rejected.");
+        }
 
         int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
@@ -531,6 +560,11 @@ public sealed class StudyGroupsController : ControllerBase
         var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
         if (studyGroup == null) return NotFound("Study group not found.");
 
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Invitations cannot be sent.");
+        }
+
         int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
 
@@ -542,6 +576,17 @@ public sealed class StudyGroupsController : ControllerBase
         if (!isSystemAdmin && !isStudyGroupOwnerOrAdmin)
         {
             return Forbid();
+        }
+
+        string assignRole = string.IsNullOrWhiteSpace(request.Role) ? StudyGroupRoles.Member : request.Role.Trim();
+        if (assignRole is not StudyGroupRoles.Owner and not StudyGroupRoles.Admin and not StudyGroupRoles.Contributor and not StudyGroupRoles.Member)
+        {
+            return BadRequest("Role must be 'Admin', 'Contributor', or 'Member'.");
+        }
+
+        if (assignRole == StudyGroupRoles.Owner)
+        {
+            return BadRequest("Owner role cannot be assigned directly. Use Transfer Ownership to transfer ownership.");
         }
 
         string reqEmail = request.Email.Trim().ToLowerInvariant();
@@ -566,22 +611,13 @@ public sealed class StudyGroupsController : ControllerBase
             }
             if (existing.Status == StudyGroupMemberStatus.PendingRequest)
             {
+                existing.Role = assignRole;
                 existing.Status = StudyGroupMemberStatus.Active;
+                existing.InvitedByUserId = currentUserId;
                 existing.JoinedAt = DateTime.UtcNow;
                 await dbContext.SaveChangesAsync();
-                return Ok(new { message = $"User '{targetUser.Email}' had a pending request and has now been approved and added." });
+                return Ok(new { message = $"User '{targetUser.Email}' had a pending request and has now been approved and added as {assignRole}." });
             }
-        }
-
-        string assignRole = string.IsNullOrWhiteSpace(request.Role) ? StudyGroupRoles.Member : request.Role.Trim();
-        if (assignRole is not StudyGroupRoles.Owner and not StudyGroupRoles.Admin and not StudyGroupRoles.Contributor and not StudyGroupRoles.Member)
-        {
-            return BadRequest("Role must be 'Owner', 'Admin', 'Contributor', or 'Member'.");
-        }
-
-        if (assignRole == StudyGroupRoles.Owner && !isSystemAdmin && callerMembership?.Role != StudyGroupRoles.Owner)
-        {
-            return BadRequest("Only study group owners can assign the Owner role.");
         }
 
         var newInvite = new StudyGroupMember
@@ -647,6 +683,11 @@ public sealed class StudyGroupsController : ControllerBase
         var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
         if (studyGroup == null) return NotFound("Study group not found.");
 
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Invitations cannot be accepted at this time.");
+        }
+
         int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         var invite = await dbContext.StudyGroupMembers
@@ -705,6 +746,11 @@ public sealed class StudyGroupsController : ControllerBase
         var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
         if (studyGroup == null) return NotFound("Study group not found.");
 
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Privacy settings cannot be changed.");
+        }
+
         int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
 
@@ -728,6 +774,11 @@ public sealed class StudyGroupsController : ControllerBase
     {
         var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
         if (studyGroup == null) return NotFound("Study group not found.");
+
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen.");
+        }
 
         int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
@@ -807,6 +858,11 @@ public sealed class StudyGroupsController : ControllerBase
         var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
         if (studyGroup == null) return NotFound("Study group not found.");
 
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Members cannot be added.");
+        }
+
         int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var callerMembership = await dbContext.StudyGroupMembers
             .FirstOrDefaultAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId && m.Status == StudyGroupMemberStatus.Active);
@@ -817,6 +873,17 @@ public sealed class StudyGroupsController : ControllerBase
         if (!isSystemAdmin && !isStudyGroupOwnerOrAdmin)
         {
             return Forbid();
+        }
+
+        string assignRole = string.IsNullOrWhiteSpace(request.Role) ? StudyGroupRoles.Member : request.Role.Trim();
+        if (assignRole is not StudyGroupRoles.Owner and not StudyGroupRoles.Admin and not StudyGroupRoles.Contributor and not StudyGroupRoles.Member)
+        {
+            return BadRequest("Role must be 'Admin', 'Contributor', or 'Member'.");
+        }
+
+        if (assignRole == StudyGroupRoles.Owner)
+        {
+            return BadRequest("Owner role cannot be assigned directly. Use Transfer Ownership to transfer ownership.");
         }
 
         string reqEmail = request.Email.Trim().ToLower();
@@ -835,6 +902,7 @@ public sealed class StudyGroupsController : ControllerBase
             {
                 return BadRequest($"User '{targetUser.Email}' is already a member of this study group.");
             }
+            existingMembership.Role = assignRole;
             existingMembership.Status = StudyGroupMemberStatus.Active;
             existingMembership.JoinedAt = DateTime.UtcNow;
             await dbContext.SaveChangesAsync();
@@ -847,17 +915,6 @@ public sealed class StudyGroupsController : ControllerBase
                 Status = existingMembership.Status,
                 JoinedAt = existingMembership.JoinedAt
             });
-        }
-
-        string assignRole = string.IsNullOrWhiteSpace(request.Role) ? StudyGroupRoles.Member : request.Role.Trim();
-        if (assignRole is not StudyGroupRoles.Owner and not StudyGroupRoles.Admin and not StudyGroupRoles.Contributor and not StudyGroupRoles.Member)
-        {
-            return BadRequest("Role must be 'Owner', 'Admin', 'Contributor', or 'Member'.");
-        }
-
-        if (assignRole == StudyGroupRoles.Owner && !isSystemAdmin && callerMembership?.Role != StudyGroupRoles.Owner)
-        {
-            return BadRequest("Only study group owners can assign Owner role.");
         }
 
         var newMember = new StudyGroupMember
@@ -890,6 +947,11 @@ public sealed class StudyGroupsController : ControllerBase
         var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
         if (studyGroup == null) return NotFound("Study group not found.");
 
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Member roles cannot be modified.");
+        }
+
         int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var callerMembership = await dbContext.StudyGroupMembers
             .FirstOrDefaultAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId && m.Status == StudyGroupMemberStatus.Active);
@@ -902,10 +964,15 @@ public sealed class StudyGroupsController : ControllerBase
             return Forbid();
         }
 
+        if (string.IsNullOrWhiteSpace(request?.Role))
+        {
+            return BadRequest("Role is required.");
+        }
+
         string newRole = request.Role.Trim();
         if (newRole is not StudyGroupRoles.Owner and not StudyGroupRoles.Admin and not StudyGroupRoles.Contributor and not StudyGroupRoles.Member)
         {
-            return BadRequest("Role must be 'Owner', 'Admin', 'Contributor', or 'Member'.");
+            return BadRequest("Role must be 'Admin', 'Contributor', or 'Member'.");
         }
 
         var targetMembership = await dbContext.StudyGroupMembers
@@ -916,9 +983,22 @@ public sealed class StudyGroupsController : ControllerBase
             return NotFound("Active member not found in study group.");
         }
 
-        if ((newRole == StudyGroupRoles.Owner || targetMembership.Role == StudyGroupRoles.Owner) && !isSystemAdmin && callerMembership?.Role != StudyGroupRoles.Owner)
+        // Owners cannot change their own role or be demoted via role dropdown (must use transfer-ownership)
+        if (targetMembership.Role == StudyGroupRoles.Owner && newRole != StudyGroupRoles.Owner)
         {
-            return BadRequest("Only study group owners can manage Owner role.");
+            return BadRequest("Study group owners cannot change their own role or be demoted directly. Use Transfer Ownership to transfer ownership.");
+        }
+
+        // Owner role cannot be assigned directly via this endpoint
+        if (newRole == StudyGroupRoles.Owner)
+        {
+            return BadRequest("Owner role cannot be assigned directly. Use Transfer Ownership to transfer ownership.");
+        }
+
+        // Group Admins cannot modify another Admin's or Owner's role
+        if (!isSystemAdmin && callerMembership?.Role != StudyGroupRoles.Owner && (targetMembership.Role == StudyGroupRoles.Admin || targetMembership.Role == StudyGroupRoles.Owner))
+        {
+            return BadRequest("Admins cannot change roles of other Admins or Owners.");
         }
 
         targetMembership.Role = newRole;
@@ -927,9 +1007,234 @@ public sealed class StudyGroupsController : ControllerBase
         return Ok(new { message = $"Role updated to '{newRole}' successfully." });
     }
 
+    [Authorize]
+    [HttpPost("{slug}/transfer-ownership")]
+    public async Task<IActionResult> TransferOwnership(string slug, [FromBody] TransferOwnershipRequest request)
+    {
+        var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
+        if (studyGroup == null) return NotFound("Study group not found.");
+
+        if (studyGroup.Slug.ToLower() == "sample")
+        {
+            return BadRequest("The sample study group ownership cannot be transferred.");
+        }
+
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Ownership cannot be transferred.");
+        }
+
+        int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        var callerMembership = await dbContext.StudyGroupMembers
+            .FirstOrDefaultAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId && m.Status == StudyGroupMemberStatus.Active);
+
+        if (!isSystemAdmin && callerMembership?.Role != StudyGroupRoles.Owner)
+        {
+            return Forbid();
+        }
+
+        var targetMembership = await dbContext.StudyGroupMembers
+            .FirstOrDefaultAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == request.NewOwnerUserId && m.Status == StudyGroupMemberStatus.Active);
+
+        if (targetMembership == null)
+        {
+            return BadRequest("Target user must be an active member of this study group.");
+        }
+
+        if (targetMembership.Role == StudyGroupRoles.Owner)
+        {
+            return BadRequest("Target user is already the owner of this study group.");
+        }
+
+        // Demote existing owner(s) to Admin
+        var existingOwners = await dbContext.StudyGroupMembers
+            .Where(m => m.StudyGroupId == studyGroup.Id && m.Role == StudyGroupRoles.Owner)
+            .ToListAsync();
+
+        foreach (var owner in existingOwners)
+        {
+            owner.Role = StudyGroupRoles.Admin;
+        }
+
+        // Promote target member to Owner
+        targetMembership.Role = StudyGroupRoles.Owner;
+        studyGroup.CreatedByUserId = targetMembership.UserId;
+
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new { message = "Ownership transferred successfully." });
+    }
+
+    [Authorize]
+    [HttpPost("{slug}/freeze")]
+    public async Task<IActionResult> FreezeStudyGroup(string slug)
+    {
+        var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
+        if (studyGroup == null) return NotFound("Study group not found.");
+
+        if (studyGroup.Slug.ToLower() == "sample")
+        {
+            return BadRequest("The sample study group cannot be frozen.");
+        }
+
+        int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        var callerMembership = await dbContext.StudyGroupMembers.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId && m.Status == StudyGroupMemberStatus.Active);
+
+        if (!isSystemAdmin && callerMembership?.Role != StudyGroupRoles.Owner)
+        {
+            return Forbid();
+        }
+
+        if (studyGroup.IsFrozen)
+        {
+            return BadRequest("Study group is already frozen.");
+        }
+
+        studyGroup.IsFrozen = true;
+        studyGroup.FrozenAt = DateTime.UtcNow;
+        studyGroup.FrozenByUserId = currentUserId;
+
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new { message = $"Study group '{studyGroup.Name}' has been frozen." });
+    }
+
+    [Authorize]
+    [HttpPost("{slug}/unfreeze")]
+    public async Task<IActionResult> UnfreezeStudyGroup(string slug)
+    {
+        var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
+        if (studyGroup == null) return NotFound("Study group not found.");
+
+        int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        var callerMembership = await dbContext.StudyGroupMembers.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId && m.Status == StudyGroupMemberStatus.Active);
+
+        if (!isSystemAdmin && callerMembership?.Role != StudyGroupRoles.Owner)
+        {
+            return Forbid();
+        }
+
+        if (!studyGroup.IsFrozen)
+        {
+            return BadRequest("Study group is not frozen.");
+        }
+
+        studyGroup.IsFrozen = false;
+        studyGroup.FrozenAt = null;
+        studyGroup.FrozenByUserId = null;
+
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new { message = $"Study group '{studyGroup.Name}' has been unfreezed." });
+    }
+
+    [Authorize]
+    [HttpDelete("{slug}")]
+    public async Task<IActionResult> DeleteStudyGroup(string slug)
+    {
+        var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
+        if (studyGroup == null) return NotFound("Study group not found.");
+
+        if (studyGroup.Slug.ToLower() == "sample")
+        {
+            return BadRequest("The sample study group cannot be deleted.");
+        }
+
+        int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        var callerMembership = await dbContext.StudyGroupMembers.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId && m.Status == StudyGroupMemberStatus.Active);
+
+        if (!isSystemAdmin && callerMembership?.Role != StudyGroupRoles.Owner)
+        {
+            return Forbid();
+        }
+
+        using var transaction = await dbContext.Database.BeginTransactionAsync();
+        try
+        {
+            int groupId = studyGroup.Id;
+
+            // Decks & Cards
+            var deckIds = await dbContext.Decks.Where(d => d.StudyGroupId == groupId).Select(d => d.Id).ToListAsync();
+            var cardIds = await dbContext.Cards.Where(c => deckIds.Contains(c.DeckId)).Select(c => c.Id).ToListAsync();
+
+            // Exercises
+            var exerciseIds = await dbContext.Exercises.Where(e => e.StudyGroupId == groupId).Select(e => e.Id).ToListAsync();
+
+            // Cascade wipe review records, followups, junction records
+            if (cardIds.Count > 0)
+            {
+                var reviewRecords = dbContext.ReviewRecords.Where(r => cardIds.Contains(r.CardId));
+                dbContext.ReviewRecords.RemoveRange(reviewRecords);
+
+                var cardFollowups = dbContext.CardFollowups.Where(f => cardIds.Contains(f.CardId));
+                dbContext.CardFollowups.RemoveRange(cardFollowups);
+            }
+
+            if (cardIds.Count > 0 || exerciseIds.Count > 0)
+            {
+                var cardExercises = dbContext.CardExercises.Where(ce => cardIds.Contains(ce.CardId) || exerciseIds.Contains(ce.ExerciseId));
+                dbContext.CardExercises.RemoveRange(cardExercises);
+            }
+
+            if (exerciseIds.Count > 0)
+            {
+                var userExercises = dbContext.UserExercises.Where(ue => exerciseIds.Contains(ue.ExerciseId));
+                dbContext.UserExercises.RemoveRange(userExercises);
+
+                var exerciseReviewRecords = dbContext.ExerciseReviewRecords.Where(er => exerciseIds.Contains(er.ExerciseId));
+                dbContext.ExerciseReviewRecords.RemoveRange(exerciseReviewRecords);
+            }
+
+            if (cardIds.Count > 0)
+            {
+                var cards = dbContext.Cards.Where(c => deckIds.Contains(c.DeckId));
+                dbContext.Cards.RemoveRange(cards);
+            }
+
+            if (deckIds.Count > 0)
+            {
+                var decks = dbContext.Decks.Where(d => d.StudyGroupId == groupId);
+                dbContext.Decks.RemoveRange(decks);
+            }
+
+            if (exerciseIds.Count > 0)
+            {
+                var exercises = dbContext.Exercises.Where(e => e.StudyGroupId == groupId);
+                dbContext.Exercises.RemoveRange(exercises);
+            }
+
+            var members = dbContext.StudyGroupMembers.Where(m => m.StudyGroupId == groupId);
+            dbContext.StudyGroupMembers.RemoveRange(members);
+
+            dbContext.StudyGroups.Remove(studyGroup);
+
+            await dbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Ok(new { message = $"Study group '{studyGroup.Name}' and all its content have been permanently erased." });
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Failed to delete study group: {ex.Message}");
+        }
+    }
+
     private int? GetCurrentUserId()
     {
         string? val = User.FindFirstValue(ClaimTypes.NameIdentifier);
         return int.TryParse(val, out int userId) ? userId : null;
     }
 }
+

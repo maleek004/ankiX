@@ -19,12 +19,16 @@ import {
   acceptStudyGroupInvitation,
   declineStudyGroupInvitation,
   updateStudyGroupPrivacy,
+  transferStudyGroupOwnership,
+  freezeStudyGroup,
+  unfreezeStudyGroup,
+  deleteStudyGroup,
   getEffectiveDisplayName
 } from '../api'
 
 export default function StudyGroups() {
   const auth = useAuth()
-  const { setActiveStudyGroup } = useStudyGroup()
+  const { activeStudyGroup, setActiveStudyGroup } = useStudyGroup() || {}
   const navigate = useNavigate()
   const [studyGroups, setStudyGroups] = useState([])
   const [invitations, setInvitations] = useState([])
@@ -36,7 +40,7 @@ export default function StudyGroups() {
 
   // Manage Members & Settings Modal State
   const [managingMembersStudyGroup, setManagingMembersStudyGroup] = useState(null)
-  const [activeTab, setActiveTab] = useState('members') // 'members' | 'requests' | 'invite' | 'settings'
+  const [activeTab, setActiveTab] = useState('members') // 'members' | 'requests' | 'invite' | 'settings' | 'danger'
   const [members, setMembers] = useState([])
   const [membersLoading, setMembersLoading] = useState(false)
   const [requests, setRequests] = useState([])
@@ -48,6 +52,15 @@ export default function StudyGroups() {
   const [processingRequestId, setProcessingRequestId] = useState(null)
   const [updatingPrivacy, setUpdatingPrivacy] = useState(false)
   const [selectedPrivacy, setSelectedPrivacy] = useState('Public')
+
+  // Transfer Ownership Modal State
+  const [transferModal, setTransferModal] = useState({ isOpen: false, targetUser: null, loading: false })
+
+  // Delete Group Modal State
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, group: null, confirmSlug: '', loading: false })
+
+  // Freeze Action Loading
+  const [freezeLoading, setFreezeLoading] = useState(false)
 
   const token = auth?.user ? localStorage.getItem('ankix_token') : null
 
@@ -77,7 +90,8 @@ export default function StudyGroups() {
       id: group.id,
       slug: group.slug,
       name: group.name,
-      role: group.userRole
+      role: group.userRole,
+      isFrozen: Boolean(group.isFrozen)
     })
     navigate('/decks')
   }
@@ -91,7 +105,8 @@ export default function StudyGroups() {
         id: group.id,
         slug: group.slug,
         name: group.name,
-        role: 'Member'
+        role: 'Member',
+        isFrozen: Boolean(group.isFrozen)
       })
       navigate('/decks')
     } catch (err) {
@@ -257,14 +272,95 @@ export default function StudyGroups() {
     if (!managingMembersStudyGroup) return
     setUpdatingPrivacy(true)
     try {
-      const updated = await updateStudyGroupPrivacy(managingMembersStudyGroup.slug, selectedPrivacy)
-      setManagingMembersStudyGroup(updated)
+      await updateStudyGroupPrivacy(managingMembersStudyGroup.slug, selectedPrivacy)
+      setManagingMembersStudyGroup(prev => prev ? ({ ...prev, privacy: selectedPrivacy }) : null)
       await loadData()
       alert(`Study group privacy updated to '${selectedPrivacy}'.`)
     } catch (err) {
       alert(err.message || 'Failed to update privacy')
     } finally {
       setUpdatingPrivacy(false)
+    }
+  }
+
+  async function handleFreezeToggle(group) {
+    if (!group) return
+    const willFreeze = !group.isFrozen
+    const confirmMsg = willFreeze
+      ? `Are you sure you want to freeze '${group.name}'? While frozen, all decks, cards, exercises, and discussions will enter read-only mode, and no members can join or change roles.`
+      : `Are you sure you want to unfreeze '${group.name}'? This will restore editing, creation, and membership access.`
+    
+    if (!window.confirm(confirmMsg)) return
+
+    setFreezeLoading(true)
+    try {
+      if (willFreeze) {
+        await freezeStudyGroup(group.slug)
+      } else {
+        await unfreezeStudyGroup(group.slug)
+      }
+      await loadData()
+      if (managingMembersStudyGroup && managingMembersStudyGroup.id === group.id) {
+        setManagingMembersStudyGroup(prev => prev ? ({ ...prev, isFrozen: willFreeze }) : null)
+      }
+      if (activeStudyGroup?.id === group.id && setActiveStudyGroup) {
+        setActiveStudyGroup({
+          ...activeStudyGroup,
+          isFrozen: willFreeze
+        })
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to update freeze status')
+    } finally {
+      setFreezeLoading(false)
+    }
+  }
+
+  async function handleConfirmTransferOwnership() {
+    if (!managingMembersStudyGroup || !transferModal.targetUser) return
+    setTransferModal(prev => ({ ...prev, loading: true }))
+    try {
+      await transferStudyGroupOwnership(managingMembersStudyGroup.slug, transferModal.targetUser.userId)
+      alert(`Ownership of '${managingMembersStudyGroup.name}' successfully transferred to ${getEffectiveDisplayName(transferModal.targetUser.displayName, transferModal.targetUser.email)}.`)
+      setTransferModal({ isOpen: false, targetUser: null, loading: false })
+      setActiveTab('members')
+      await loadGroupMembersAndRequests(managingMembersStudyGroup.slug)
+      await loadData()
+      setManagingMembersStudyGroup(prev => prev ? ({ ...prev, userRole: 'Admin' }) : null)
+      if (activeStudyGroup?.id === managingMembersStudyGroup.id && setActiveStudyGroup) {
+        setActiveStudyGroup({
+          ...activeStudyGroup,
+          role: 'Admin'
+        })
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to transfer ownership')
+      setTransferModal(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  async function handleConfirmDeleteGroup() {
+    if (!deleteModal.group) return
+    if (deleteModal.confirmSlug.trim().toLowerCase() !== deleteModal.group.slug.toLowerCase()) {
+      alert(`Please enter the exact slug '${deleteModal.group.slug}' to confirm deletion.`)
+      return
+    }
+    setDeleteModal(prev => ({ ...prev, loading: true }))
+    try {
+      await deleteStudyGroup(deleteModal.group.slug)
+      alert(`Study group '${deleteModal.group.name}' and all associated decks, cards, and exercises have been permanently erased.`)
+      const deletedGroupId = deleteModal.group.id
+      setDeleteModal({ isOpen: false, group: null, confirmSlug: '', loading: false })
+      if (managingMembersStudyGroup && managingMembersStudyGroup.id === deletedGroupId) {
+        setManagingMembersStudyGroup(null)
+      }
+      if (activeStudyGroup?.id === deletedGroupId && setActiveStudyGroup) {
+        setActiveStudyGroup(null)
+      }
+      await loadData()
+    } catch (err) {
+      alert(err.message || 'Failed to delete study group')
+      setDeleteModal(prev => ({ ...prev, loading: false }))
     }
   }
 
@@ -416,7 +512,15 @@ export default function StudyGroups() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#1e293b' }}>{c.name}</h3>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {c.isFrozen && (
+                      <span style={{
+                        fontSize: '0.7rem', padding: '2px 8px', borderRadius: 999,
+                        background: '#e0f2fe', color: '#0369a1', fontWeight: 600, border: '1px solid #bae6fd'
+                      }}>
+                        ❄️ Frozen
+                      </span>
+                    )}
                     {c.userRole && (
                       <span style={{
                         fontSize: '0.7rem', padding: '2px 8px', borderRadius: 999,
@@ -692,7 +796,14 @@ export default function StudyGroups() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
-                <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.35rem' }}>⚙️ {managingMembersStudyGroup.name}</h2>
+                <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.35rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  ⚙️ {managingMembersStudyGroup.name}
+                  {managingMembersStudyGroup.isFrozen && (
+                    <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 999, background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
+                      ❄️ Frozen
+                    </span>
+                  )}
+                </h2>
                 <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: 2 }}>
                   Role: <strong>{managingMembersStudyGroup.userRole}</strong> • Tier: <strong>{managingMembersStudyGroup.privacy || 'Public'}</strong>
                 </div>
@@ -700,8 +811,19 @@ export default function StudyGroups() {
               <button className="btn btn-secondary" onClick={() => setManagingMembersStudyGroup(null)}>✕</button>
             </div>
 
+            {managingMembersStudyGroup.isFrozen && (
+              <div style={{
+                background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8,
+                padding: '0.75rem 1rem', marginBottom: '1.25rem', color: '#1e40af', fontSize: '0.85rem',
+                display: 'flex', alignItems: 'center', gap: 8
+              }}>
+                <span>❄️</span>
+                <span>This study group is currently <strong>frozen in read-only mode</strong>. Content mutation and membership modifications are disabled until unfreezed.</span>
+              </div>
+            )}
+
             {/* Modal Tabs */}
-            <div style={{ display: 'flex', gap: 6, borderBottom: '1px solid #e2e8f0', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', gap: 6, borderBottom: '1px solid #e2e8f0', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={() => setActiveTab('members')}
@@ -732,19 +854,21 @@ export default function StudyGroups() {
                   </span>
                 )}
               </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('invite')}
-                style={{
-                  padding: '0.5rem 1rem', border: 'none', background: 'none', cursor: 'pointer',
-                  fontWeight: activeTab === 'invite' ? 600 : 'normal',
-                  color: activeTab === 'invite' ? '#2563eb' : '#64748b',
-                  borderBottom: activeTab === 'invite' ? '2px solid #2563eb' : '2px solid transparent'
-                }}
-              >
-                ✉️ Send Invite
-              </button>
-              {managingMembersStudyGroup.userRole === 'Owner' && (
+              {!managingMembersStudyGroup.isFrozen && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('invite')}
+                  style={{
+                    padding: '0.5rem 1rem', border: 'none', background: 'none', cursor: 'pointer',
+                    fontWeight: activeTab === 'invite' ? 600 : 'normal',
+                    color: activeTab === 'invite' ? '#2563eb' : '#64748b',
+                    borderBottom: activeTab === 'invite' ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  ✉️ Send Invite
+                </button>
+              )}
+              {managingMembersStudyGroup.userRole === 'Owner' && !managingMembersStudyGroup.isFrozen && (
                 <button
                   type="button"
                   onClick={() => setActiveTab('settings')}
@@ -756,6 +880,20 @@ export default function StudyGroups() {
                   }}
                 >
                   🔒 Privacy Settings
+                </button>
+              )}
+              {(managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin') && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('danger')}
+                  style={{
+                    padding: '0.5rem 1rem', border: 'none', background: 'none', cursor: 'pointer',
+                    fontWeight: activeTab === 'danger' ? 600 : 'normal',
+                    color: activeTab === 'danger' ? '#dc2626' : '#64748b',
+                    borderBottom: activeTab === 'danger' ? '2px solid #dc2626' : '2px solid transparent'
+                  }}
+                >
+                  ⚠️ Lifecycle & Danger
                 </button>
               )}
             </div>
@@ -791,18 +929,34 @@ export default function StudyGroups() {
                           </span>
                         </td>
                         <td style={{ padding: '8px', textAlign: 'right' }}>
-                          {(managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin' || (managingMembersStudyGroup.userRole === 'Admin' && m.role !== 'Owner')) ? (
-                            <select
-                              value={m.role}
-                              disabled={updatingRoleId === m.userId}
-                              onChange={e => handleRoleChange(m.userId, e.target.value)}
-                              style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
-                            >
-                              <option value="Admin">Admin</option>
-                              <option value="Contributor">Contributor</option>
-                              <option value="Member">Member</option>
-                              {managingMembersStudyGroup.userRole === 'Owner' && <option value="Owner">Owner</option>}
-                            </select>
+                          {m.role === 'Owner' ? (
+                            <span style={{ fontSize: '0.8rem', color: '#92400e', fontWeight: 600 }}>
+                              👑 Owner {m.userId === auth?.user?.id ? '(You)' : ''}
+                            </span>
+                          ) : (managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin' || (managingMembersStudyGroup.userRole === 'Admin' && m.role !== 'Owner')) ? (
+                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                              <select
+                                value={m.role}
+                                disabled={updatingRoleId === m.userId || managingMembersStudyGroup.isFrozen}
+                                onChange={e => handleRoleChange(m.userId, e.target.value)}
+                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                              >
+                                <option value="Admin">Admin</option>
+                                <option value="Contributor">Contributor</option>
+                                <option value="Member">Member</option>
+                              </select>
+                              {(managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin') && !managingMembersStudyGroup.isFrozen && (
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  style={{ padding: '3px 8px', fontSize: '0.75rem', border: '1px solid #fde68a', background: '#fffbeb', color: '#92400e' }}
+                                  title="Transfer group ownership to this member"
+                                  onClick={() => setTransferModal({ isOpen: true, targetUser: m, loading: false })}
+                                >
+                                  👑 Transfer
+                                </button>
+                              )}
+                            </div>
                           ) : (
                             <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>—</span>
                           )}
@@ -840,7 +994,7 @@ export default function StudyGroups() {
                         <button
                           className="btn btn-primary"
                           style={{ padding: '0.35rem 0.8rem', fontSize: '0.85rem' }}
-                          disabled={processingRequestId === req.userId}
+                          disabled={processingRequestId === req.userId || managingMembersStudyGroup.isFrozen}
                           onClick={() => handleApproveRequest(req.userId)}
                         >
                           {processingRequestId === req.userId ? 'Processing...' : '✅ Approve'}
@@ -848,7 +1002,7 @@ export default function StudyGroups() {
                         <button
                           className="btn btn-secondary"
                           style={{ padding: '0.35rem 0.8rem', fontSize: '0.85rem' }}
-                          disabled={processingRequestId === req.userId}
+                          disabled={processingRequestId === req.userId || managingMembersStudyGroup.isFrozen}
                           onClick={() => handleRejectRequest(req.userId)}
                         >
                           ✕ Reject
@@ -887,11 +1041,10 @@ export default function StudyGroups() {
                     <option value="Member">Member (View & Practice)</option>
                     <option value="Contributor">Contributor (Create & Edit Content)</option>
                     <option value="Admin">Admin (Manage Members & Content)</option>
-                    {managingMembersStudyGroup.userRole === 'Owner' && <option value="Owner">Owner</option>}
                   </select>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                  <button type="submit" className="btn btn-primary" disabled={inviteLoading}>
+                  <button type="submit" className="btn btn-primary" disabled={inviteLoading || managingMembersStudyGroup.isFrozen}>
                     {inviteLoading ? 'Sending Invitation...' : '✉️ Send Invitation'}
                   </button>
                 </div>
@@ -976,6 +1129,168 @@ export default function StudyGroups() {
                 </div>
               </div>
             )}
+
+            {/* TAB 5: LIFECYCLE & DANGER ZONE */}
+            {activeTab === 'danger' && (managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin') && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {/* Freeze Section */}
+                <div style={{ border: '1px solid #bae6fd', borderRadius: 10, padding: '1.25rem', background: '#f0f9ff' }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#0369a1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {managingMembersStudyGroup.isFrozen ? '🔥 Unfreeze Study Group' : '❄️ Freeze Study Group (Read-Only Mode)'}
+                  </h4>
+                  <p style={{ margin: '0 0 1rem 0', fontSize: '0.85rem', color: '#0c4a6e', lineHeight: 1.4 }}>
+                    {managingMembersStudyGroup.isFrozen
+                      ? 'This study group is currently frozen. Unfreezing will restore full content creation, deck editing, and membership management.'
+                      : 'Freezing locks the study group in read-only archival mode. Existing members can still study and review cards, but nobody can create/edit decks, cards, exercises, or modify memberships.'}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={freezeLoading || managingMembersStudyGroup.slug === 'sample'}
+                    onClick={() => handleFreezeToggle(managingMembersStudyGroup)}
+                    style={{
+                      padding: '0.5rem 1.25rem', fontSize: '0.85rem',
+                      background: managingMembersStudyGroup.isFrozen ? '#2563eb' : '#0284c7',
+                      color: '#fff', border: 'none'
+                    }}
+                  >
+                    {freezeLoading ? 'Updating...' : managingMembersStudyGroup.isFrozen ? '🔥 Unfreeze Study Group' : '❄️ Freeze Study Group'}
+                  </button>
+                </div>
+
+                {/* Delete Section */}
+                {managingMembersStudyGroup.slug !== 'sample' && (
+                  <div style={{ border: '1px solid #fecaca', borderRadius: 10, padding: '1.25rem', background: '#fef2f2' }}>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#991b1b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      🗑️ Delete Study Group (Permanent Erase)
+                    </h4>
+                    <p style={{ margin: '0 0 1rem 0', fontSize: '0.85rem', color: '#7f1d1d', lineHeight: 1.4 }}>
+                      Permanently erases this study group along with all its decks, cards, exercises, student review histories, and followup questions. <strong>This action is irreversible.</strong>
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setDeleteModal({ isOpen: true, group: managingMembersStudyGroup, confirmSlug: '', loading: false })}
+                      style={{
+                        padding: '0.5rem 1.25rem', fontSize: '0.85rem',
+                        background: '#dc2626', color: '#fff', border: 'none'
+                      }}
+                    >
+                      🗑️ Delete Study Group
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Ownership Modal */}
+      {transferModal.isOpen && transferModal.targetUser && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.6)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 1100
+          }}
+          onClick={() => { if (!transferModal.loading) setTransferModal({ isOpen: false, targetUser: null, loading: false }) }}
+        >
+          <div
+            style={{
+              background: '#fff', borderRadius: 16, padding: '2rem',
+              width: '100%', maxWidth: 480, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 1rem 0', color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
+              👑 Transfer Group Ownership
+            </h3>
+            <p style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.5, margin: '0 0 1rem 0' }}>
+              Are you sure you want to transfer full ownership of <strong>{managingMembersStudyGroup?.name}</strong> to <strong>{getEffectiveDisplayName(transferModal.targetUser.displayName, transferModal.targetUser.email)}</strong>?
+            </p>
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '0.75rem', marginBottom: '1.5rem', fontSize: '0.8rem', color: '#854d0e' }}>
+              ⚠️ You will be downgraded to <strong>Admin</strong>. The new owner will have full authority over this study group, including deletion and further role management.
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={transferModal.loading}
+                onClick={() => setTransferModal({ isOpen: false, targetUser: null, loading: false })}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={transferModal.loading}
+                onClick={handleConfirmTransferOwnership}
+                style={{ background: '#d97706', borderColor: '#d97706' }}
+              >
+                {transferModal.loading ? 'Transferring...' : '👑 Confirm Transfer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Study Group Modal */}
+      {deleteModal.isOpen && deleteModal.group && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.6)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 1100
+          }}
+          onClick={() => { if (!deleteModal.loading) setDeleteModal({ isOpen: false, group: null, confirmSlug: '', loading: false }) }}
+        >
+          <div
+            style={{
+              background: '#fff', borderRadius: 16, padding: '2rem',
+              width: '100%', maxWidth: 500, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 1rem 0', color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+              🗑️ Delete Study Group
+            </h3>
+            <p style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.5, margin: '0 0 1rem 0' }}>
+              This will permanently delete <strong>{deleteModal.group.name}</strong>, along with all associated decks, cards, exercises, and members' review progress.
+            </p>
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '0.75rem', marginBottom: '1.25rem', fontSize: '0.85rem', color: '#991b1b' }}>
+              Please type <strong>{deleteModal.group.slug}</strong> to confirm deletion:
+            </div>
+            <input
+              type="text"
+              className="form-control"
+              placeholder={deleteModal.group.slug}
+              value={deleteModal.confirmSlug}
+              onChange={e => setDeleteModal({ ...deleteModal, confirmSlug: e.target.value })}
+              style={{ marginBottom: '1.5rem' }}
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={deleteModal.loading}
+                onClick={() => setDeleteModal({ isOpen: false, group: null, confirmSlug: '', loading: false })}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={deleteModal.loading || deleteModal.confirmSlug.trim().toLowerCase() !== deleteModal.group.slug.toLowerCase()}
+                onClick={handleConfirmDeleteGroup}
+                style={{
+                  background: deleteModal.confirmSlug.trim().toLowerCase() === deleteModal.group.slug.toLowerCase() ? '#dc2626' : '#fca5a5',
+                  color: '#fff', border: 'none', cursor: deleteModal.confirmSlug.trim().toLowerCase() === deleteModal.group.slug.toLowerCase() ? 'pointer' : 'not-allowed'
+                }}
+              >
+                {deleteModal.loading ? 'Deleting...' : 'Permanently Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -31,5 +31,11 @@ public sealed class StudyGroup
 
     public int CreatedByUserId { get; set; }
 
+    public bool IsFrozen { get; set; } = false;
+
+    public DateTime? FrozenAt { get; set; }
+
+    public int? FrozenByUserId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

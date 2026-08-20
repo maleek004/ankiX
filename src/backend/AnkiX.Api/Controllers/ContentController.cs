@@ -414,6 +414,13 @@ public sealed class ContentController : ControllerBase
 
     private async Task<bool> CanManageContentAsync(int? studyGroupId)
     {
+        if (studyGroupId.HasValue && studyGroupId.Value > 0)
+        {
+            bool isFrozen = await dbContext.StudyGroups.AsNoTracking()
+                .AnyAsync(g => g.Id == studyGroupId.Value && g.IsFrozen);
+            if (isFrozen) return false;
+        }
+
         if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Contributor))
         {
             return true;
@@ -431,7 +438,7 @@ public sealed class ContentController : ControllerBase
         }
 
         string? memberRole = await dbContext.StudyGroupMembers
-            .Where(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId)
+            .Where(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId && m.Status == StudyGroupMemberStatus.Active)
             .Select(m => m.Role)
             .FirstOrDefaultAsync();
 

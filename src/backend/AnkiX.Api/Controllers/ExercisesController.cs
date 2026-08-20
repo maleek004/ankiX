@@ -350,10 +350,15 @@ public sealed class ExercisesController : ControllerBase
         Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId);
         if (!await CanManageContentAsync(deck?.StudyGroupId)) return Forbid();
 
-        bool exerciseExists = await dbContext.Exercises.AnyAsync(e => e.Id == exerciseId);
-        if (!exerciseExists)
+        Exercise? exercise = await dbContext.Exercises.FirstOrDefaultAsync(e => e.Id == exerciseId);
+        if (exercise is null)
         {
             return NotFound(new { message = "Exercise not found." });
+        }
+
+        if (!await CanReadContentAsync(exercise.StudyGroupId))
+        {
+            return Forbid();
         }
 
         bool alreadyLinked = await dbContext.CardExercises.AnyAsync(ce => ce.CardId == cardId && ce.ExerciseId == exerciseId);
@@ -891,10 +896,28 @@ public sealed class ExercisesController : ControllerBase
     [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> ReseedBasicExercises()
     {
-        if (await dbContext.CardExercises.AnyAsync()) dbContext.CardExercises.RemoveRange(dbContext.CardExercises);
-        if (await dbContext.ExerciseReviewRecords.AnyAsync()) dbContext.ExerciseReviewRecords.RemoveRange(dbContext.ExerciseReviewRecords);
-        if (await dbContext.Exercises.AnyAsync()) dbContext.Exercises.RemoveRange(dbContext.Exercises);
-        await dbContext.SaveChangesAsync();
+        var sampleGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Slug == "sample");
+        int? sampleGroupId = sampleGroup?.Id;
+
+        var globalExercises = await dbContext.Exercises
+            .Where(e => e.StudyGroupId == null || (sampleGroupId.HasValue && e.StudyGroupId == sampleGroupId.Value))
+            .ToListAsync();
+        var globalExerciseIds = globalExercises.Select(e => e.Id).ToList();
+
+        if (globalExerciseIds.Count > 0)
+        {
+            var cardExercises = dbContext.CardExercises.Where(ce => globalExerciseIds.Contains(ce.ExerciseId));
+            dbContext.CardExercises.RemoveRange(cardExercises);
+
+            var userExercises = dbContext.UserExercises.Where(ue => globalExerciseIds.Contains(ue.ExerciseId));
+            dbContext.UserExercises.RemoveRange(userExercises);
+
+            var reviewRecords = dbContext.ExerciseReviewRecords.Where(er => globalExerciseIds.Contains(er.ExerciseId));
+            dbContext.ExerciseReviewRecords.RemoveRange(reviewRecords);
+
+            dbContext.Exercises.RemoveRange(globalExercises);
+            await dbContext.SaveChangesAsync();
+        }
 
         var ex1 = new Exercise
         {
@@ -1051,6 +1074,13 @@ public sealed class ExercisesController : ControllerBase
 
     private async Task<bool> CanManageContentAsync(int? studyGroupId)
     {
+        if (studyGroupId.HasValue && studyGroupId.Value > 0)
+        {
+            bool isFrozen = await dbContext.StudyGroups.AsNoTracking()
+                .AnyAsync(g => g.Id == studyGroupId.Value && g.IsFrozen);
+            if (isFrozen) return false;
+        }
+
         if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Contributor))
         {
             return true;

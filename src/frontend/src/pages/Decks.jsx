@@ -24,7 +24,7 @@ export default function Decks(){
   useEffect(() => {
     let mounted = true
     setLoading(true)
-    setCanCreate(canCreateContent(activeStudyGroup?.role))
+    setCanCreate(Boolean(!activeStudyGroup?.isFrozen && canCreateContent(activeStudyGroup?.role)))
     const groupId = activeStudyGroup ? activeStudyGroup.id : null
     getDecks(groupId)
       .then(data => {
@@ -92,8 +92,13 @@ export default function Decks(){
   return (
     <div>
       <div className="decks-header-bar">
-        <h2 style={{ margin: 0, fontWeight: 500, fontSize: '1.5rem' }}>
+        <h2 style={{ margin: 0, fontWeight: 500, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: 8 }}>
           {activeStudyGroup ? `Decks: ${activeStudyGroup.name}` : 'Public Flashcard Decks'}
+          {activeStudyGroup?.isFrozen && (
+            <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 999, background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
+              ❄️ Frozen
+            </span>
+          )}
         </h2>
         {canCreate ? (
           <button 
@@ -102,7 +107,7 @@ export default function Decks(){
           >
             {showAddForm ? 'Cancel' : '+ Add Deck'}
           </button>
-        ) : isGuest ? (
+        ) : isGuest && !activeStudyGroup?.isFrozen ? (
           <button
             className="btn-primary"
             onClick={() => setAuthModalConfig({
@@ -116,6 +121,17 @@ export default function Decks(){
           </button>
         ) : null}
       </div>
+
+      {activeStudyGroup?.isFrozen && (
+        <div style={{
+          background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8,
+          padding: '0.75rem 1rem', marginBottom: 20, color: '#0369a1', fontSize: '0.85rem',
+          display: 'flex', alignItems: 'center', gap: 8
+        }}>
+          <span>❄️</span>
+          <span>This study group is currently <strong>frozen in read-only mode</strong>. You can study and review decks, but deck creation and card edits are disabled.</span>
+        </div>
+      )}
 
       {showAddForm && canCreate && (
         <div className="form-card" style={{ marginBottom: 20 }}>

@@ -700,7 +700,7 @@ export async function importCardsFile(deckId, file){
   const formData = new FormData()
   formData.append('file', file)
 
-  const token = localStorage.getItem('token')
+  const token = getToken()
   const headers = {}
   if (token) headers['Authorization'] = `Bearer ${token}`
 
@@ -951,4 +951,54 @@ export async function updateStudyGroupPrivacy(slug, privacy){
   }
   return res.json()
 }
+
+export async function transferStudyGroupOwnership(slug, newOwnerUserId){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/transfer-ownership`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ newOwnerUserId: Number(newOwnerUserId) })
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to transfer ownership')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function freezeStudyGroup(slug){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/freeze`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to freeze study group')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function unfreezeStudyGroup(slug){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}/unfreeze`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to unfreeze study group')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function deleteStudyGroup(slug){
+  const res = await fetch(`${API_BASE}/study-groups/${slug}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to delete study group')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
 

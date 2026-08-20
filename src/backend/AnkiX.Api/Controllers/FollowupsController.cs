@@ -44,7 +44,7 @@ public sealed class FollowupsController : ControllerBase
                 {
                     return NotFound(new { message = "Card not found." });
                 }
-                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == deck.StudyGroupId.Value && m.UserId == userId);
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == deck.StudyGroupId.Value && m.UserId == userId && m.Status == StudyGroupMemberStatus.Active);
                 if (!isMember)
                 {
                     return NotFound(new { message = "Card not found." });
@@ -96,16 +96,31 @@ public sealed class FollowupsController : ControllerBase
         [FromRoute] int cardId,
         [FromBody] CreateFollowupRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request?.QuestionText))
+        {
+            return BadRequest(new { message = "Question text cannot be empty." });
+        }
+
         string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!int.TryParse(userIdClaim, out int userId))
         {
             return Unauthorized(new { message = "Invalid user identity in token." });
         }
 
-        bool cardExists = await dbContext.Cards.AnyAsync(c => c.Id == cardId);
-        if (!cardExists)
+        var card = await dbContext.Cards.AsNoTracking().FirstOrDefaultAsync(c => c.Id == cardId);
+        if (card == null)
         {
             return NotFound(new { message = "Card not found." });
+        }
+
+        var deck = await dbContext.Decks.AsNoTracking().FirstOrDefaultAsync(d => d.Id == card.DeckId);
+        if (deck != null && deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0)
+        {
+            bool isFrozen = await dbContext.StudyGroups.AsNoTracking().AnyAsync(g => g.Id == deck.StudyGroupId.Value && g.IsFrozen);
+            if (isFrozen)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Follow-up discussions are locked.");
+            }
         }
 
         CardFollowup followup = new CardFollowup
@@ -205,6 +220,13 @@ public sealed class FollowupsController : ControllerBase
 
     private async Task<bool> CanManageContentAsync(int? studyGroupId)
     {
+        if (studyGroupId.HasValue && studyGroupId.Value > 0)
+        {
+            bool isFrozen = await dbContext.StudyGroups.AsNoTracking()
+                .AnyAsync(g => g.Id == studyGroupId.Value && g.IsFrozen);
+            if (isFrozen) return false;
+        }
+
         if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Contributor))
         {
             return true;
@@ -222,7 +244,7 @@ public sealed class FollowupsController : ControllerBase
         }
 
         string? memberRole = await dbContext.StudyGroupMembers
-            .Where(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId)
+            .Where(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId && m.Status == StudyGroupMemberStatus.Active)
             .Select(m => m.Role)
             .FirstOrDefaultAsync();
 
