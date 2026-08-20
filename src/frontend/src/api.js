@@ -12,6 +12,46 @@ async function safeFetch(url, options) {
   }
 }
 
+export async function parseApiError(res, fallbackMessage = 'An unexpected error occurred.') {
+  try {
+    const text = await res.text()
+    if (!text || !text.trim()) return fallbackMessage
+
+    // Try parsing as JSON
+    try {
+      const data = JSON.parse(text)
+      if (typeof data === 'string' && data.trim()) return data.trim()
+      if (data && typeof data === 'object') {
+        if (typeof data.message === 'string' && data.message.trim()) return data.message.trim()
+        if (typeof data.detail === 'string' && data.detail.trim()) return data.detail.trim()
+        if (data.errors && typeof data.errors === 'object') {
+          const keys = Object.keys(data.errors)
+          for (const key of keys) {
+            const val = data.errors[key]
+            if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'string' && val[0].trim()) {
+              return val[0].trim()
+            }
+            if (typeof val === 'string' && val.trim()) {
+              return val.trim()
+            }
+          }
+        }
+        if (typeof data.title === 'string' && data.title.trim()) return data.title.trim()
+        if (typeof data.error === 'string' && data.error.trim()) return data.error.trim()
+      }
+    } catch {
+      // Non-JSON response: check if readable short text (not HTML document)
+      const trimmed = text.trim()
+      if (trimmed.length > 0 && trimmed.length < 300 && !trimmed.startsWith('<!DOCTYPE') && !trimmed.startsWith('<html')) {
+        return trimmed
+      }
+    }
+    return fallbackMessage
+  } catch {
+    return fallbackMessage
+  }
+}
+
 export async function register(email, password, displayName){
   const res = await safeFetch(`${API_BASE}/auth/register`,{
     method:'POST',
@@ -19,8 +59,8 @@ export async function register(email, password, displayName){
     body: JSON.stringify({ email, password, displayName: displayName || null })
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Register failed')
+    const msg = await parseApiError(res, 'Registration failed. Please try again.')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -32,12 +72,7 @@ export async function forgotPassword(email){
     body: JSON.stringify({ email })
   })
   if(!res.ok){
-    const txt = await res.text()
-    let msg = 'Failed to process forgot password request'
-    try {
-      const parsed = JSON.parse(txt)
-      msg = parsed.message || msg
-    } catch {}
+    const msg = await parseApiError(res, 'Failed to process forgot password request')
     throw new Error(msg)
   }
   return res.json()
@@ -50,12 +85,7 @@ export async function verifyResetToken(token){
     body: JSON.stringify({ token })
   })
   if(!res.ok){
-    const txt = await res.text()
-    let msg = 'Reset token is invalid or expired'
-    try {
-      const parsed = JSON.parse(txt)
-      msg = parsed.message || msg
-    } catch {}
+    const msg = await parseApiError(res, 'Reset token is invalid or expired')
     throw new Error(msg)
   }
   return res.json()
@@ -68,12 +98,7 @@ export async function resetPassword(token, newPassword){
     body: JSON.stringify({ token, newPassword })
   })
   if(!res.ok){
-    const txt = await res.text()
-    let msg = 'Failed to reset password'
-    try {
-      const parsed = JSON.parse(txt)
-      msg = parsed.message || msg
-    } catch {}
+    const msg = await parseApiError(res, 'Failed to reset password')
     throw new Error(msg)
   }
   return res.json()
@@ -86,12 +111,7 @@ export async function sendVerificationEmail(email){
     body: JSON.stringify({ email })
   })
   if(!res.ok){
-    const txt = await res.text()
-    let msg = 'Failed to send verification email'
-    try {
-      const parsed = JSON.parse(txt)
-      msg = parsed.message || msg
-    } catch {}
+    const msg = await parseApiError(res, 'Failed to send verification email')
     throw new Error(msg)
   }
   return res.json()
@@ -104,12 +124,7 @@ export async function verifyEmail(token){
     body: JSON.stringify({ token })
   })
   if(!res.ok){
-    const txt = await res.text()
-    let msg = 'Failed to verify email'
-    try {
-      const parsed = JSON.parse(txt)
-      msg = parsed.message || msg
-    } catch {}
+    const msg = await parseApiError(res, 'Failed to verify email')
     throw new Error(msg)
   }
   return res.json()
@@ -117,7 +132,10 @@ export async function verifyEmail(token){
 
 export async function getAdminUsers(){
   const res = await safeFetch(`${API_BASE}/admin/users`, { headers: authHeaders() })
-  if(!res.ok) throw new Error('Failed to fetch admin users')
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to fetch admin users')
+    throw new Error(msg)
+  }
   return res.json()
 }
 
@@ -128,8 +146,8 @@ export async function updateUserRole(userId, role){
     body: JSON.stringify({ role })
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to update user role')
+    const msg = await parseApiError(res, 'Failed to update user role')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -141,8 +159,8 @@ export async function login(email, password){
     body: JSON.stringify({ email, password })
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Login failed')
+    const msg = await parseApiError(res, 'Invalid email or password. Please check your credentials.')
+    throw new Error(msg)
   }
   const data = await res.json()
   if(data?.accessToken){
@@ -162,12 +180,7 @@ export async function oauthLogin(provider, { idToken, code, redirectUri } = {}){
   })
 
   if(!res.ok){
-    const txt = await res.text()
-    let msg = 'OAuth authentication failed'
-    try {
-      const parsed = JSON.parse(txt)
-      msg = parsed.message || msg
-    } catch {}
+    const msg = await parseApiError(res, 'OAuth authentication failed')
     throw new Error(msg)
   }
   const data = await res.json()
@@ -297,8 +310,8 @@ export async function createDeck(title, description = '', studyGroupId = null){
     body: JSON.stringify(body)
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to create deck')
+    const msg = await parseApiError(res, 'Failed to create deck')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -349,8 +362,8 @@ export async function createCard(deckId, prompt, answer, type = 'basic'){
     })
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to create card')
+    const msg = await parseApiError(res, 'Failed to create card')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -375,8 +388,8 @@ export async function updateCard(cardId, prompt, answer, type = 'basic'){
     })
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to update card')
+    const msg = await parseApiError(res, 'Failed to update card')
+    throw new Error(msg)
   }
   return true
 }
@@ -391,8 +404,8 @@ export async function copyCardToDeck(sourceCardId, targetDeckId){
     })
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to copy card to deck')
+    const msg = await parseApiError(res, 'Failed to copy card to deck')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -407,8 +420,8 @@ export async function copyExerciseToGroup(sourceExerciseId, targetStudyGroupId){
     })
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to copy exercise to group')
+    const msg = await parseApiError(res, 'Failed to copy exercise to group')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -419,8 +432,8 @@ export async function deleteDeck(id){
     headers: authHeaders()
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to delete deck')
+    const msg = await parseApiError(res, 'Failed to delete deck')
+    throw new Error(msg)
   }
   return true
 }
@@ -431,8 +444,8 @@ export async function deleteCard(deckId, cardId){
     headers: authHeaders()
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to delete card')
+    const msg = await parseApiError(res, 'Failed to delete card')
+    throw new Error(msg)
   }
   return true
 }
@@ -444,8 +457,8 @@ export async function submitReview(cardId, outcome){
     body: JSON.stringify({ cardId, outcome })
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to submit review')
+    const msg = await parseApiError(res, 'Failed to submit review')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -463,8 +476,8 @@ export async function addFollowup(cardId, questionText){
     body: JSON.stringify({ questionText })
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to add followup')
+    const msg = await parseApiError(res, 'Failed to add followup')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -476,8 +489,8 @@ export async function linkFollowupToCard(cardId, followupId, linkedCardId){
     body: JSON.stringify({ linkedCardId })
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to link followup to card')
+    const msg = await parseApiError(res, 'Failed to link followup to card')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -488,8 +501,8 @@ export async function resetDeckProgress(deckId){
     headers: authHeaders()
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to reset deck progress')
+    const msg = await parseApiError(res, 'Failed to reset deck progress')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -523,8 +536,8 @@ export async function createExercise(exerciseData){
     body: JSON.stringify(exerciseData)
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to create exercise')
+    const msg = await parseApiError(res, 'Failed to create exercise')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -535,8 +548,8 @@ export async function deleteExercise(id){
     headers: authHeaders()
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to delete exercise')
+    const msg = await parseApiError(res, 'Failed to delete exercise')
+    throw new Error(msg)
   }
   return true
 }
@@ -553,8 +566,8 @@ export async function linkCardExercise(cardId, exerciseId){
     headers: authHeaders()
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to link exercise to card')
+    const msg = await parseApiError(res, 'Failed to link exercise to card')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -565,8 +578,8 @@ export async function unlinkCardExercise(cardId, exerciseId){
     headers: authHeaders()
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to unlink exercise from card')
+    const msg = await parseApiError(res, 'Failed to unlink exercise from card')
+    throw new Error(msg)
   }
   return true
 }
@@ -580,8 +593,8 @@ export async function runCardCode(cardId, submittedCode, language = 'csharp'){
     body: JSON.stringify({ submittedCode, language })
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to run code')
+    const msg = await parseApiError(res, 'Failed to run code')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -595,8 +608,8 @@ export async function runExerciseCode(exerciseId, submittedCode, language = 'csh
     body: JSON.stringify({ submittedCode, language })
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to run exercise code')
+    const msg = await parseApiError(res, 'Failed to run exercise code')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -608,8 +621,8 @@ export async function submitExerciseReview(exerciseId, outcome){
     body: JSON.stringify({ outcome })
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Failed to submit exercise review')
+    const msg = await parseApiError(res, 'Failed to submit exercise review')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -635,8 +648,8 @@ export async function unlinkFollowupCard(cardId, followupId, linkedCardId){
     headers: authHeaders()
   })
   if(!res.ok){
-    const txt = await res.text()
-    throw new Error(txt || 'Unlink failed')
+    const msg = await parseApiError(res, 'Unlink failed')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -763,8 +776,8 @@ export async function createStudyGroup(studyGroupData){
     body: JSON.stringify(studyGroupData)
   })
   if(!res.ok){
-    const errText = await res.text()
-    throw new Error(errText || 'Failed to create study group')
+    const msg = await parseApiError(res, 'Failed to create study group')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -776,8 +789,8 @@ export async function joinStudyGroup(slug){
     headers: authHeaders()
   })
   if(!res.ok){
-    const errText = await res.text()
-    throw new Error(errText || 'Failed to join study group')
+    const msg = await parseApiError(res, 'Failed to join study group')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -789,8 +802,8 @@ export async function leaveStudyGroup(slug){
     headers: authHeaders()
   })
   if(!res.ok){
-    const errText = await res.text()
-    throw new Error(errText || 'Failed to leave study group')
+    const msg = await parseApiError(res, 'Failed to leave study group')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -810,8 +823,8 @@ export async function updateStudyGroupMemberRole(slug, targetUserId, role){
     body: JSON.stringify({ role })
   })
   if(!res.ok){
-    const errText = await res.text()
-    throw new Error(errText || 'Failed to update member role')
+    const msg = await parseApiError(res, 'Failed to update member role')
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -824,8 +837,8 @@ export async function addStudyGroupMember(slug, email, role = 'Member'){
     body: JSON.stringify({ email, role })
   })
   if(!res.ok){
-    const errText = await res.text()
-    throw new Error(errText || 'Failed to add member')
+    const msg = await parseApiError(res, 'Failed to add member')
+    throw new Error(msg)
   }
   return res.json()
 }

@@ -16,9 +16,15 @@ export default function Register(){
 
   const auth = useAuth()
 
+  const handleDisplayNameChange = (e) => {
+    setDisplayName(e.target.value)
+    if (error) setError('')
+  }
+
   const handleEmailChange = (e) => {
     const val = e.target.value
     setEmail(val)
+    if (error) setError('')
     if (emailError && isValidEmail(val)) {
       setEmailError('')
     }
@@ -27,6 +33,7 @@ export default function Register(){
   const handlePasswordChange = (e) => {
     const val = e.target.value
     setPassword(val)
+    if (error) setError('')
     if (passwordError && val.length >= 8) {
       setPasswordError('')
     }
@@ -56,7 +63,14 @@ export default function Register(){
       await auth.register(email.trim(), password, displayName.trim())
       setRegistered(true)
     }catch(err){
-      setError(err.message || 'Registration failed. Please try again.')
+      let msg = err.message || 'Registration failed. Please try again.'
+      try {
+        if (typeof msg === 'string' && msg.trim().startsWith('{')) {
+          const parsed = JSON.parse(msg)
+          msg = parsed.message || parsed.detail || parsed.title || msg
+        }
+      } catch {}
+      setError(msg)
     }finally{
       setIsLoading(false)
     }
@@ -90,34 +104,55 @@ export default function Register(){
         ) : (
           <>
             {error && (
-              <div style={{
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
-                color: '#991b1b',
-                padding: '10px 14px',
-                borderRadius: 6,
-                marginBottom: 16,
-                fontSize: '0.9rem'
-              }}>
-                {error}
+              <div
+                role="alert"
+                style={{
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#991b1b',
+                  padding: '12px 14px',
+                  borderRadius: 8,
+                  marginBottom: 16,
+                  fontSize: '0.9rem',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  lineHeight: 1.45
+                }}
+              >
+                <svg
+                  style={{ width: 18, height: 18, flexShrink: 0, marginTop: 1, color: '#dc2626' }}
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <div>{error}</div>
               </div>
             )}
 
             <form onSubmit={submit} noValidate>
               <div className="form-group">
-                <label>Display Name</label>
+                <label htmlFor="reg-displayName">Display Name</label>
                 <input
+                  id="reg-displayName"
                   className="form-control"
                   type="text"
                   placeholder="e.g. Alex Smith"
                   value={displayName}
-                  onChange={e=>setDisplayName(e.target.value)}
+                  onChange={handleDisplayNameChange}
                 />
               </div>
 
               <div className="form-group">
-                <label>Email</label>
+                <label htmlFor="reg-email">Email</label>
                 <input
+                  id="reg-email"
                   className="form-control"
                   type="email"
                   placeholder="name@example.com"
@@ -141,8 +176,9 @@ export default function Register(){
               </div>
 
               <div className="form-group">
-                <label>Password (min 8 characters)</label>
+                <label htmlFor="reg-password">Password (min 8 characters)</label>
                 <input
+                  id="reg-password"
                   className="form-control"
                   type="password"
                   placeholder="••••••••"
