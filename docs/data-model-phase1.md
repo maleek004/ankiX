@@ -33,28 +33,20 @@ CREATE TABLE [dbo].[Decks] (
 CREATE TABLE [dbo].[Cards] (
     [Id] INT IDENTITY(1,1) PRIMARY KEY,
     [DeckId] INT NOT NULL REFERENCES [dbo].[Decks](Id),
-    [Type] NVARCHAR(50) NOT NULL, -- micro-coding | concept
-    [Prompt] NVARCHAR(MAX) NOT NULL,
-    [ValidationSpec] NVARCHAR(MAX) NULL, -- used for micro-coding cards
+    [Type] NVARCHAR(50) NOT NULL DEFAULT 'basic', -- basic | concept
+    [Prompt] NVARCHAR(MAX) NOT NULL, -- Markdown formatted prompt
+    [Answer] NVARCHAR(MAX) NOT NULL, -- Markdown formatted answer with code blocks
     [CreatedAt] DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
 );
 
-CREATE TABLE [dbo].[CardRuns] (
-    [Id] BIGINT IDENTITY(1,1) PRIMARY KEY,
-    [CardId] INT NOT NULL REFERENCES [dbo].[Cards](Id),
-    [UserId] INT NOT NULL REFERENCES [dbo].[Users](Id),
-    [SubmittedCode] NVARCHAR(MAX) NOT NULL,
-    [Result] BIT NULL, -- 1 pass, 0 fail, NULL pending/error
-    [ResultDetails] NVARCHAR(MAX) NULL,
-    [DurationMs] INT NULL,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
-);
+-- Note: CardRuns table dropped in migration 20260820010945_RenameValidationSpecToAnswerAndDropCardRuns.
+-- Code execution history is managed under Exercises.
 
 CREATE TABLE [dbo].[ReviewRecords] (
     [Id] BIGINT IDENTITY(1,1) PRIMARY KEY,
     [CardId] INT NOT NULL REFERENCES [dbo].[Cards](Id),
     [UserId] INT NOT NULL REFERENCES [dbo].[Users](Id),
-    [Outcome] NVARCHAR(10) NOT NULL, -- Hard | Good | Easy
+    [Outcome] NVARCHAR(10) NOT NULL, -- Again | Hard | Good | Easy
     [EaseFactor] DECIMAL(4,2) NOT NULL,
     [IntervalDays] INT NOT NULL,
     [NextReviewAt] DATETIME2 NOT NULL,
@@ -62,7 +54,6 @@ CREATE TABLE [dbo].[ReviewRecords] (
 );
 
 CREATE INDEX IX_Cards_DeckId ON [dbo].[Cards]([DeckId]);
-CREATE INDEX IX_CardRuns_UserId_CardId ON [dbo].[CardRuns]([UserId], [CardId]);
 CREATE INDEX IX_ReviewRecords_UserId_NextReviewAt ON [dbo].[ReviewRecords]([UserId], [NextReviewAt]);
 ```
 

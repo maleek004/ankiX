@@ -48,13 +48,13 @@ public class SearchControllerTests
         db.StudyGroups.Add(new StudyGroup { Id = 1, Name = "Joined Group", Slug = "joined-group", IsPublic = true });
         db.StudyGroupMembers.Add(new StudyGroupMember { StudyGroupId = 1, UserId = 10, Role = "Member" });
         db.Decks.Add(new Deck { Id = 101, Title = "Joined Group Data Structures", StudyGroupId = 1 });
-        db.Cards.Add(new Card { Id = 1001, DeckId = 101, Prompt = "Data Structures Card Prompt", Type = "basic" });
+        db.Cards.Add(new Card { Id = 1001, DeckId = 101, Prompt = "Data Structures Card Prompt", Answer = "Data Structures Answer", Type = "basic" });
         db.Exercises.Add(new Exercise { Id = 501, Title = "Data Structures Coding Exercise", StudyGroupId = 1 });
 
         // Group 2 (Public group, but User 10 has NOT joined)
         db.StudyGroups.Add(new StudyGroup { Id = 2, Name = "Unjoined Public Group", Slug = "unjoined-public", IsPublic = true });
         db.Decks.Add(new Deck { Id = 102, Title = "Unjoined Public Data Structures Deck", StudyGroupId = 2 });
-        db.Cards.Add(new Card { Id = 1002, DeckId = 102, Prompt = "Unjoined Public Data Structures Card Prompt", Type = "basic" });
+        db.Cards.Add(new Card { Id = 1002, DeckId = 102, Prompt = "Unjoined Public Data Structures Card Prompt", Answer = "Unjoined Answer", Type = "basic" });
         db.Exercises.Add(new Exercise { Id = 502, Title = "Unjoined Public Data Structures Exercise", StudyGroupId = 2 });
 
         // Group 3 (Private group, User 10 has NOT joined)

@@ -328,13 +328,13 @@ export async function getAllCards(studyGroupId = null){
   return res.json()
 }
 
-export async function createCard(deckId, prompt, validationSpec, type = 'basic'){
+export async function createCard(deckId, prompt, answer, type = 'basic'){
   let p = prompt
-  let v = validationSpec
+  let a = answer
   let t = type
   if (typeof prompt === 'object' && prompt !== null) {
     p = prompt.prompt
-    v = prompt.validationSpec
+    a = prompt.answer || prompt.validationSpec
     t = prompt.type
   }
   const cardType = t || 'basic'
@@ -343,9 +343,9 @@ export async function createCard(deckId, prompt, validationSpec, type = 'basic')
     headers: authHeaders(),
     body: JSON.stringify({
       deckId: Number(deckId),
-      type: cardType === 'micro-coding' ? 'micro-coding' : 'concept',
+      type: cardType,
       prompt: p,
-      validationSpec: v || null
+      answer: a
     })
   })
   if(!res.ok){

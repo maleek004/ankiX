@@ -88,7 +88,7 @@ public sealed class StudyQueueController : ControllerBase
                 DeckId         = c.DeckId,
                 Type           = c.Type,
                 Prompt         = c.Prompt,
-                ValidationSpec = c.ValidationSpec
+                Answer         = c.Answer
             }).ToList()
         });
     }

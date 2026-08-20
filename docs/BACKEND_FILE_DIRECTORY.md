@@ -36,9 +36,8 @@ This document provides a comprehensive inventory of all source files in the back
 
 - **`Controllers/AdminUsersController.cs`**: Manages admin administrative tasks, such as querying registered platform users and updating user role permissions (`User`, `Contributor`, `Admin`).
 - **`Controllers/AuthController.cs`**: Handles user authentication operations, including user registration, credential validation, and JWT token issuance.
-- **`Controllers/CardRunsController.cs`**: Handles code execution requests for cards with interactive code runners.
 - **`Controllers/ContentController.cs`**: Provides endpoints for browsing, retrieving, and inspecting global platform flashcards.
-- **`Controllers/DecksController.cs`**: Manages CRUD operations for study decks and their associated flashcards.
+- **`Controllers/DecksController.cs`**: Manages CRUD operations for study decks, flat-file card imports (CSV/TSV/JSON), and associated flashcards.
 - **`Controllers/ExercisesController.cs`**: Manages coding exercise creation, execution, personal collection enrollment, SRS queue reviews, and study group difficulty sorting.
 - **`Controllers/FollowupsController.cs`**: Handles asking follow-up questions on study cards, linking follow-ups to standalone answer cards, and unlinking cards.
 - **`Controllers/ReviewsController.cs`**: Handles recording SuperMemo SM-2 recall reviews for flashcards and updating review schedules.
@@ -51,10 +50,9 @@ This document provides a comprehensive inventory of all source files in the back
 ## 🗄️ Database Context & Entity Models
 
 - **`Data/ApplicationDbContext.cs`**: Configures the Entity Framework Core database context, entity table mappings, composite primary keys, indexes, and database relationships.
-- **`Models/Card.cs`**: Represents a flashcard entity containing its prompt, card type, validation spec, deck relationship, and creation timestamp.
+- **`Models/Card.cs`**: Represents a flashcard entity containing its Markdown prompt, card type, Markdown answer, deck relationship, and creation timestamp.
 - **`Models/CardExercise.cs`**: Represents the many-to-many join entity linking flashcards to their associated coding exercises.
 - **`Models/CardFollowup.cs`**: Represents a user follow-up question asked on a flashcard, tracking author info, question text, and linked answer card IDs.
-- **`Models/CardRun.cs`**: Stores historical code execution attempts submitted by users against flashcards or exercises.
 - **`Models/Deck.cs`**: Represents a study deck containing title, description, creator user ID, and associated flashcards.
 - **`Models/Exercise.cs`**: Represents a coding exercise containing its title, description, language, starter code, solution reference, test cases, and creator ID.
 - **`Models/ExerciseReviewRecord.cs`**: Tracks historical SuperMemo SM-2 review outcomes, ease factors, intervals, and next review timestamps for coding exercises.

@@ -8,11 +8,11 @@ public sealed class CardResponse
 
     public int DeckId { get; set; }
 
-    public string Type { get; set; } = string.Empty;
+    public string Type { get; set; } = "basic";
 
     public string Prompt { get; set; } = string.Empty;
 
-    public string? ValidationSpec { get; set; }
+    public string Answer { get; set; } = string.Empty;
 }
 
 public sealed class CreateCardRequest
@@ -20,26 +20,26 @@ public sealed class CreateCardRequest
     [Required]
     public int DeckId { get; set; }
 
-    [Required]
     [MaxLength(50)]
-    public string Type { get; set; } = string.Empty;
+    public string Type { get; set; } = "basic";
 
     [Required]
     public string Prompt { get; set; } = string.Empty;
 
-    public string? ValidationSpec { get; set; }
+    [Required]
+    public string Answer { get; set; } = string.Empty;
 }
 
 public sealed class UpdateCardRequest
 {
-    [Required]
     [MaxLength(50)]
-    public string Type { get; set; } = string.Empty;
+    public string Type { get; set; } = "basic";
 
     [Required]
     public string Prompt { get; set; } = string.Empty;
 
-    public string? ValidationSpec { get; set; }
+    [Required]
+    public string Answer { get; set; } = string.Empty;
 }
 
 public sealed class CopyCardRequest

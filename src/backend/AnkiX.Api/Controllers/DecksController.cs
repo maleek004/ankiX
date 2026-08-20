@@ -217,7 +217,7 @@ public sealed class DecksController : ControllerBase
                 DeckId = c.DeckId,
                 Type = c.Type,
                 Prompt = c.Prompt,
-                ValidationSpec = c.ValidationSpec
+                Answer = c.Answer
             })
             .ToListAsync();
 
@@ -271,7 +271,7 @@ public sealed class DecksController : ControllerBase
                 DeckId = card.DeckId,
                 Type = card.Type,
                 Prompt = card.Prompt,
-                ValidationSpec = card.ValidationSpec
+                Answer = card.Answer
             })
             .ToListAsync();
 
@@ -334,7 +334,7 @@ public sealed class DecksController : ControllerBase
         }
 
         var parsed = ParseFlatFileContent(fileContent, file.FileName);
-        return await ProcessImportedCards(deckId, parsed);
+        return await ImportCardsToDeck(deckId, parsed);
     }
 
     [HttpPost("{deckId:int}/import-cards-text")]
@@ -353,18 +353,18 @@ public sealed class DecksController : ControllerBase
         }
 
         var parsed = ParseFlatFileContent(request.Content, request.Format ?? "csv");
-        return await ProcessImportedCards(deckId, parsed);
+        return await ImportCardsToDeck(deckId, parsed);
     }
 
-    private async Task<ImportCardsResponse> ProcessImportedCards(int deckId, List<(string prompt, string type, string validationSpec)> parsedCards)
+    private async Task<ImportCardsResponse> ImportCardsToDeck(int deckId, List<(string prompt, string type, string answer)> parsedCards)
     {
         int importedCount = 0;
         int skippedCount = 0;
         var createdCards = new List<Card>();
 
-        foreach (var (prompt, type, validationSpec) in parsedCards)
+        foreach (var (prompt, type, answer) in parsedCards)
         {
-            if (string.IsNullOrWhiteSpace(prompt))
+            if (string.IsNullOrWhiteSpace(prompt) || string.IsNullOrWhiteSpace(answer))
             {
                 skippedCount++;
                 continue;
@@ -375,7 +375,7 @@ public sealed class DecksController : ControllerBase
                 DeckId = deckId,
                 Prompt = prompt,
                 Type = !string.IsNullOrWhiteSpace(type) ? type : "basic",
-                ValidationSpec = validationSpec,
+                Answer = answer,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -395,7 +395,7 @@ public sealed class DecksController : ControllerBase
             DeckId = c.DeckId,
             Type = c.Type,
             Prompt = c.Prompt,
-            ValidationSpec = c.ValidationSpec
+            Answer = c.Answer
         }).ToList();
 
         return new ImportCardsResponse
@@ -408,9 +408,9 @@ public sealed class DecksController : ControllerBase
         };
     }
 
-    private static List<(string prompt, string type, string validationSpec)> ParseFlatFileContent(string content, string fileNameOrFormat)
+    private static List<(string prompt, string type, string answer)> ParseFlatFileContent(string content, string fileNameOrFormat)
     {
-        var list = new List<(string prompt, string type, string validationSpec)>();
+        var list = new List<(string prompt, string type, string answer)>();
         if (string.IsNullOrWhiteSpace(content)) return list;
 
         string trimmed = content.Trim();
@@ -428,20 +428,11 @@ public sealed class DecksController : ControllerBase
                     {
                         string p = item.TryGetProperty("prompt", out var pProp) ? pProp.GetString() ?? "" : "";
                         string t = item.TryGetProperty("type", out var tProp) ? tProp.GetString() ?? "basic" : "basic";
-                        string v = "";
-                        if (item.TryGetProperty("validationSpec", out var vProp))
-                        {
-                            v = vProp.ValueKind == System.Text.Json.JsonValueKind.String ? vProp.GetString() ?? "" : vProp.GetRawText();
-                        }
-                        else if (item.TryGetProperty("answer", out var aProp))
-                        {
-                            string ans = aProp.GetString() ?? "";
-                            v = System.Text.Json.JsonSerializer.Serialize(new { answer = ans });
-                        }
+                        string a = item.TryGetProperty("answer", out var aProp) ? aProp.GetString() ?? "" : "";
 
-                        if (!string.IsNullOrWhiteSpace(p))
+                        if (!string.IsNullOrWhiteSpace(p) && !string.IsNullOrWhiteSpace(a))
                         {
-                            list.Add((p.Trim(), string.IsNullOrWhiteSpace(t) ? "basic" : t.Trim(), NormalizeValidationSpec(v)));
+                            list.Add((p.Trim(), string.IsNullOrWhiteSpace(t) ? "basic" : t.Trim(), a.Trim()));
                         }
                     }
                 }
@@ -479,37 +470,25 @@ public sealed class DecksController : ControllerBase
             if (string.IsNullOrWhiteSpace(prompt)) continue;
 
             string type = "basic";
-            string valSpec = "";
+            string answer = "";
 
             if (fields.Count == 2)
             {
-                valSpec = NormalizeValidationSpec(fields[1].Trim());
+                answer = fields[1].Trim();
             }
             else if (fields.Count >= 3)
             {
                 type = string.IsNullOrWhiteSpace(fields[1]) ? "basic" : fields[1].Trim();
-                valSpec = NormalizeValidationSpec(fields[2].Trim());
+                answer = fields[2].Trim();
             }
 
-            list.Add((prompt, type, valSpec));
+            if (!string.IsNullOrWhiteSpace(answer))
+            {
+                list.Add((prompt, type, answer));
+            }
         }
 
         return list;
-    }
-
-    private static string NormalizeValidationSpec(string spec)
-    {
-        if (string.IsNullOrWhiteSpace(spec)) return "{\"answer\":\"\"}";
-        spec = spec.Trim();
-        try
-        {
-            using var doc = System.Text.Json.JsonDocument.Parse(spec);
-            return spec;
-        }
-        catch
-        {
-            return System.Text.Json.JsonSerializer.Serialize(new { answer = spec });
-        }
     }
 
     private static List<string> ParseCsvLine(string line, char delimiter)

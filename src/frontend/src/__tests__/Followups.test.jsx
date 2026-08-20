@@ -10,9 +10,9 @@ const { mockGetDeck, mockGetStudyQueue, mockGetCards, mockGetFollowups, mockGetC
     newCount: 1,
     learningCount: 0,
     reviewCount: 0,
-    dueCards: [{ id: 10, prompt: 'What is 2+2?', type: 'basic', validationSpec: '4' }]
+    dueCards: [{ id: 10, prompt: 'What is 2+2?', type: 'basic', answer: '4' }]
   }),
-  mockGetCards: vi.fn().mockResolvedValue([{ id: 10, prompt: 'What is 2+2?', type: 'basic', validationSpec: '4' }]),
+  mockGetCards: vi.fn().mockResolvedValue([{ id: 10, prompt: 'What is 2+2?', type: 'basic', answer: '4' }]),
   mockGetFollowups: vi.fn().mockResolvedValue([
     { id: 101, questionText: 'Followup 1', authorDisplayName: 'User A', createdAt: '2026-08-08T00:00:00Z' },
     { id: 102, questionText: 'Followup 2', authorDisplayName: 'User B', createdAt: '2026-08-08T00:00:00Z' }
@@ -35,7 +35,8 @@ vi.mock('../api.js', () => ({
   getEffectiveDisplayName: (displayName, email) => displayName || (email ? email.split('@')[0] : 'User'),
   canCreateContent: () => true,
   getDecks: async () => [],
-  getAllCards: async () => []
+  getAllCards: async () => [],
+  getUser: () => ({ id: 1, email: 'test@example.com', role: 'Admin' })
 }))
 
 test('Deck renders followups in a scrollable list container', async () => {

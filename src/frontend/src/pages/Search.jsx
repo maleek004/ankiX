@@ -4,6 +4,7 @@ import { globalSearch, getEffectiveDisplayName } from '../api'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import ExercisePracticeModal from './Exercises'
 import CopyModal from '../components/CopyModal'
+import MarkdownViewer from '../components/MarkdownViewer'
 
 export default function Search() {
   const { activeStudyGroup } = useStudyGroup() || {}
@@ -217,9 +218,8 @@ export default function Search() {
                       alignItems: 'center'
                     }}
                   >
-                    <div>
+                    <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <strong style={{ fontSize: '0.95rem' }}>{c.prompt}</strong>
                         <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: '#e7f5ff', color: '#1864ab' }}>
                           {c.type}
                         </span>
@@ -227,10 +227,14 @@ export default function Search() {
                           in <strong>{c.deckTitle}</strong>
                         </span>
                       </div>
-                      {c.validationSpec && (
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#6c757d', fontFamily: 'Consolas, Monaco, monospace' }}>
-                          Answer: {c.validationSpec}
-                        </p>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#1f2937', marginBottom: 4 }}>
+                        <MarkdownViewer content={c.prompt} />
+                      </div>
+                      {(c.answer || c.validationSpec) && (
+                        <div style={{ margin: 0, fontSize: '0.85rem', color: '#4b5563', borderTop: '1px dashed #e5e7eb', paddingTop: 4 }}>
+                          <span style={{ fontWeight: 600, color: '#6b7280' }}>Answer: </span>
+                          <MarkdownViewer content={c.answer || c.validationSpec} />
+                        </div>
                       )}
                     </div>
 

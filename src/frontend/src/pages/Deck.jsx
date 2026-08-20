@@ -4,6 +4,8 @@ import ExerciseRenderer from '../components/ExerciseComponents'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import CopyModal from '../components/CopyModal'
 import AuthModal from '../components/AuthModal'
+import MarkdownViewer from '../components/MarkdownViewer'
+import MarkdownField from '../components/MarkdownField'
 import * as api from '../api'
 
 export default function Deck(){
@@ -31,8 +33,7 @@ export default function Deck(){
   // Edit / Admin mode toggle
   const [isEditing, setIsEditing]           = useState(false)
   const [prompt, setPrompt]                 = useState('')
-  const [validationSpec, setValidationSpec] = useState('')
-  const [type, setType]                     = useState('basic')
+  const [answer, setAnswer]                 = useState('')
 
   // Followups & Linked Exercises
   const [showFollowups, setShowFollowups]             = useState(false)
@@ -208,12 +209,12 @@ export default function Deck(){
   // ── Edit Drawer ───────────────────────────────────────────────────────────
   const addCard = async (e) => {
     e.preventDefault()
-    if(!prompt.trim()) return
+    if(!prompt.trim() || !answer.trim()) return
     setIsAddingCard(true)
     try{
-      const c = await api.createCard(id, prompt, validationSpec, type)
+      const c = await api.createCard(id, prompt.trim(), answer.trim(), 'basic')
       setAllCards(prev => [...prev, c])
-      setPrompt(''); setValidationSpec(''); setType('basic')
+      setPrompt(''); setAnswer('');
       alert('Card added!')
       await loadQueue() // refresh queue counts
     }catch(err){ alert('Create card failed: ' + (err.message || err)) }
@@ -300,52 +301,83 @@ export default function Deck(){
         <div className="form-card" style={{ marginBottom: 24 }}>
           <h3 style={{ marginTop: 0 }}>Add New Card to Deck</h3>
           <form onSubmit={addCard}>
-            <div className="form-group">
-              <label>Prompt / Question</label>
-              <input className="form-control" value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="Enter question or problem" required />
-            </div>
-            <div className="form-group">
-              <label>Validation Spec / Answer</label>
-              <input className="form-control" value={validationSpec} onChange={e=>setValidationSpec(e.target.value)} placeholder='Answer or {"answer":"Paris"}' />
-            </div>
-            <div className="form-group">
-              <label>Type</label>
-              <select className="form-control" value={type} onChange={e=>setType(e.target.value)}>
-                <option value="basic">basic</option>
-                <option value="micro-coding">micro-coding</option>
-              </select>
-            </div>
-            <button type="submit" className="btn-primary" disabled={isAddingCard}>
-              {isAddingCard ? 'Adding Card...' : 'Add Card'}
+            <MarkdownField
+              label="Question / Prompt"
+              value={prompt}
+              onChange={e => setPrompt(e.target.value)}
+              placeholder="Type card question or prompt using Markdown (supports ```code, **bold**, etc.)..."
+              required
+              rows={3}
+            />
+            <MarkdownField
+              label="Answer"
+              value={answer}
+              onChange={e => setAnswer(e.target.value)}
+              placeholder="Type answer in Markdown with syntax-highlighted code blocks, explanations, etc..."
+              required
+              rows={4}
+            />
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={isAddingCard || !prompt.trim() || !answer.trim()}
+            >
+              {isAddingCard ? 'Adding Card...' : 'Add Flashcard'}
             </button>
           </form>
 
           <h4 style={{ marginTop: 24, marginBottom: 12 }}>Existing Cards ({allCards.length})</h4>
-          <ul style={{ paddingLeft: 20 }}>
+          <ul style={{ paddingLeft: 0, listStyle: 'none' }}>
             {allCards.map(c => (
-              <li key={c.id} style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span><strong>{c.prompt}</strong> ({c.type})</span>
-                <button
-                  className="btn-study-tool"
-                  style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#0d6efd', color: '#0d6efd' }}
-                  onClick={() => setCopyModalCard(c)}
-                >
-                  📋 Copy
-                </button>
-                <button
-                  className="btn-study-tool"
-                  style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#0d6efd', color: '#0d6efd' }}
-                  onClick={() => setLinkerModalCard(c)}
-                >
-                  🔗 Link Exercises
-                </button>
-                <button
-                  style={{ color: '#dc3545', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem' }}
-                  disabled={deletingCardId === c.id}
-                  onClick={() => removeCard(c.id)}
-                >
-                  {deletingCardId === c.id ? '[Deleting...]' : '[Delete]'}
-                </button>
+              <li
+                key={c.id}
+                style={{
+                  marginBottom: 12,
+                  padding: 12,
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 8,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: 12
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>
+                    <MarkdownViewer content={c.prompt} />
+                  </div>
+                  {(c.answer || c.validationSpec) && (
+                    <div style={{ fontSize: '0.85rem', color: '#4b5563', borderTop: '1px dashed #e5e7eb', paddingTop: 6, marginTop: 6 }}>
+                      <span style={{ fontWeight: 600, color: '#6b7280' }}>Answer:</span>
+                      <MarkdownViewer content={c.answer || c.validationSpec} />
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button
+                    className="btn-study-tool"
+                    style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#0d6efd', color: '#0d6efd' }}
+                    onClick={() => setCopyModalCard(c)}
+                  >
+                    📋 Copy
+                  </button>
+                  <button
+                    className="btn-study-tool"
+                    style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#0d6efd', color: '#0d6efd' }}
+                    onClick={() => setLinkerModalCard(c)}
+                  >
+                    🔗 Link
+                  </button>
+                  <button
+                    style={{ color: '#dc3545', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem' }}
+                    disabled={deletingCardId === c.id}
+                    onClick={() => removeCard(c.id)}
+                  >
+                    {deletingCardId === c.id ? '[Deleting...]' : '[Delete]'}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -417,7 +449,9 @@ export default function Deck(){
           <div className="card-viewer-area">
             {/* Front Prompt */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-              <div className="card-prompt" style={{ flex: 1 }}>{currentCard.prompt}</div>
+              <div className="card-prompt" style={{ flex: 1 }}>
+                <MarkdownViewer content={currentCard.prompt} />
+              </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button
                   className="btn-study-tool"
@@ -438,25 +472,12 @@ export default function Deck(){
               </div>
             </div>
 
-
-            {/* Micro-coding Editor */}
-            {currentCard.type === 'micro-coding' && (
-              <div className="code-box">
-                <textarea
-                  className="code-input"
-                  placeholder="// Type your code solution here..."
-                  value={userCode}
-                  onChange={e=>setUserCode(e.target.value)}
-                />
-              </div>
-            )}
-
             {/* Answer Section — revealed after Show Answer */}
             {showAnswer && (
               <>
                 <hr className="card-divider" />
                 <div className="card-answer">
-                  {currentCard.validationSpec || 'Correct answer verified.'}
+                  <MarkdownViewer content={currentCard.answer || currentCard.validationSpec || 'Correct answer verified.'} />
                 </div>
 
                 {/* ── Followups & Linked Exercises Toggles (Only visible after answer is shown) ── */}
@@ -1345,8 +1366,7 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
   const [newPrompt, setNewPrompt] = useState(followup?.questionText || '')
   const [decks, setDecks] = useState([])
   const [targetDeckId, setTargetDeckId] = useState(currentDeckId || '')
-  const [validationSpec, setValidationSpec] = useState('')
-  const [type, setType] = useState('basic')
+  const [answer, setAnswer] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -1381,12 +1401,12 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
 
   const handleCreateAndLink = async (e) => {
     e.preventDefault()
-    if (!targetDeckId || !newPrompt.trim()) return
+    if (!targetDeckId || !newPrompt.trim() || !answer.trim()) return
     setSaving(true)
     try {
       const m = await import('../api.js')
-      // 1. Create card in selected target deck with user-defined prompt
-      const newCard = await m.createCard(targetDeckId, newPrompt.trim(), validationSpec, type)
+      // 1. Create card in selected target deck with user-defined prompt and answer
+      const newCard = await m.createCard(targetDeckId, newPrompt.trim(), answer.trim(), 'basic')
 
       // 2. Link followup question to new card
       await m.linkFollowupToCard(parentCard.id, followup.id, newCard.id)
@@ -1404,6 +1424,7 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
     if (!searchQuery.trim()) return true
     const q = searchQuery.toLowerCase()
     return c.prompt.toLowerCase().includes(q) ||
+           (c.answer && c.answer.toLowerCase().includes(q)) ||
            (c.validationSpec && c.validationSpec.toLowerCase().includes(q))
   })
 
@@ -1419,189 +1440,163 @@ function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, on
         background: 'rgba(0, 0, 0, 0.65)',
         backdropFilter: 'blur(4px)',
         display: 'flex',
-        alignItems: 'center',
         justifyContent: 'center',
+        alignItems: 'center',
         padding: 16
       }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      onClick={onClose}
     >
       <div
         style={{
-          margin: 'auto',
-          width: '90%',
-          maxWidth: 750,
-          maxHeight: '85vh',
-          background: '#fff',
+          background: '#ffffff',
           borderRadius: 12,
-          boxShadow: '0 20px 40px rgba(0,0,0,0.35)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
+          maxWidth: 640,
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+          padding: 24
         }}
+        onClick={e => e.stopPropagation()}
       >
-        {/* Header Bar */}
-        <div style={{ padding: '16px 24px', background: '#f8f9fa', borderBottom: '1px solid #dee2e6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>🎴 Resolve Follow-up Question</h3>
-            <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>Question: "{followup.questionText.length > 50 ? followup.questionText.substring(0, 50) + '...' : followup.questionText}"</span>
-          </div>
-          <button style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.4rem', color: '#6c757d' }} onClick={onClose}>✕</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#212529' }}>Turn Follow-up into Flashcard</h3>
+          <button style={{ border: 'none', background: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#6c757d' }} onClick={onClose}>✕</button>
         </div>
 
-        {/* Tab Buttons */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #dee2e6', background: '#fff' }}>
+        {/* Tab Toggle */}
+        <div style={{ display: 'flex', borderBottom: '2px solid #dee2e6', marginBottom: 16 }}>
           <button
             style={{
-              flex: 1,
-              padding: '12px 16px',
+              padding: '8px 16px',
+              fontSize: '0.9rem',
+              fontWeight: 600,
               border: 'none',
-              borderBottom: activeTab === 'link' ? '3px solid #0d6efd' : 'none',
-              background: activeTab === 'link' ? '#fff' : '#f8f9fa',
-              fontWeight: activeTab === 'link' ? 600 : 400,
-              color: activeTab === 'link' ? '#0d6efd' : '#495057',
-              cursor: 'pointer'
+              background: 'none',
+              cursor: 'pointer',
+              borderBottom: activeTab === 'link' ? '3px solid #0d6efd' : '3px solid transparent',
+              color: activeTab === 'link' ? '#0d6efd' : '#495057'
             }}
             onClick={() => setActiveTab('link')}
           >
-            🔗 Link to Existing Card ({existingCards.length})
+            🔗 Link to Existing Card
           </button>
           <button
             style={{
-              flex: 1,
-              padding: '12px 16px',
+              padding: '8px 16px',
+              fontSize: '0.9rem',
+              fontWeight: 600,
               border: 'none',
-              borderBottom: activeTab === 'create' ? '3px solid #0d6efd' : 'none',
-              background: activeTab === 'create' ? '#fff' : '#f8f9fa',
-              fontWeight: activeTab === 'create' ? 600 : 400,
-              color: activeTab === 'create' ? '#0d6efd' : '#495057',
-              cursor: 'pointer'
+              background: 'none',
+              cursor: 'pointer',
+              borderBottom: activeTab === 'create' ? '3px solid #0d6efd' : '3px solid transparent',
+              color: activeTab === 'create' ? '#0d6efd' : '#495057'
             }}
             onClick={() => setActiveTab('create')}
           >
-            + Create New Standalone Card
+            ✨ Create New Card & Link
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
-          {activeTab === 'link' ? (
-            <div>
-              <div style={{ marginBottom: 16 }}>
-                <input
-                  className="form-control"
-                  placeholder="Type keyword to search existing cards by prompt or answer..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                />
-              </div>
+        {activeTab === 'link' ? (
+          <div>
+            <input
+              className="form-control"
+              placeholder="Search existing cards by prompt or answer..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ marginBottom: 12 }}
+            />
 
-              {loadingCards ? (
-                <div style={{ textAlign: 'center', padding: 20, color: '#6c757d' }}>Loading cards catalog...</div>
-              ) : filteredCards.length === 0 ? (
-                <div className="empty-state">No matching cards found in this study group. Try another search or create a new card in the tab above!</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {filteredCards.map(c => (
-                    <div
-                      key={c.id}
-                      style={{
-                        padding: 12,
-                        border: '1px solid #dee2e6',
-                        borderRadius: 8,
-                        background: '#fff',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <strong style={{ fontSize: '0.95rem' }}>{c.prompt}</strong>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#e7f5ff', color: '#1864ab' }}>
-                            {c.type}
-                          </span>
-                        </div>
-                        {c.validationSpec && (
-                          <p style={{ margin: 0, fontSize: '0.8rem', color: '#6c757d', maxWidth: 480, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            Answer: {c.validationSpec}
-                          </p>
-                        )}
-                      </div>
-
-                      <button
-                        className="btn-primary"
-                        disabled={saving}
-                        style={{ padding: '6px 14px', fontSize: '0.85rem' }}
-                        onClick={() => handleLinkExistingCard(c.id)}
-                      >
-                        Link to this Card 🔗
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <form onSubmit={handleCreateAndLink} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Question / Prompt Field */}
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 6 }}>Question / Prompt</label>
-                <input
-                  className="form-control"
-                  value={newPrompt}
-                  onChange={e => setNewPrompt(e.target.value)}
-                  placeholder="Enter question or prompt for the new card..."
-                  required
-                />
-              </div>
-
-              {/* Target Deck & Card Type */}
-              <div style={{ display: 'flex', gap: 12 }}>
-                <div style={{ flex: 2 }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Target Deck</label>
-                  <select
-                    className="form-control"
-                    value={targetDeckId}
-                    onChange={e => setTargetDeckId(e.target.value)}
-                    required
+            {loadingCards ? (
+              <div style={{ textAlign: 'center', padding: 20, color: '#6c757d' }}>Loading cards catalog...</div>
+            ) : filteredCards.length === 0 ? (
+              <div className="empty-state">No matching cards found in this study group. Try another search or create a new card in the tab above!</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {filteredCards.map(c => (
+                  <div
+                    key={c.id}
+                    style={{
+                      padding: 12,
+                      border: '1px solid #dee2e6',
+                      borderRadius: 8,
+                      background: '#fff',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
                   >
-                    {decks.map(d => (
-                      <option key={d.id} value={d.id}>{d.title}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Card Type</label>
-                  <select className="form-control" value={type} onChange={e => setType(e.target.value)}>
-                    <option value="basic">basic</option>
-                    <option value="micro-coding">micro-coding</option>
-                  </select>
-                </div>
-              </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <strong style={{ fontSize: '0.95rem' }}>{c.prompt}</strong>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#e7f5ff', color: '#1864ab' }}>
+                          {c.type}
+                        </span>
+                      </div>
+                      {(c.answer || c.validationSpec) && (
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#6c757d', maxWidth: 480, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          Answer: {c.answer || c.validationSpec}
+                        </p>
+                      )}
+                    </div>
 
-              {/* Validation Spec / Answer Field */}
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Validation Spec / Answer</label>
-                <textarea
-                  className="form-control"
-                  rows={4}
-                  placeholder='Answer or JSON spec (e.g. {"answer":"4"})'
-                  value={validationSpec}
-                  onChange={e => setValidationSpec(e.target.value)}
-                  style={{ fontFamily: 'Consolas, Monaco, monospace', fontSize: '0.9rem' }}
-                />
+                    <button
+                      className="btn-primary"
+                      disabled={saving}
+                      style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+                      onClick={() => handleLinkExistingCard(c.id)}
+                    >
+                      Link to this Card 🔗
+                    </button>
+                  </div>
+                ))}
               </div>
+            )}
+          </div>
+        ) : (
+          <form onSubmit={handleCreateAndLink} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <MarkdownField
+              label="Question / Prompt"
+              value={newPrompt}
+              onChange={e => setNewPrompt(e.target.value)}
+              placeholder="Enter question or prompt for the new card in Markdown..."
+              required
+              rows={3}
+            />
 
-              {/* Submit Button */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
-                <button type="button" className="btn-study-tool" onClick={onClose}>Cancel</button>
-                <button type="submit" className="btn-primary" disabled={saving || !newPrompt.trim()}>
-                  {saving ? 'Converting Card...' : 'Save & Link Standalone Card 🎴'}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 6 }}>Target Deck</label>
+              <select
+                className="form-control"
+                value={targetDeckId}
+                onChange={e => setTargetDeckId(e.target.value)}
+                required
+              >
+                {decks.map(d => (
+                  <option key={d.id} value={d.id}>{d.title}</option>
+                ))}
+              </select>
+            </div>
+
+            <MarkdownField
+              label="Answer"
+              value={answer}
+              onChange={e => setAnswer(e.target.value)}
+              placeholder="Type answer in Markdown with syntax-highlighted code blocks, explanations, etc..."
+              required
+              rows={4}
+            />
+
+            {/* Submit Button */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
+              <button type="button" className="btn-study-tool" onClick={onClose}>Cancel</button>
+              <button type="submit" className="btn-primary" disabled={saving || !newPrompt.trim() || !answer.trim()}>
+                {saving ? 'Converting Card...' : 'Save & Link Standalone Card 🎴'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   )
@@ -1714,14 +1709,14 @@ function CardPreviewModal({ modalData, onClose, onUnlinked }) {
           <div>
             <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 6 }}>Card Question / Prompt</label>
             <div style={{ padding: 14, background: '#f8f9fa', borderRadius: 8, border: '1px solid #dee2e6', fontSize: '1rem', fontWeight: 500, color: '#212529' }}>
-              {currentCard?.prompt}
+              <MarkdownViewer content={currentCard?.prompt} />
             </div>
           </div>
 
           <div>
-            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 6 }}>Card Validation Spec / Answer</label>
-            <div style={{ padding: 14, background: '#e7f5ff', borderRadius: 8, border: '1px solid #a5d8ff', fontFamily: 'Consolas, Monaco, monospace', fontSize: '0.95rem', color: '#1864ab', whiteSpace: 'pre-wrap' }}>
-              {currentCard?.validationSpec || 'No specific answer text configured.'}
+            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 6 }}>Card Answer</label>
+            <div style={{ padding: 14, background: '#e7f5ff', borderRadius: 8, border: '1px solid #a5d8ff', fontSize: '0.95rem', color: '#1864ab' }}>
+              <MarkdownViewer content={currentCard?.answer || currentCard?.validationSpec || 'No specific answer text configured.'} />
             </div>
           </div>
 
@@ -1812,8 +1807,8 @@ function ImportCardsModal({ deckId, onClose, onImportSuccess }) {
         <div style={{ background: '#e7f5ff', border: '1px solid #a5d8ff', borderRadius: 8, padding: 14, fontSize: '0.85rem', color: '#1864ab', marginBottom: 16 }}>
           <strong>Supported Flat File Formats:</strong>
           <ul style={{ margin: '6px 0 0 0', paddingLeft: 18 }}>
-            <li><strong>CSV / TSV (.csv, .tsv, .txt):</strong> <code>Prompt, Answer</code> OR <code>Prompt, Type, ValidationSpec</code></li>
-            <li><strong>JSON (.json):</strong> <code>[ &#123; "prompt": "...", "type": "basic", "validationSpec": "..." &#125; ]</code></li>
+            <li><strong>CSV / TSV (.csv, .tsv, .txt):</strong> <code>Prompt, Answer</code> (supports multi-line Markdown)</li>
+            <li><strong>JSON (.json):</strong> <code>[ &#123; "prompt": "...", "answer": "..." &#125; ]</code></li>
           </ul>
         </div>
 
@@ -1892,7 +1887,7 @@ function ImportCardsModal({ deckId, onClose, onImportSuccess }) {
                 <textarea
                   className="form-control"
                   rows={8}
-                  placeholder={textFormat === 'json' ? '[\n  { "prompt": "What is binary search?", "type": "basic", "validationSpec": "O(log n)" }\n]' : 'Question 1, Answer 1\nQuestion 2, Answer 2'}
+                  placeholder={textFormat === 'json' ? '[\n  { "prompt": "What is binary search?", "answer": "O(log n)" }\n]' : 'Question 1, Answer 1\nQuestion 2, Answer 2'}
                   value={rawText}
                   onChange={e => setRawText(e.target.value)}
                   style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}

@@ -355,9 +355,9 @@ if (shouldSeed)
         db.SaveChanges();
 
         db.Cards.AddRange(new[] {
-            new Card { DeckId = deck.Id, Type = "basic", Prompt = "What is the time complexity of Binary Search?", ValidationSpec = "{\"answer\":\"O(log n)\"}", CreatedAt = DateTime.UtcNow },
-            new Card { DeckId = deck.Id, Type = "micro-coding", Prompt = "Write a C# method that reverses a string in-place.", ValidationSpec = "{\"answer\":\"Reverse\"}", CreatedAt = DateTime.UtcNow },
-            new Card { DeckId = deck.Id, Type = "micro-coding", Prompt = "Write a Python function for Two Sum problem.", ValidationSpec = "{\"answer\":\"seen\"}", CreatedAt = DateTime.UtcNow }
+            new Card { DeckId = deck.Id, Type = "basic", Prompt = "What is the time complexity of Binary Search?", Answer = "The time complexity is `O(log n)` because the search space is halved in each step.", CreatedAt = DateTime.UtcNow },
+            new Card { DeckId = deck.Id, Type = "basic", Prompt = "Write a C# method that reverses a string in-place or using Array.Reverse.", Answer = "```csharp\npublic static string ReverseString(string s)\n{\n    char[] arr = s.ToCharArray();\n    Array.Reverse(arr);\n    return new string(arr);\n}\n```", CreatedAt = DateTime.UtcNow },
+            new Card { DeckId = deck.Id, Type = "basic", Prompt = "Write a Python function for Two Sum problem.", Answer = "```python\ndef two_sum(nums: list[int], target: int) -> list[int]:\n    seen = {}\n    for i, num in enumerate(nums):\n        complement = target - num\n        if complement in seen:\n            return [seen[complement], i]\n        seen[num] = i\n    return []\n```", CreatedAt = DateTime.UtcNow }
         });
         db.SaveChanges();
     }
@@ -500,8 +500,8 @@ if (shouldSeed)
         db.SaveChanges();
 
         // Link seeded cards to exercises
-        var microCard1 = db.Cards.FirstOrDefault(c => c.Type == "micro-coding" && c.Prompt.Contains("C#"));
-        var microCard2 = db.Cards.FirstOrDefault(c => c.Type == "micro-coding" && c.Prompt.Contains("Python"));
+        var microCard1 = db.Cards.FirstOrDefault(c => c.Prompt.Contains("C#"));
+        var microCard2 = db.Cards.FirstOrDefault(c => c.Prompt.Contains("Python"));
 
         if (microCard1 != null) db.CardExercises.Add(new CardExercise { CardId = microCard1.Id, ExerciseId = ex2.Id });
         if (microCard2 != null) db.CardExercises.Add(new CardExercise { CardId = microCard2.Id, ExerciseId = ex1.Id });

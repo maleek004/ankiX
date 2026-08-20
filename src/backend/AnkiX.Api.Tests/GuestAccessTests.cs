@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using AnkiX.Api.Contracts.Content;
 using AnkiX.Api.Contracts.Study;
 using AnkiX.Api.Controllers;
@@ -118,8 +118,8 @@ public class GuestAccessTests
             new Deck { Id = 20, Title = "Private Deck", StudyGroupId = 2, CreatedByUserId = 2, CreatedAt = DateTime.UtcNow }
         );
         db.Cards.AddRange(
-            new Card { Id = 101, DeckId = 10, Prompt = "Public Q", ValidationSpec = "{\"answer\":\"A\"}", CreatedAt = DateTime.UtcNow },
-            new Card { Id = 201, DeckId = 20, Prompt = "Private Q", ValidationSpec = "{\"answer\":\"B\"}", CreatedAt = DateTime.UtcNow }
+            new Card { Id = 101, DeckId = 10, Prompt = "Public Q", Answer = "A", CreatedAt = DateTime.UtcNow },
+            new Card { Id = 201, DeckId = 20, Prompt = "Private Q", Answer = "B", CreatedAt = DateTime.UtcNow }
         );
         await db.SaveChangesAsync();
 
@@ -174,33 +174,6 @@ public class GuestAccessTests
 
         // Verify zero review records were written
         Assert.Equal(0, await db.ExerciseReviewRecords.CountAsync());
-    }
-
-    [Fact]
-    public async Task CardRuns_RunCardCodeEphemeral_ExecutesWithoutPersistingCardRunRecord()
-    {
-        using var db = CreateInMemoryDbContext();
-        db.StudyGroups.Add(new StudyGroup { Id = 1, Name = "Public", Slug = "pub", IsPublic = true, CreatedByUserId = 1, CreatedAt = DateTime.UtcNow });
-        db.Decks.Add(new Deck { Id = 10, Title = "Public Deck", StudyGroupId = 1, CreatedByUserId = 1, CreatedAt = DateTime.UtcNow });
-        db.Cards.Add(new Card { Id = 101, DeckId = 10, Prompt = "Return 42", ValidationSpec = "{\"answer\":\"42\"}", CreatedAt = DateTime.UtcNow });
-        await db.SaveChangesAsync();
-
-        var options = Microsoft.Extensions.Options.Options.Create(new ExecutionApiOptions());
-        var execService = new CodeExecutionService(new HttpClient(), options);
-        var controller = new CardRunsController(db, execService)
-        {
-            ControllerContext = CreateAnonymousContext()
-        };
-
-        var request = new CodeRunRequest { SubmittedCode = "42", Language = "csharp" };
-        var result = await controller.RunCardCodeEphemeral(101, request, CancellationToken.None);
-
-        var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var response = Assert.IsType<CodeRunResponse>(okResult.Value);
-
-        Assert.Equal(0, response.RunId);
-        // Verify no CardRun was written to DB
-        Assert.Equal(0, await db.CardRuns.CountAsync());
     }
 
     [Fact]

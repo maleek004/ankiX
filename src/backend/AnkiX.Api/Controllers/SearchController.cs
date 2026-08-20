@@ -22,8 +22,8 @@ public sealed class CardSearchResult
     public int DeckId { get; set; }
     public string DeckTitle { get; set; } = string.Empty;
     public string Prompt { get; set; } = string.Empty;
-    public string? ValidationSpec { get; set; }
-    public string Type { get; set; } = string.Empty;
+    public string Answer { get; set; } = string.Empty;
+    public string Type { get; set; } = "basic";
 }
 
 public sealed class ExerciseSearchResult
@@ -175,7 +175,7 @@ public sealed class SearchController : ControllerBase
         {
             List<Card> matchingCards = await dbContext.Cards.AsNoTracking()
                 .Where(c => scopedDeckIds.Contains(c.DeckId))
-                .Where(c => EF.Functions.Like(c.Prompt, pattern) || (c.ValidationSpec != null && EF.Functions.Like(c.ValidationSpec, pattern)))
+                .Where(c => EF.Functions.Like(c.Prompt, pattern) || EF.Functions.Like(c.Answer, pattern))
                 .Take(25)
                 .ToListAsync();
 
@@ -185,7 +185,7 @@ public sealed class SearchController : ControllerBase
                 DeckId = c.DeckId,
                 DeckTitle = deckTitles.GetValueOrDefault(c.DeckId, "Deck"),
                 Prompt = c.Prompt,
-                ValidationSpec = c.ValidationSpec,
+                Answer = c.Answer,
                 Type = c.Type
             }).ToList();
         }

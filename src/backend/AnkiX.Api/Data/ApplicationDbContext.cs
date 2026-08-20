@@ -15,8 +15,6 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<Card> Cards => Set<Card>();
 
-    public DbSet<CardRun> CardRuns => Set<CardRun>();
-
     public DbSet<ReviewRecord> ReviewRecords => Set<ReviewRecord>();
 
     // Phase 1 stubs — Exercise functionality implemented in Phase 2
@@ -56,9 +54,6 @@ public sealed class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<Card>()
             .HasIndex(card => card.DeckId);
-
-        modelBuilder.Entity<CardRun>()
-            .HasIndex(run => new { run.UserId, run.CardId });
 
         modelBuilder.Entity<ReviewRecord>()
             .HasIndex(record => new { record.UserId, record.NextReviewAt });

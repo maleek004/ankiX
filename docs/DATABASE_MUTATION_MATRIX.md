@@ -59,9 +59,9 @@ The AnkiX platform persistence layer is built on Entity Framework Core mapped to
 |---|---|---|---|---|
 | **`Users`** | `POST /api/auth/register`<br/>`POST /api/admin/users`<br/>`Program.cs` (Seed) | `PUT /api/admin/users/{id}/role`<br/>↳ `Role` | None (Permanent user retention) | Unique index on `Email`; timing-safe password hash verify; `409 Conflict` duplicate check |
 | **`Decks`** | `POST /api/content/decks`<br/>`POST /api/decks`<br/>`Program.cs` (Seed) | `PUT /api/content/decks/{id}`<br/>`PUT /api/decks/{id}`<br/>↳ `Title`, `Description` | `DELETE /api/content/decks/{id}`<br/>`DELETE /api/decks/{id}`<br/>*(Blocked if cards exist)* | Ownership/Role check (`CanManageContentAsync`); foreign key guard prevents deck deletion with cards (`409 Conflict`) |
-| **`Cards`** | `POST /api/content/cards`<br/>`POST /api/decks/{id}/cards`<br/>`POST /api/decks/{id}/import`<br/>`Program.cs` (Seed) | `PUT /api/content/cards/{id}`<br/>`PUT /api/decks/{id}/cards/{id}`<br/>↳ `Type`, `Prompt`, `ValidationSpec` | `DELETE /api/content/cards/{id}`<br/>`DELETE /api/decks/{id}/cards/{id}` | Type discriminator validation (`micro-coding`, `concept`, `basic`); parent Deck existence check |
+| **`Cards`** | `POST /api/content/cards`<br/>`POST /api/decks/{id}/cards`<br/>`POST /api/decks/{id}/import-cards`<br/>`POST /api/decks/{id}/import-cards-text`<br/>`Program.cs` (Seed) | `PUT /api/content/cards/{id}`<br/>`PUT /api/decks/{id}/cards/{id}`<br/>↳ `Type`, `Prompt`, `Answer` | `DELETE /api/content/cards/{id}`<br/>`DELETE /api/decks/{id}/cards/{id}` | Type discriminator (`basic`, `concept`); required non-empty Markdown `Prompt` & `Answer`; parent Deck existence check |
 | **`ReviewRecords`** | `POST /api/reviews` | None (Append-only immutable audit ledger) | None | Compound index on `(UserId, NextReviewAt)`; outcome validation regex (`Again\|Hard\|Good\|Easy`) |
-| **`CardRuns`** | `POST /api/cards/{id}/run` | None (Append-only execution history) | None | Compound index on `(UserId, CardId)`; timeout cancellation token (5s execution boundary) |
+| *~~`CardRuns`~~* | *Dropped in Migration* | *N/A (Code execution migrated to Exercises)* | *N/A* | *Table dropped; execution runs live under `POST /api/exercises/{id}/run`* |
 | **`CardFollowups`** | `POST /api/cards/{id}/followups` | `PATCH /api/cards/{id}/followups/{id}/link`<br/>↳ `LinkedCardId`, `LinkedCardIds`<br/>`DELETE /api/cards/{id}/followups/{id}/link/{linkedId}`<br/>↳ `LinkedCardId`, `LinkedCardIds` | None (Question text preserved) | `CanManageContentAsync` authorization on link/unlink; deduplicated CSV helper methods (`AddLinkedCardId`, `RemoveLinkedCardId`) |
 | **`Exercises`** | `POST /api/exercises`<br/>`Program.cs` (Seed) | `PUT /api/exercises/{id}`<br/>↳ `Title`, `Description`, `Language`, `ExerciseType`, `ExerciseSpec`, `StarterCode`, `SolutionCode`, `TestCasesSpec` | `DELETE /api/exercises/{id}`<br/>*(Cascade cleanup of `CardExercises`)* | Authorization check; explicit manual cascade delete of `CardExercises` and `ExerciseReviewRecords` on deletion |
 | **`UserExercises`** | `POST /api/exercises/{id}/enroll`<br/>`POST /api/exercises/{id}/reviews` *(Auto-enroll)* | None (Enrollment timestamp is fixed) | `DELETE /api/exercises/{id}/enroll` | Composite Primary Key `(UserId, ExerciseId)` prevents duplicate enrollments |
@@ -115,22 +115,23 @@ Groups flashcards under a specific subject and study group.
 
 ### 3.3 Cards
 
-Individual flashcards contained within decks. Supports `basic`, `concept`, and `micro-coding` types.
+Individual flashcards contained within decks. Rendered with GitHub Flavored Markdown, code syntax highlighting, and live preview.
 
 - **INSERT Endpoints**:
   - `POST /api/content/cards` & `POST /api/decks/{deckId}/cards`
-    - Injected properties: `DeckId`, `Type`, `Prompt`, `ValidationSpec`, `CreatedAt`.
-  - `POST /api/decks/{deckId}/import`
-    - CSV/TSV/JSON batch import creating multiple `Card` entities.
+    - Injected properties: `DeckId`, `Type` (`basic`), `Prompt` (Markdown), `Answer` (Markdown), `CreatedAt`.
+  - `POST /api/decks/{deckId}/import-cards` & `POST /api/decks/{deckId}/import-cards-text`
+    - CSV/TSV/JSON batch import creating multiple `Card` entities with `Prompt, Answer`.
 - **UPDATE Endpoints & Mutated Columns**:
   - `PUT /api/content/cards/{cardId}` & `PUT /api/decks/{deckId}/cards/{cardId}`
-    - Mutated Columns: `Type`, `Prompt`, `ValidationSpec`.
+    - Mutated Columns: `Type`, `Prompt`, `Answer`.
 - **DELETE Endpoints**:
   - `DELETE /api/content/cards/{cardId}` & `DELETE /api/decks/{deckId}/cards/{cardId}`
     - Hard delete of `Card` row.
 - **Constraint Protections**:
   - Foreign key index on `DeckId` (`IX_Cards_DeckId`).
-  - Card type discriminator whitelist: `cardType is not "micro-coding" and not "concept" and not "basic"` triggers `400 Bad Request`.
+  - Required non-empty string validation for both `Prompt` and `Answer`.
+  - Card type default: `basic`.
   - Target deck existence validation (`dbContext.Decks.FirstOrDefaultAsync(d => d.Id == targetDeckId)`) returns `404 Not Found`.
 
 ---
@@ -153,20 +154,10 @@ Immutable spaced-repetition audit log tracking user flashcard study reviews.
 
 ---
 
-### 3.5 CardRuns
+### 3.5 CardRuns *(Deprecated & Dropped)*
 
-Tracks code execution attempts submitted by users against `micro-coding` cards.
-
-- **INSERT Endpoints**:
-  - `POST /api/cards/{cardId}/run`
-    - Injected properties: `CardId`, `UserId`, `SubmittedCode`, `Result` (bool), `ResultDetails`, `DurationMs`, `CreatedAt`.
-- **UPDATE Endpoints**:
-  - *None*. Append-only execution history.
-- **DELETE Endpoints**:
-  - *None*.
-- **Constraint Protections**:
-  - Compound Index: `IX_CardRuns_UserId_CardId` for execution history lookups.
-  - Execution boundary: 5-second `CancellationTokenSource` timeout prevents infinite loops or CPU exhaustion attacks.
+> [!NOTE]
+> The `CardRuns` table and `/api/cards/{id}/run` endpoint were dropped in migration `20260820010945_RenameValidationSpecToAnswerAndDropCardRuns`. All active test execution and code evaluation is consolidated in the `Exercises` subsystem (`/api/exercises/{id}/run`).
 
 ---
 

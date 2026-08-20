@@ -96,7 +96,7 @@ public class ExercisesControllerTests
         var controller = CreateController(db);
 
         db.Decks.Add(new Deck { Id = 1, Title = "Algorithms" });
-        db.Cards.Add(new Card { Id = 10, DeckId = 1, Type = "micro-coding", Prompt = "Reverse String Prompt" });
+        db.Cards.Add(new Card { Id = 10, DeckId = 1, Type = "basic", Prompt = "Reverse String Prompt", Answer = "Reverse" });
         db.Exercises.Add(new Exercise { Id = 100, Title = "Reverse String Ex", Language = "csharp" });
         await db.SaveChangesAsync();
 

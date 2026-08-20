@@ -73,7 +73,7 @@ public class CopyContentTests
         // Setup Source Group (Private) & Deck & Card
         var sourceGroup = new StudyGroup { Id = 1, Name = "Source Group", Slug = "source", IsPublic = false };
         var sourceDeck = new Deck { Id = 100, Title = "Source Deck", StudyGroupId = 1 };
-        var sourceCard = new Card { Id = 1000, DeckId = 100, Type = "basic", Prompt = "Source Question", ValidationSpec = "Answer" };
+        var sourceCard = new Card { Id = 1000, DeckId = 100, Type = "basic", Prompt = "Source Question", Answer = "Answer" };
 
         // Setup Target Group (Private) & Target Deck
         var targetGroup = new StudyGroup { Id = 2, Name = "Target Group", Slug = "target", IsPublic = false };

@@ -110,10 +110,20 @@ public sealed class ContentController : ControllerBase
         if (targetDeck is null) return NotFound(new { message = "Deck not found." });
         if (!await CanManageContentAsync(targetDeck.StudyGroupId)) return Forbid();
 
-        string cardType = request.Type.Trim().ToLowerInvariant();
-        if (cardType is not "micro-coding" and not "concept" and not "basic")
+        if (string.IsNullOrWhiteSpace(request.Prompt))
         {
-            return BadRequest(new { message = "Card type must be 'micro-coding', 'concept', or 'basic'." });
+            return BadRequest(new { message = "Card prompt cannot be empty." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Answer))
+        {
+            return BadRequest(new { message = "Card answer cannot be empty." });
+        }
+
+        string cardType = string.IsNullOrWhiteSpace(request.Type) ? "basic" : request.Type.Trim().ToLowerInvariant();
+        if (cardType is not "concept" and not "basic")
+        {
+            cardType = "basic";
         }
 
         Card card = new Card
@@ -121,7 +131,7 @@ public sealed class ContentController : ControllerBase
             DeckId = targetDeckId,
             Type = cardType,
             Prompt = request.Prompt.Trim(),
-            ValidationSpec = request.ValidationSpec,
+            Answer = request.Answer.Trim(),
             CreatedAt = DateTime.UtcNow
         };
 
@@ -134,7 +144,7 @@ public sealed class ContentController : ControllerBase
             DeckId = card.DeckId,
             Type = card.Type,
             Prompt = card.Prompt,
-            ValidationSpec = card.ValidationSpec
+            Answer = card.Answer
         };
 
         return CreatedAtAction(nameof(DecksController.GetCardsByDeck), "Decks", new { deckId = card.DeckId }, response);
@@ -154,15 +164,25 @@ public sealed class ContentController : ControllerBase
         Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId);
         if (!await CanManageContentAsync(deck?.StudyGroupId)) return Forbid();
 
-        string cardType = request.Type.Trim().ToLowerInvariant();
-        if (cardType is not "micro-coding" and not "concept" and not "basic")
+        if (string.IsNullOrWhiteSpace(request.Prompt))
         {
-            return BadRequest(new { message = "Card type must be 'micro-coding', 'concept', or 'basic'." });
+            return BadRequest(new { message = "Card prompt cannot be empty." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Answer))
+        {
+            return BadRequest(new { message = "Card answer cannot be empty." });
+        }
+
+        string cardType = string.IsNullOrWhiteSpace(request.Type) ? "basic" : request.Type.Trim().ToLowerInvariant();
+        if (cardType is not "concept" and not "basic")
+        {
+            cardType = "basic";
         }
 
         card.Type = cardType;
         card.Prompt = request.Prompt.Trim();
-        card.ValidationSpec = request.ValidationSpec;
+        card.Answer = request.Answer.Trim();
         await dbContext.SaveChangesAsync();
         return Ok();
     }
@@ -224,7 +244,7 @@ public sealed class ContentController : ControllerBase
             DeckId = card.DeckId,
             Type = card.Type,
             Prompt = card.Prompt,
-            ValidationSpec = card.ValidationSpec
+            Answer = card.Answer
         });
     }
 
@@ -281,7 +301,7 @@ public sealed class ContentController : ControllerBase
                 DeckId = c.DeckId,
                 Type = c.Type,
                 Prompt = c.Prompt,
-                ValidationSpec = c.ValidationSpec
+                Answer = c.Answer
             })
             .ToListAsync();
 
@@ -340,7 +360,7 @@ public sealed class ContentController : ControllerBase
             DeckId = targetDeck.Id,
             Type = sourceCard.Type,
             Prompt = sourceCard.Prompt,
-            ValidationSpec = sourceCard.ValidationSpec,
+            Answer = sourceCard.Answer,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -353,7 +373,7 @@ public sealed class ContentController : ControllerBase
             DeckId = newCard.DeckId,
             Type = newCard.Type,
             Prompt = newCard.Prompt,
-            ValidationSpec = newCard.ValidationSpec
+            Answer = newCard.Answer
         };
 
         return CreatedAtAction(nameof(DecksController.GetCardsByDeck), "Decks", new { deckId = newCard.DeckId }, response);

@@ -20,12 +20,13 @@ vi.mock('../api.js', () => ({
     newCount: 1,
     learningCount: 0,
     reviewCount: 0,
-    dueCards: [{ id: 100, prompt: 'Async Card Prompt', type: 'basic' }]
+    dueCards: [{ id: 100, prompt: 'Async Card Prompt', type: 'basic', answer: 'Async Card Answer' }]
   }),
-  getCards: async () => [{ id: 100, prompt: 'Async Card Prompt', type: 'basic' }],
+  getCards: async () => [{ id: 100, prompt: 'Async Card Prompt', type: 'basic', answer: 'Async Card Answer' }],
   getFollowups: async () => [],
   getCardExercises: async () => [],
-  canCreateContent: () => true
+  canCreateContent: () => true,
+  getUser: () => ({ id: 1, email: 'test@example.com', role: 'Admin' })
 }))
 
 describe('Resource Loading & Button Disabled States', () => {
@@ -44,6 +45,7 @@ describe('Resource Loading & Button Disabled States', () => {
   })
 
   test('Exercises clears loading indicator after loading', async () => {
+    localStorage.setItem('ankix_token', 'test_token')
     render(
       <MemoryRouter>
         <Exercises />
@@ -51,10 +53,11 @@ describe('Resource Loading & Button Disabled States', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText(/🎉 All Caught Up!/i)).toBeInTheDocument()
+      expect(screen.getByText(/Personal Exercise Collection/i)).toBeInTheDocument()
     })
 
     expect(screen.queryByText('Fetching exercise queue...')).not.toBeInTheDocument()
+    localStorage.removeItem('ankix_token')
   })
 
   test('Deck page shows card prompt and clears loading indicator', async () => {
