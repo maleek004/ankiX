@@ -211,10 +211,11 @@ public sealed class ExercisesController : ControllerBase
 
         if (!await CanManageContentAsync(request.StudyGroupId)) return Forbid();
 
+        string exerciseType = !string.IsNullOrWhiteSpace(request.ExerciseType) ? request.ExerciseType.Trim() : "CodeExecution";
         string language = request.Language.Trim().ToLowerInvariant();
-        if (language is not "csharp" and not "python" and not "javascript" and not "go")
+        if (exerciseType == "CodeExecution" && language is not "csharp" and not "python" and not "javascript" and not "go")
         {
-            return BadRequest(new { message = "Language must be one of: csharp, python, javascript, go." });
+            return BadRequest(new { message = "Language for code execution must be one of: csharp, python, javascript, go." });
         }
 
         Exercise exercise = new Exercise
@@ -222,7 +223,7 @@ public sealed class ExercisesController : ControllerBase
             Title = request.Title.Trim(),
             Description = request.Description,
             Language = language,
-            ExerciseType = !string.IsNullOrWhiteSpace(request.ExerciseType) ? request.ExerciseType.Trim() : "CodeExecution",
+            ExerciseType = exerciseType,
             ExerciseSpec = request.ExerciseSpec,
             StarterCode = request.StarterCode,
             SolutionCode = request.SolutionCode,
@@ -241,6 +242,8 @@ public sealed class ExercisesController : ControllerBase
             Title = exercise.Title,
             Description = exercise.Description,
             Language = exercise.Language,
+            ExerciseType = exercise.ExerciseType,
+            ExerciseSpec = exercise.ExerciseSpec,
             StarterCode = exercise.StarterCode,
             SolutionCode = exercise.SolutionCode,
             TestCasesSpec = exercise.TestCasesSpec,
@@ -263,15 +266,18 @@ public sealed class ExercisesController : ControllerBase
 
         if (!await CanManageContentAsync(exercise.StudyGroupId)) return Forbid();
 
+        string exerciseType = !string.IsNullOrWhiteSpace(request.ExerciseType) ? request.ExerciseType.Trim() : (exercise.ExerciseType ?? "CodeExecution");
         string language = request.Language.Trim().ToLowerInvariant();
-        if (language is not "csharp" and not "python" and not "javascript" and not "go")
+        if (exerciseType == "CodeExecution" && language is not "csharp" and not "python" and not "javascript" and not "go")
         {
-            return BadRequest(new { message = "Language must be one of: csharp, python, javascript, go." });
+            return BadRequest(new { message = "Language for code execution must be one of: csharp, python, javascript, go." });
         }
 
         exercise.Title = request.Title.Trim();
         exercise.Description = request.Description?.Trim();
         exercise.Language = language;
+        exercise.ExerciseType = exerciseType;
+        exercise.ExerciseSpec = request.ExerciseSpec;
         exercise.StarterCode = request.StarterCode;
         exercise.SolutionCode = request.SolutionCode;
         exercise.TestCasesSpec = request.TestCasesSpec;
@@ -326,6 +332,8 @@ public sealed class ExercisesController : ControllerBase
                 Title = e.Title,
                 Description = e.Description,
                 Language = e.Language,
+                ExerciseType = e.ExerciseType ?? "CodeExecution",
+                ExerciseSpec = e.ExerciseSpec,
                 StarterCode = e.StarterCode,
                 SolutionCode = e.SolutionCode,
                 TestCasesSpec = e.TestCasesSpec,

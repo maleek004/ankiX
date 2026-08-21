@@ -41,9 +41,8 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-24T12:23:20
-last_updated: 2026-08-21T17:35:30
+last_updated: 2026-08-21T23:26:00
 project: ankix
-project_key: NOKEY
 tracking_system: file-system
 story_location: /home/l2e/Desktop/ankiX/_bmad-output/implementation-artifacts
 
@@ -73,7 +72,7 @@ development_status:
   5-4-self-service-password-reset-and-email-verification: done
   epic-5-retrospective: optional
   epic-7: in-progress
-  7-4-multi-modal-exercise-integrity-custom-topic-tagging-and-locked-runtime-engine: ready-for-dev
+  7-4-multi-modal-exercise-integrity-custom-topic-tagging-and-locked-runtime-engine: done
   7-0-universal-mobile-viewport-and-touch-ergonomics: done
   7-1-vector-icon-migration-lucide-react: backlog
   7-2-monaco-code-editor-integration: backlog

@@ -8,6 +8,27 @@ import MarkdownViewer from '../components/MarkdownViewer'
 import MarkdownField from '../components/MarkdownField'
 import * as api from '../api'
 
+const LANG_BADGES = {
+  // Programming language tags (CodeExecution exercises)
+  csharp:      { label: 'C#',            color: '#68217a', bg: '#f2e6f7' },
+  python:      { label: 'Python',        color: '#3572A5', bg: '#e8f2fc' },
+  javascript:  { label: 'JavaScript',    color: '#b5a000', bg: '#fffde6' },
+  go:          { label: 'Go',            color: '#00ADD8', bg: '#e6f9fc' },
+  // Topic tags (MCQ / Short Answer exercises)
+  general:     { label: '🏷️ General',    color: '#495057', bg: '#e9ecef' },
+  linux:       { label: '🐧 Linux',      color: '#2c5282', bg: '#ebf8ff' },
+  networking:  { label: '🌐 Networking', color: '#2c5282', bg: '#e8f4fd' },
+  devops:      { label: '⚙️ DevOps',     color: '#276749', bg: '#e6fffa' },
+  sql:         { label: '🗄️ SQL',        color: '#744210', bg: '#fefcbf' },
+  architecture:{ label: '🏛️ Architecture',color: '#44337a', bg: '#faf5ff' },
+  security:    { label: '🔐 Security',   color: '#7b341e', bg: '#fff5f5' },
+  algorithms:  { label: '🧮 Algorithms', color: '#1a365d', bg: '#ebf8ff' },
+}
+
+function langBadgeFor(lang) {
+  return LANG_BADGES[lang] || { label: lang || 'General', color: '#495057', bg: '#e9ecef' }
+}
+
 export default function Deck(){
   const { activeStudyGroup } = useStudyGroup() || {}
   const { id } = useParams()
@@ -684,8 +705,15 @@ export default function Deck(){
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                                   <strong style={{ fontSize: '0.95rem', color: '#212529' }}>⚡ {ex.title}</strong>
                                   {ex.language && (
-                                    <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 4, background: '#e7f5ff', color: '#0d6efd', fontWeight: 600 }}>
-                                      {ex.language}
+                                    <span style={{
+                                      fontSize: '0.75rem',
+                                      padding: '2px 8px',
+                                      borderRadius: 4,
+                                      background: langBadgeFor(ex.language).bg,
+                                      color: langBadgeFor(ex.language).color,
+                                      fontWeight: 600
+                                    }}>
+                                      {langBadgeFor(ex.language).label}
                                     </span>
                                   )}
                                 </div>
@@ -1109,13 +1137,20 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
               <div style={{ display: 'grid', gridTemplateColumns: exerciseType === 'CodeExecution' ? '1fr 1fr' : '1fr', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Exercise Format</label>
-                  <select className="form-control" value={exerciseType} onChange={e => setExerciseType(e.target.value)}>
+                  <select className="form-control" value={exerciseType} onChange={e => {
+                    setExerciseType(e.target.value)
+                    if (e.target.value !== 'CodeExecution') {
+                      setLanguage('general')
+                    } else {
+                      setLanguage('csharp')
+                    }
+                  }}>
                     <option value="CodeExecution">⚡ Code Execution</option>
                     <option value="MultipleChoice">🔘 Multiple Choice (MCQ)</option>
                     <option value="ExactString">✏️ Exact String / Short Answer</option>
                   </select>
                 </div>
-                {exerciseType === 'CodeExecution' && (
+                {exerciseType === 'CodeExecution' ? (
                   <div>
                     <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language Tag</label>
                     <select className="form-control" value={language} onChange={e => setLanguage(e.target.value)}>
@@ -1123,6 +1158,20 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
                       <option value="python">Python</option>
                       <option value="javascript">JavaScript</option>
                       <option value="go">Go</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Topic Tag</label>
+                    <select className="form-control" value={language} onChange={e => setLanguage(e.target.value)}>
+                      <option value="general">🏷️ General</option>
+                      <option value="linux">🐧 Linux</option>
+                      <option value="networking">🌐 Networking</option>
+                      <option value="devops">⚙️ DevOps</option>
+                      <option value="sql">🗄️ SQL</option>
+                      <option value="architecture">🏛️ Architecture</option>
+                      <option value="security">🔐 Security</option>
+                      <option value="algorithms">🧮 Algorithms</option>
                     </select>
                   </div>
                 )}
@@ -1197,19 +1246,11 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
   const [activeIdx, setActiveIdx] = useState(initialIndex)
   const currentEx = exercises[activeIdx]
 
-  const [practiceLang, setPracticeLang] = useState(currentEx?.language || 'python')
   const [practiceCode, setPracticeCode] = useState(currentEx?.starterCode || currentEx?.solutionCode || '')
   const [running, setRunning] = useState(false)
   const [runResult, setRunResult] = useState(null)
   const [enrolling, setEnrolling] = useState(false)
   const [rating, setRating] = useState(false)
-
-  const langBadges = {
-    csharp: { label: 'C#', color: '#68217a', bg: '#f2e6f7' },
-    python: { label: 'Python', color: '#3572A5', bg: '#e8f2fc' },
-    javascript: { label: 'JavaScript', color: '#f1e05a', bg: '#fffde6' },
-    go: { label: 'Go', color: '#00ADD8', bg: '#e6f9fc' }
-  }
 
   useEffect(() => {
     let mounted = true
@@ -1218,16 +1259,13 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
         import('../api.js').then(m => m.getExercise(currentEx.id))
           .then(fullEx => {
             if (!mounted) return
-            setPracticeLang(fullEx.language || 'python')
             setPracticeCode(fullEx.starterCode || fullEx.solutionCode || '')
           })
           .catch(() => {
             if (!mounted) return
-            setPracticeLang(currentEx.language || 'python')
             setPracticeCode(currentEx.starterCode || currentEx.solutionCode || '')
           })
       } else {
-        setPracticeLang(currentEx.language || 'python')
         setPracticeCode(currentEx.starterCode || currentEx.solutionCode || '')
       }
       setRunResult(null)
@@ -1266,7 +1304,8 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
     try {
       const codeToSubmit = typeof submittedPayload === 'string' ? submittedPayload : practiceCode
       const m = await import('../api.js')
-      const res = await m.runExerciseCode(currentEx.id, codeToSubmit, practiceLang)
+      const targetLang = currentEx.language || 'csharp'
+      const res = await m.runExerciseCode(currentEx.id, codeToSubmit, targetLang)
       setRunResult(res)
     } catch (err) {
       alert('Run failed: ' + (err.message || err))
@@ -1296,7 +1335,7 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
 
   if (!currentEx) return null
 
-  const badge = langBadges[currentEx.language] || { label: currentEx.language, color: '#333', bg: '#eee' }
+  const badge = langBadgeFor(currentEx.language)
 
   return (
     <div
@@ -1394,20 +1433,13 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
             exercise={currentEx}
             practiceCode={practiceCode}
             setPracticeCode={setPracticeCode}
-            practiceLang={practiceLang}
-            setPracticeLang={setPracticeLang}
             onRunCode={handleRunCode}
             running={running}
             runResult={runResult}
           />
 
-          {/* Action & Status Bar */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
-            <button className="btn-primary" onClick={handleRunCode} disabled={running} style={{ padding: '8px 20px', fontSize: '0.9rem' }}>
-              {running ? 'Running Solution...' : '▶ Run Solution'}
-            </button>
-
-            {runResult && (
+          {/* Result Status Badge */}
+          {runResult && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{
                   padding: '5px 12px',
@@ -1424,7 +1456,6 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
                 </span>
               </div>
             )}
-          </div>
 
           {/* Output Details Box (Scrollable max-height) */}
           {runResult?.details && (

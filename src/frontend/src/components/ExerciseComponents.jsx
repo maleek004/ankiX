@@ -1,5 +1,16 @@
 import React, { useState } from 'react'
 
+const LANG_BADGES = {
+  csharp:     { label: 'C#',         color: '#68217a', bg: '#f3e8f8' },
+  python:     { label: 'Python',     color: '#3572A5', bg: '#e8f4f8' },
+  javascript: { label: 'JavaScript', color: '#b5a000', bg: '#fffde8' },
+  go:         { label: 'Go',         color: '#00ADD8', bg: '#e8f9fd' },
+}
+
+function langBadgeFor(lang) {
+  return LANG_BADGES[lang] || { label: lang || 'Unknown', color: '#495057', bg: '#e9ecef' }
+}
+
 export function MultipleChoiceExercise({ exercise, onRunCode, running, runResult }) {
   const [selectedIdx, setSelectedIdx] = useState(null)
 
@@ -105,22 +116,25 @@ export function ExactStringExercise({ exercise, onRunCode, running, runResult })
   )
 }
 
-export function CodeEditorExercise({ exercise, practiceCode, setPracticeCode, practiceLang, setPracticeLang, onRunCode, running }) {
+export function CodeEditorExercise({ exercise, practiceCode, setPracticeCode, onRunCode, running }) {
+  const badge = langBadgeFor(exercise.language)
+
   return (
     <div>
       <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Code Solution</label>
-        <select
-          className="form-control"
-          style={{ width: 'auto', padding: '2px 8px', fontSize: '0.85rem' }}
-          value={practiceLang}
-          onChange={e => setPracticeLang(e.target.value)}
-        >
-          <option value="csharp">C#</option>
-          <option value="python">Python</option>
-          <option value="javascript">JavaScript</option>
-          <option value="go">Go</option>
-        </select>
+        {/* Runtime is locked to the exercise's authored language — read-only badge */}
+        <span style={{
+          fontSize: '0.75rem',
+          fontWeight: 700,
+          padding: '3px 10px',
+          borderRadius: 4,
+          background: badge.bg,
+          color: badge.color,
+          letterSpacing: '0.02em'
+        }}>
+          🔒 {badge.label}
+        </span>
       </div>
 
       <textarea
@@ -162,10 +176,9 @@ export default function ExerciseRenderer({ exercise, practiceCode, setPracticeCo
       exercise={exercise}
       practiceCode={practiceCode}
       setPracticeCode={setPracticeCode}
-      practiceLang={practiceLang}
-      setPracticeLang={setPracticeLang}
       onRunCode={onRunCode}
       running={running}
     />
   )
 }
+

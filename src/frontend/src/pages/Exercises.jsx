@@ -211,12 +211,10 @@ export default function Exercises() {
       const detail = await getExercise(ex.id)
       setActiveExercise(detail)
       setPracticeCode(detail.starterCode || detail.solutionCode || '')
-      setPracticeLang(detail.language || 'csharp')
       setRunResult(null)
     } catch (err) {
       setActiveExercise(ex)
       setPracticeCode(ex.starterCode || '')
-      setPracticeLang(ex.language || 'csharp')
       setRunResult(null)
     }
     if (inQueueMode) {
@@ -233,7 +231,8 @@ export default function Exercises() {
     setMobilePracticeTab('output')
     try {
       const codeToSubmit = typeof submittedPayload === 'string' ? submittedPayload : practiceCode
-      const res = await runExerciseCode(activeExercise.id, codeToSubmit, practiceLang)
+      const targetLang = activeExercise.language || 'csharp'
+      const res = await runExerciseCode(activeExercise.id, codeToSubmit, targetLang)
       setRunResult(res)
     } catch (err) {
       setRunResult({ passed: false, result: 'FAIL', details: 'Error: ' + (err.message || err), durationMs: 0 })
@@ -271,10 +270,24 @@ export default function Exercises() {
   }
 
   const langBadges = {
-    csharp: { label: 'C#', color: '#68217a', bg: '#f3e8f8' },
-    python: { label: 'Python', color: '#3572A5', bg: '#e8f4f8' },
-    javascript: { label: 'JavaScript', color: '#f1e05a', bg: '#fffde8' },
-    go: { label: 'Go', color: '#00ADD8', bg: '#e8f9fd' }
+    // Programming language tags (CodeExecution exercises)
+    csharp:      { label: 'C#',           color: '#68217a', bg: '#f3e8f8' },
+    python:      { label: 'Python',       color: '#3572A5', bg: '#e8f4f8' },
+    javascript:  { label: 'JavaScript',   color: '#b5a000', bg: '#fffde8' },
+    go:          { label: 'Go',           color: '#00ADD8', bg: '#e8f9fd' },
+    // Topic tags (MCQ / Short Answer exercises)
+    general:     { label: '🏷️ General',    color: '#495057', bg: '#e9ecef' },
+    linux:       { label: '🐧 Linux',      color: '#2c5282', bg: '#ebf8ff' },
+    networking:  { label: '🌐 Networking', color: '#2c5282', bg: '#e8f4fd' },
+    devops:      { label: '⚙️ DevOps',     color: '#276749', bg: '#e6fffa' },
+    sql:         { label: '🗄️ SQL',        color: '#744210', bg: '#fefcbf' },
+    architecture:{ label: '🏛️ Architecture',color: '#44337a', bg: '#faf5ff' },
+    security:    { label: '🔐 Security',   color: '#7b341e', bg: '#fff5f5' },
+    algorithms:  { label: '🧮 Algorithms', color: '#1a365d', bg: '#ebf8ff' },
+  }
+
+  function langBadgeFor(lang) {
+    return langBadges[lang] || { label: lang || 'General', color: '#495057', bg: '#e9ecef' }
   }
 
   const typeBadges = {
@@ -398,7 +411,7 @@ export default function Exercises() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
                 {dueQueue.map((ex, idx) => {
-                  const badge = langBadges[ex.language] || { label: ex.language, color: '#333', bg: '#eee' }
+                  const badge = langBadgeFor(ex.language)
                   const typeB = typeBadges[ex.exerciseType || 'CodeExecution'] || typeBadges.CodeExecution
                   return (
                     <div
@@ -509,7 +522,7 @@ export default function Exercises() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
               {exercises.map(ex => {
-                const badge = langBadges[ex.language] || { label: ex.language, color: '#333', bg: '#eee' }
+                const badge = langBadgeFor(ex.language)
                 const typeB = typeBadges[ex.exerciseType || 'CodeExecution'] || typeBadges.CodeExecution
                 const isEnrolled = enrolledIds.has(ex.id)
                 const ease = ex.averageEaseFactor ?? 2.50
@@ -621,13 +634,21 @@ export default function Exercises() {
               <div style={{ display: 'grid', gridTemplateColumns: exerciseType === 'CodeExecution' ? '1fr 1fr' : '1fr', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Exercise Format</label>
-                  <select className="form-control" value={exerciseType} onChange={e => setExerciseType(e.target.value)}>
+                  <select className="form-control" value={exerciseType} onChange={e => {
+                    setExerciseType(e.target.value)
+                    // Reset language to a sensible default when switching modes
+                    if (e.target.value !== 'CodeExecution') {
+                      setLanguage('general')
+                    } else {
+                      setLanguage('csharp')
+                    }
+                  }}>
                     <option value="CodeExecution">⚡ Code Execution</option>
                     <option value="MultipleChoice">🔘 Multiple Choice (MCQ)</option>
                     <option value="ExactString">✏️ Exact String / Short Answer</option>
                   </select>
                 </div>
-                {exerciseType === 'CodeExecution' && (
+                {exerciseType === 'CodeExecution' ? (
                   <div>
                     <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language Tag</label>
                     <select className="form-control" value={language} onChange={e => setLanguage(e.target.value)}>
@@ -635,6 +656,20 @@ export default function Exercises() {
                       <option value="python">Python</option>
                       <option value="javascript">JavaScript</option>
                       <option value="go">Go</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Topic Tag</label>
+                    <select className="form-control" value={language} onChange={e => setLanguage(e.target.value)}>
+                      <option value="general">🏷️ General</option>
+                      <option value="linux">🐧 Linux</option>
+                      <option value="networking">🌐 Networking</option>
+                      <option value="devops">⚙️ DevOps</option>
+                      <option value="sql">🗄️ SQL</option>
+                      <option value="architecture">🏛️ Architecture</option>
+                      <option value="security">🔐 Security</option>
+                      <option value="algorithms">🧮 Algorithms</option>
                     </select>
                   </div>
                 )}
@@ -747,10 +782,10 @@ export default function Exercises() {
                   fontWeight: 600,
                   padding: '2px 8px',
                   borderRadius: 4,
-                  background: langBadges[activeExercise.language]?.bg || '#eee',
-                  color: langBadges[activeExercise.language]?.color || '#333'
+                  background: langBadgeFor(activeExercise.language).bg,
+                  color: langBadgeFor(activeExercise.language).color
                 }}>
-                  {langBadges[activeExercise.language]?.label || activeExercise.language}
+                  {langBadgeFor(activeExercise.language).label}
                 </span>
 
                 <button
@@ -789,7 +824,7 @@ export default function Exercises() {
             <div style={{ padding: 24, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
               {/* Tab: Problem & Specs (desktop: always visible; mobile: tab 0) */}
-              <div className={mobilePracticeTab !== 'problem' ? 'exercise-desktop-only' : ''} style={mobilePracticeTab !== 'problem' ? {} : {}}>
+              <div className={mobilePracticeTab !== 'problem' ? 'exercise-desktop-only' : ''}>
                 {activeExercise.description && (
                   <div style={{ padding: 12, background: '#f8f9fa', borderRadius: 8, fontSize: '0.9rem', border: '1px solid #e9ecef', marginBottom: 16 }}>
                     <strong>Instructions:</strong>
@@ -805,8 +840,6 @@ export default function Exercises() {
                   exercise={activeExercise}
                   practiceCode={practiceCode}
                   setPracticeCode={setPracticeCode}
-                  practiceLang={practiceLang}
-                  setPracticeLang={setPracticeLang}
                   onRunCode={handleRunCode}
                   running={running}
                   runResult={runResult}
