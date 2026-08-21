@@ -731,27 +731,27 @@ export async function importCardsFile(deckId, file){
   const headers = {}
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(`${API_BASE}/decks/${deckId}/import-cards`, {
+  const res = await safeFetch(`${API_BASE}/decks/${deckId}/import-cards`, {
     method: 'POST',
     headers,
     body: formData
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.message || 'File import failed')
+    const msg = await parseApiError(res, 'File import failed')
+    throw new Error(msg)
   }
   return res.json()
 }
 
 export async function importCardsText(deckId, content, format = 'csv'){
-  const res = await fetch(`${API_BASE}/decks/${deckId}/import-cards-text`, {
+  const res = await safeFetch(`${API_BASE}/decks/${deckId}/import-cards-text`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ content, format })
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.message || 'Text import failed')
+    const msg = await parseApiError(res, 'Text import failed')
+    throw new Error(msg)
   }
   return res.json()
 }

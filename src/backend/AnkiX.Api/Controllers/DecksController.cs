@@ -313,7 +313,7 @@ public sealed class DecksController : ControllerBase
     }
 
     [HttpPost("{deckId:int}/import-cards")]
-    [Authorize(Roles = $"{Roles.Contributor},{Roles.Admin}")]
+    [Authorize]
     public async Task<ActionResult<ImportCardsResponse>> ImportCardsFromFile([FromRoute] int deckId, IFormFile? file)
     {
         Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == deckId);
@@ -322,13 +322,9 @@ public sealed class DecksController : ControllerBase
             return NotFound(new { message = "Deck not found." });
         }
 
-        if (deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0)
+        if (!await CanManageContentAsync(deck.StudyGroupId))
         {
-            bool isFrozen = await dbContext.StudyGroups.AsNoTracking().AnyAsync(g => g.Id == deck.StudyGroupId.Value && g.IsFrozen);
-            if (isFrozen)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Cards cannot be imported.");
-            }
+            return Forbid();
         }
 
         if (file is null || file.Length == 0)
@@ -347,7 +343,7 @@ public sealed class DecksController : ControllerBase
     }
 
     [HttpPost("{deckId:int}/import-cards-text")]
-    [Authorize(Roles = $"{Roles.Contributor},{Roles.Admin}")]
+    [Authorize]
     public async Task<ActionResult<ImportCardsResponse>> ImportCardsFromText([FromRoute] int deckId, [FromBody] ImportCardsTextRequest request)
     {
         Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == deckId);
@@ -356,13 +352,9 @@ public sealed class DecksController : ControllerBase
             return NotFound(new { message = "Deck not found." });
         }
 
-        if (deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0)
+        if (!await CanManageContentAsync(deck.StudyGroupId))
         {
-            bool isFrozen = await dbContext.StudyGroups.AsNoTracking().AnyAsync(g => g.Id == deck.StudyGroupId.Value && g.IsFrozen);
-            if (isFrozen)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Cards cannot be imported.");
-            }
+            return Forbid();
         }
 
         if (string.IsNullOrWhiteSpace(request.Content))
@@ -432,7 +424,10 @@ public sealed class DecksController : ControllerBase
         if (string.IsNullOrWhiteSpace(content)) return list;
 
         string trimmed = content.Trim();
-        bool isJson = fileNameOrFormat.EndsWith(".json", StringComparison.OrdinalIgnoreCase) || trimmed.StartsWith("[") || trimmed.StartsWith("{");
+        bool isJson = fileNameOrFormat.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(fileNameOrFormat, "json", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("[")
+            || (trimmed.StartsWith("{") && trimmed.EndsWith("}"));
 
         if (isJson)
         {
@@ -459,9 +454,37 @@ public sealed class DecksController : ControllerBase
             return list;
         }
 
-        char delimiter = fileNameOrFormat.EndsWith(".tsv", StringComparison.OrdinalIgnoreCase) ? '\t' : ',';
-        if (content.Contains('\t') && !content.Contains(',')) delimiter = '\t';
-        else if (content.Contains(';') && !content.Contains(',')) delimiter = ';';
+        char delimiter = ',';
+        bool isExplicitTsv = fileNameOrFormat.EndsWith(".tsv", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(fileNameOrFormat, "tsv", StringComparison.OrdinalIgnoreCase);
+        bool isExplicitCsv = fileNameOrFormat.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(fileNameOrFormat, "csv", StringComparison.OrdinalIgnoreCase);
+
+        if (isExplicitTsv)
+        {
+            delimiter = '\t';
+        }
+        else if (isExplicitCsv)
+        {
+            delimiter = ',';
+        }
+        else
+        {
+            // Auto-detect for .txt or other raw input:
+            // If content contains tabs, TSV takes priority because tabs are not standard English prose punctuation.
+            if (content.Contains('\t'))
+            {
+                delimiter = '\t';
+            }
+            else if (content.Contains(';') && !content.Contains(','))
+            {
+                delimiter = ';';
+            }
+            else
+            {
+                delimiter = ',';
+            }
+        }
 
         var lines = content.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
         bool isFirstLineHeader = false;
@@ -482,6 +505,16 @@ public sealed class DecksController : ControllerBase
             if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
 
             var fields = ParseCsvLine(line, delimiter);
+            // Fallback for TSV lines if quotes were unbalanced but tab delimiter exists
+            if (delimiter == '\t' && fields.Count < 2 && line.Contains('\t'))
+            {
+                var tabSplit = line.Split('\t').Select(s => s.Trim().Trim('"').Replace("\"\"", "\"")).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+                if (tabSplit.Count >= 2)
+                {
+                    fields = tabSplit;
+                }
+            }
+
             if (fields.Count == 0) continue;
 
             string prompt = fields[0].Trim();
@@ -496,8 +529,17 @@ public sealed class DecksController : ControllerBase
             }
             else if (fields.Count >= 3)
             {
-                type = string.IsNullOrWhiteSpace(fields[1]) ? "basic" : fields[1].Trim();
-                answer = fields[2].Trim();
+                string secondField = fields[1].Trim().ToLowerInvariant();
+                if (secondField is "basic" or "concept" or "cloze" or "code")
+                {
+                    type = secondField;
+                    answer = fields[2].Trim();
+                }
+                else
+                {
+                    type = "basic";
+                    answer = fields[1].Trim();
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(answer))
@@ -542,5 +584,40 @@ public sealed class DecksController : ControllerBase
         }
         result.Add(currentField.ToString());
         return result;
+    }
+
+    private async Task<bool> CanManageContentAsync(int? studyGroupId)
+    {
+        if (studyGroupId.HasValue && studyGroupId.Value > 0)
+        {
+            bool isFrozen = await dbContext.StudyGroups.AsNoTracking()
+                .AnyAsync(g => g.Id == studyGroupId.Value && g.IsFrozen);
+            if (isFrozen) return false;
+        }
+
+        if (User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Contributor))
+        {
+            return true;
+        }
+
+        if (!studyGroupId.HasValue || studyGroupId.Value <= 0)
+        {
+            return false;
+        }
+
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            return false;
+        }
+
+        string? memberRole = await dbContext.StudyGroupMembers
+            .Where(m => m.StudyGroupId == studyGroupId.Value && m.UserId == userId && m.Status == StudyGroupMemberStatus.Active)
+            .Select(m => m.Role)
+            .FirstOrDefaultAsync();
+
+        return memberRole == StudyGroupRoles.Owner
+            || memberRole == StudyGroupRoles.Admin
+            || memberRole == StudyGroupRoles.Contributor;
     }
 }
