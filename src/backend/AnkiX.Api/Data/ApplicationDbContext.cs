@@ -39,6 +39,9 @@ public sealed class ApplicationDbContext : DbContext
             .HasIndex(user => user.Email)
             .IsUnique();
 
+        modelBuilder.Entity<User>()
+            .HasIndex(user => user.LastActiveAt);
+
         modelBuilder.Entity<StudyGroup>()
             .HasIndex(sg => sg.Slug)
             .IsUnique();

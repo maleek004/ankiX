@@ -41,4 +41,6 @@ public sealed class User
     public DateTime? EmailVerificationExpiresAt { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public DateTime? LastActiveAt { get; set; }
 }

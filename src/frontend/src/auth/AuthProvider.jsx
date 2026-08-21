@@ -8,9 +8,21 @@ export function AuthProvider({ children }){
     try{ return JSON.parse(localStorage.getItem('ankix_user') || 'null') }catch{ return null }
   })
 
-  useEffect(()=>{
-    // noop: token is persisted in api.js localStorage by login
-  },[])
+  useEffect(() => {
+    if (!user) return
+
+    const sendHeartbeat = async () => {
+      try {
+        await api.sendPresenceHeartbeat()
+      } catch (err) {
+        // Non-blocking background heartbeat
+      }
+    }
+
+    sendHeartbeat()
+    const interval = setInterval(sendHeartbeat, 120000) // Every 2 minutes
+    return () => clearInterval(interval)
+  }, [user])
 
 
 

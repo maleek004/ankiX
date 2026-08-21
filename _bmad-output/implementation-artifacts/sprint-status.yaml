@@ -69,6 +69,7 @@ development_status:
   4-3-enforce-runtime-security-and-release-guardrails: backlog
   epic-4-retrospective: optional
   epic-5: done
+  5-2-platform-super-admin-dashboard-metrics: done
   5-4-self-service-password-reset-and-email-verification: done
   epic-5-retrospective: optional
   epic-10: done

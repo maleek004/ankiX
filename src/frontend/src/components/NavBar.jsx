@@ -51,8 +51,8 @@ export default function NavBar(){
                 <li><Link to="/exercises" className="nav-link">Exercises</Link></li>
               </>
             )}
-            {auth?.user?.role === 'Admin' && (
-              <li><Link to="/admin/users" className="nav-link">👥 Users</Link></li>
+            {(auth?.user?.role === 'Admin' || auth?.user?.role === 'SuperAdmin') && (
+              <li><Link to="/admin" className="nav-link">🛡️ Admin</Link></li>
             )}
             <li><Link to="/search" className="nav-link">🔍 Search</Link></li>
           </ul>

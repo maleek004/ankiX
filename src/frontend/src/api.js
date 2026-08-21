@@ -152,6 +152,27 @@ export async function updateUserRole(userId, role){
   return res.json()
 }
 
+export async function getAdminMetrics(){
+  const res = await safeFetch(`${API_BASE}/admin/metrics`, { headers: authHeaders() })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to fetch admin metrics')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function sendPresenceHeartbeat(){
+  const res = await safeFetch(`${API_BASE}/presence/heartbeat`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to update presence heartbeat')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
 export async function login(email, password){
   const res = await safeFetch(`${API_BASE}/auth/login`,{
     method:'POST',
