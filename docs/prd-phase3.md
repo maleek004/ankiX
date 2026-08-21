@@ -72,6 +72,12 @@ Key focus areas for Phase 3:
   * **Tabbed Mobile Coding Sandbox:** Coding challenge interface on screens `<768px` transitions from desktop side-by-side into a 3-tab workspace (`[Problem & Specs]`, `[Code Editor]`, `[Terminal Output & Diffs]`) with a persistent floating action button (`▶ Run Code`).
   * **Adaptive Modals & Bottom Sheets:** Card creation/editing drawers, study group invite modals, and dialogs render as native-feeling bottom sheets with 100% width and safe keyboard auto-scrolling.
   * **Guest Hero Touch Optimization:** Landing hero actions (`Try as Guest`, `Explore Groups`, `Sign In`) stack vertically into full-width touch targets (min 44px height) on mobile devices.
+* **FR34:** Multi-Modal Exercise Integrity & Custom Topic Tagging:
+  * **Consistent Multi-Modal Projection:** Linked card exercises (`GET /api/cards/{cardId}/exercises`) consistently return `ExerciseType` and `ExerciseSpec`, rendering MCQ, Short Answer, and Code Execution formats identically across card views and the catalog.
+  * **Locked Execution Runtime:** Code execution exercises strictly execute in the exact language chosen at creation time (Python, C#, JavaScript, Go); runtime switching dropdown during practice is disabled.
+  * **Custom Topic & Domain Tags:** MCQ and Short Answer exercises allow custom topic tagging (e.g., Linux, Networking, SQL, DevOps, Architecture, General) rather than forcing programming language assignments.
+  * **Deduplicated Action Controls:** Action buttons (`▶ Run Solution`, `Check Answer`, `Submit Answer`) render as single, unified controls across standalone views and linked card modals.
+
 
 ### Analytics & Gamification
 * **FR23:** Provide a **GitHub-style study activity heatmap** on the user dashboard displaying daily card reviews and exercise runs.

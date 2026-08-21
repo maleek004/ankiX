@@ -28,6 +28,7 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 | **FR21** | Monaco Code Editor integration for code cards & exercises | Epic 7 (Story 7.2) |
 | **FR22** | Dark / Light mode theme switcher engine | Epic 7 (Story 7.3) |
 | **FR33** | Universal Mobile-First Responsiveness & Touch Adaptive UX | Epic 7 (Story 7.0) |
+| **FR34** | Multi-Modal Exercise Integrity & Custom Topic Tagging | Epic 7 (Story 7.4) |
 | **FR23** | GitHub-style study activity heatmap | Epic 8 (Story 8.1) |
 | **FR24** | Daily study streak tracking & milestone badges | Epic 8 (Story 8.2) |
 | **FR25** | Health probe endpoints (`GET /healthz`) & Load Balancer setup | Epic 9 (Story 9.1) |
@@ -44,7 +45,8 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 
 * **Epic 5: Social Authentication, Self-Service Password Reset & Platform Super-Admin Operations** (FR13, FR14, FR28, FR18, FR19)
 * **Epic 6: In-App Notification Center & Event Engine** (FR15, FR16, FR17)
-* **Epic 7: Modernized UI/UX Design System, Mobile Responsiveness & Workspace** (FR33, FR20, FR21, FR22)
+* **Epic 7: Modernized UI/UX Design System, Mobile Responsiveness & Workspace** (FR33, FR34, FR20, FR21, FR22)
+
 
 * **Epic 8: Spaced Repetition Analytics & Gamification** (FR23, FR24)
 * **Epic 9: High-Availability Infrastructure & Execution Isolation** (FR25, FR26, FR27)
@@ -208,9 +210,23 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
     **When** clicked,  
     **Then** the theme switches instantly between dark and light palettes, saving the selection in `localStorage`.
 
+#### Story 7.4: Multi-Modal Exercise Integrity, Custom Topic Tagging & Locked Runtime Engine
+
+**As a** learner practicing exercises and a contributor authoring them,  
+**I want to** experience consistent multi-modal rendering (MCQ, Short Answer, Code), custom topic tagging, locked execution runtimes, and clean deduplicated action controls,  
+**So that** linked card exercises render faithfully and cannot be submitted in the wrong programming language or with misleading tags.  
+
+* **Acceptance Criteria:**
+  * **Consistent Linked Card Exercise Projection:** `GET /api/cards/{cardId}/exercises` backend projection includes `ExerciseType` and `ExerciseSpec`, ensuring MCQ and Short Answer exercises render their respective native radio buttons and text response forms in the linked card modal (`ExercisePracticeModal`) rather than defaulting to a code editor.
+  * **Deduplicated Execution & Submission Controls:** In `Deck.jsx` `ExercisePracticeModal`, the duplicate hardcoded "▶ Run Solution" button is removed, delegating action control entirely to `ExerciseRenderer` (which renders a single, clean `Check Answer`, `Submit Answer`, or `▶ Run Solution` button based on exercise modality).
+  * **Locked Execution Runtime:** For Code Execution exercises, the practice view locks execution strictly to the exercise's authored language (Python, C#, JavaScript, Go) and removes the runtime `<select>` switcher, rendering the language as a read-only tag badge.
+  * **Custom Topic & Domain Tags for Non-Coding Exercises:** MCQ and Short Answer creation and editing interfaces allow authors to specify custom topic/domain tags (e.g. `Linux`, `Networking`, `DevOps`, `SQL`, `Architecture`, `General`) instead of forcing programming language tags.
+  * **Polished Tag Badge Rendering:** Non-coding exercises display their custom topic badge with a clean, neutral theme rather than defaulting to a purple `C#` badge.
+
 ---
 
 ### Epic 8: Spaced Repetition Analytics & Gamification
+
 
 #### Story 8.1: GitHub-Style Study Activity Heatmap
 **As a** learner,  
