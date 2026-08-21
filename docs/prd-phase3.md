@@ -66,6 +66,12 @@ Key focus areas for Phase 3:
 * **FR20:** Replace all legacy inline emojis across frontend views with vector SVG icons using `lucide-react`.
 * **FR21:** Integrate **Monaco Editor** into code flashcards and standalone exercises with auto-indentation and syntax highlighting.
 * **FR22:** Implement a system-wide Dark / Light mode theme switcher using CSS custom variables.
+* **FR33:** The entire web application is fully responsive and touch-optimized across mobile (<480px), tablet (481px–768px), and desktop (>768px) viewports:
+  * **Collapsible Mobile Navigation:** Header collapses into a clean brand bar with notification bell and top hamburger menu drawer (☰) sliding out touch-friendly navigation links and user profile actions.
+  * **Ergonomic Mobile Flashcard Study Interface:** Flashcard canvas fluidly expands to full viewport width with horizontal scrolling for wide markdown code blocks, and SRS rating buttons (`Again`, `Hard`, `Good`, `Easy`) are pinned as a sticky bottom bar in the natural thumb zone.
+  * **Tabbed Mobile Coding Sandbox:** Coding challenge interface on screens `<768px` transitions from desktop side-by-side into a 3-tab workspace (`[Problem & Specs]`, `[Code Editor]`, `[Terminal Output & Diffs]`) with a persistent floating action button (`▶ Run Code`).
+  * **Adaptive Modals & Bottom Sheets:** Card creation/editing drawers, study group invite modals, and dialogs render as native-feeling bottom sheets with 100% width and safe keyboard auto-scrolling.
+  * **Guest Hero Touch Optimization:** Landing hero actions (`Try as Guest`, `Explore Groups`, `Sign In`) stack vertically into full-width touch targets (min 44px height) on mobile devices.
 
 ### Analytics & Gamification
 * **FR23:** Provide a **GitHub-style study activity heatmap** on the user dashboard displaying daily card reviews and exercise runs.
@@ -75,6 +81,7 @@ Key focus areas for Phase 3:
 * **FR25:** Expose standardized health probes (`GET /healthz`) for load balancing readiness.
 * **FR26:** Utilize Redis for distributed caching of hot SRS study queues and user session tokens.
 * **FR27:** Execute user code solutions in isolated Docker container worker pools with strict CPU and memory bounds.
+
 
 ---
 

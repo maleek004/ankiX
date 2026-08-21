@@ -72,9 +72,16 @@ development_status:
   5-2-platform-super-admin-dashboard-metrics: done
   5-4-self-service-password-reset-and-email-verification: done
   epic-5-retrospective: optional
+  epic-7: in-progress
+  7-0-universal-mobile-viewport-and-touch-ergonomics: ready-for-dev
+  7-1-vector-icon-migration-lucide-react: backlog
+  7-2-monaco-code-editor-integration: backlog
+  7-3-dark-light-mode-theme-system: backlog
+  epic-7-retrospective: optional
   epic-10: done
   10-1-unauthenticated-public-catalog-browsing-and-strict-privacy-gating: done
   10-2-ephemeral-sandbox-execution-without-state-pollution: done
   10-3-contextual-auth-modals-and-intent-preservation: done
   10-4-guest-ip-sliding-window-rate-limiting: done
   epic-10-retrospective: optional
+

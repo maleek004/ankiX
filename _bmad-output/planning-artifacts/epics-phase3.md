@@ -27,6 +27,7 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 | **FR20** | Vector icon system migration (`lucide-react`) | Epic 7 (Story 7.1) |
 | **FR21** | Monaco Code Editor integration for code cards & exercises | Epic 7 (Story 7.2) |
 | **FR22** | Dark / Light mode theme switcher engine | Epic 7 (Story 7.3) |
+| **FR33** | Universal Mobile-First Responsiveness & Touch Adaptive UX | Epic 7 (Story 7.0) |
 | **FR23** | GitHub-style study activity heatmap | Epic 8 (Story 8.1) |
 | **FR24** | Daily study streak tracking & milestone badges | Epic 8 (Story 8.2) |
 | **FR25** | Health probe endpoints (`GET /healthz`) & Load Balancer setup | Epic 9 (Story 9.1) |
@@ -43,7 +44,8 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 
 * **Epic 5: Social Authentication, Self-Service Password Reset & Platform Super-Admin Operations** (FR13, FR14, FR28, FR18, FR19)
 * **Epic 6: In-App Notification Center & Event Engine** (FR15, FR16, FR17)
-* **Epic 7: Modernized UI/UX Design System & Workspace** (FR20, FR21, FR22)
+* **Epic 7: Modernized UI/UX Design System, Mobile Responsiveness & Workspace** (FR33, FR20, FR21, FR22)
+
 * **Epic 8: Spaced Repetition Analytics & Gamification** (FR23, FR24)
 * **Epic 9: High-Availability Infrastructure & Execution Isolation** (FR25, FR26, FR27)
 * **Epic 10: Anonymous Guest Access & Ephemeral Discovery Funnel** (FR29, FR30, FR31, FR32)
@@ -160,9 +162,23 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 
 ---
 
-### Epic 7: Modernized UI/UX Design System & Workspace
+### Epic 7: Modernized UI/UX Design System, Mobile Responsiveness & Workspace
+
+#### Story 7.0: Universal Mobile-First Responsiveness & Touch Adaptive UX
+**As a** learner using AnkiX on a mobile phone or tablet,  
+**I want to** navigate, study flashcards, run code exercises, and manage content seamlessly with touch ergonomics,  
+**So that** I have a first-class, distraction-free study experience on any device.  
+
+* **Acceptance Criteria:**
+  * **Collapsible Mobile Header (Option B):** On viewports `<768px`, the horizontal navbar collapses into a clean header with brand title and a top-right hamburger menu icon (☰) that opens a slide-out navigation drawer with touch-friendly links (Study Groups, Decks, Exercises, Admin, Profile, Logout).
+  * **Touch-Optimized Study Session (`Deck.jsx`):** Flashcards expand to 100% viewport width without horizontal window blowout. Wide markdown code blocks feature internal horizontal scroll with a floating copy button. The `[Again] [Hard] [Good] [Easy]` rating buttons are pinned to a sticky bottom bar at the bottom of the screen for one-handed thumb interaction.
+  * **Tabbed Mobile Coding Sandbox (`Exercises.jsx`):** On screens `<768px`, the coding challenge workspace transitions from side-by-side columns into a 3-tab layout: `[Problem & Specs]`, `[Code Editor]`, `[Terminal Output & Diffs]`, accompanied by a persistent floating action button (`▶ Run Code`).
+  * **Adaptive Modals & Bottom Sheets:** The Rapid Add card drawer, Edit Card modal, and Study Group dialogs render as full-width bottom sheets on mobile devices with safe keyboard auto-scrolling.
+  * **Guest Landing Touch Optimization:** On mobile viewports, the landing hero action buttons (`Try as Guest`, `Explore Groups`, `Sign In`) stack vertically into full-width touch buttons (min 44px height).
+  * **iOS Zoom Prevention & Touch Targets:** Form inputs enforce a minimum `16px` font size on mobile to prevent iOS Safari auto-zoom, and all buttons adhere to a minimum 44px tap target.
 
 #### Story 7.1: Vector Icon Migration (`lucide-react`)
+
 **As a** platform user,  
 **I want to** experience a clean, modern interface using vector icons instead of inline emojis,  
 **So that** the app feels professional and visually cohesive.  
