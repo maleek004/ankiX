@@ -97,13 +97,13 @@ export default function CopyModal({ isOpen, onClose, itemType, item, onSuccess }
   if (!isOpen || !item) return null
 
   return (
-    <div style={{
+    <div className="mobile-bottom-sheet-overlay" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 9999, padding: '1rem'
     }}>
-      <div style={{
+      <div className="mobile-bottom-sheet-content" style={{
         backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '12px',
         maxWidth: '500px', width: '100%', padding: '1.5rem', color: '#f3f4f6',
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)'

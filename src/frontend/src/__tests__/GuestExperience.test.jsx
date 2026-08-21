@@ -76,9 +76,9 @@ describe('Guest Experience & AuthModal', () => {
     )
 
     expect(screen.getByText('Guest')).toBeInTheDocument()
-    expect(screen.getByText('👥 Study Groups')).toBeInTheDocument()
-    expect(screen.getByText('Decks')).toBeInTheDocument()
-    expect(screen.getByText('Exercises')).toBeInTheDocument()
-    expect(screen.getByText('🔍 Search')).toBeInTheDocument()
+    expect(screen.getAllByText('👥 Study Groups').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Decks').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Exercises').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('🔍 Search').length).toBeGreaterThan(0)
   })
 })

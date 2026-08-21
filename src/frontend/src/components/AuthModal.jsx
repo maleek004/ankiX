@@ -26,6 +26,7 @@ export default function AuthModal({
 
   return (
     <div
+      className="mobile-bottom-sheet-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -43,7 +44,7 @@ export default function AuthModal({
       onClick={onClose}
     >
       <div
-        className="card"
+        className="card mobile-bottom-sheet-content"
         style={{
           width: '100%',
           maxWidth: 460,

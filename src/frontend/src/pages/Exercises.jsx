@@ -68,6 +68,7 @@ export default function Exercises() {
   const [runResult, setRunResult] = useState(null)
   const [running, setRunning] = useState(false)
   const [queueIndex, setQueueIndex] = useState(0)
+  const [mobilePracticeTab, setMobilePracticeTab] = useState('problem') // 'problem' | 'code' | 'output'
 
   const loadData = async () => {
     setLoading(true)
@@ -205,6 +206,7 @@ export default function Exercises() {
   }
 
   const openPractice = async (ex, inQueueMode = false, qIdx = 0) => {
+    setMobilePracticeTab('problem')
     try {
       const detail = await getExercise(ex.id)
       setActiveExercise(detail)
@@ -228,6 +230,7 @@ export default function Exercises() {
     if (!activeExercise) return
     setRunning(true)
     setRunResult(null)
+    setMobilePracticeTab('output')
     try {
       const codeToSubmit = typeof submittedPayload === 'string' ? submittedPayload : practiceCode
       const res = await runExerciseCode(activeExercise.id, codeToSubmit, practiceLang)
@@ -703,6 +706,7 @@ export default function Exercises() {
       {/* Floating Practice Modal Overlay */}
       {activeExercise && (
         <div
+          className="mobile-bottom-sheet-overlay"
           style={{
             position: 'fixed',
             top: 0,
@@ -720,6 +724,7 @@ export default function Exercises() {
           onClick={e => { if (e.target === e.currentTarget) setActiveExercise(null) }}
         >
           <div
+            className="mobile-bottom-sheet-content"
             style={{
               margin: 'auto',
               width: '90%',
@@ -735,7 +740,7 @@ export default function Exercises() {
           >
             {/* Modal Header */}
             <div style={{ padding: '16px 24px', background: '#f8f9fa', borderBottom: '1px solid #dee2e6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600 }}>⚡ {activeExercise.title}</h3>
                 <span style={{
                   fontSize: '0.75rem',
@@ -766,88 +771,114 @@ export default function Exercises() {
               </div>
 
               <button
-                style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.4rem', color: '#6c757d', padding: '0 4px' }}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.4rem', color: '#6c757d', padding: '0 4px', minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 onClick={() => setActiveExercise(null)}
               >
                 ✕
               </button>
             </div>
 
+            {/* Mobile 3-Tab Nav (hidden on desktop via CSS) */}
+            <MobilePracticeTabBar
+              activeTab={mobilePracticeTab}
+              onTabChange={setMobilePracticeTab}
+              hasResult={!!runResult}
+            />
+
             {/* Modal Body */}
             <div style={{ padding: 24, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {activeExercise.description && (
-                <div style={{ padding: 12, background: '#f8f9fa', borderRadius: 8, fontSize: '0.9rem', border: '1px solid #e9ecef' }}>
-                  <strong>Instructions:</strong>
-                  <p style={{ margin: '4px 0 0 0', whiteSpace: 'pre-wrap', color: '#333' }}>{activeExercise.description}</p>
-                </div>
-              )}
 
-              {/* Multi-Modal Exercise Renderer */}
-              <ExerciseRenderer
-                exercise={activeExercise}
-                practiceCode={practiceCode}
-                setPracticeCode={setPracticeCode}
-                practiceLang={practiceLang}
-                setPracticeLang={setPracticeLang}
-                onRunCode={handleRunCode}
-                running={running}
-                runResult={runResult}
-              />
-
-              {/* Status & Output Box */}
-              {runResult && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{
-                      padding: '5px 12px',
-                      borderRadius: 6,
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
-                      background: runResult.passed ? '#d4edda' : '#f8d7da',
-                      color: runResult.passed ? '#155724' : '#721c24'
-                    }}>
-                      {runResult.passed ? '✓ PASS' : '✗ FAIL'}
-                    </span>
-                    <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
-                      ({runResult.durationMs}ms)
-                    </span>
+              {/* Tab: Problem & Specs (desktop: always visible; mobile: tab 0) */}
+              <div className={mobilePracticeTab !== 'problem' ? 'exercise-desktop-only' : ''} style={mobilePracticeTab !== 'problem' ? {} : {}}>
+                {activeExercise.description && (
+                  <div style={{ padding: 12, background: '#f8f9fa', borderRadius: 8, fontSize: '0.9rem', border: '1px solid #e9ecef', marginBottom: 16 }}>
+                    <strong>Instructions:</strong>
+                    <p style={{ margin: '4px 0 0 0', whiteSpace: 'pre-wrap', color: '#333' }}>{activeExercise.description}</p>
                   </div>
+                )}
+              </div>
 
-                  {runResult.details && (
-                    <div style={{
-                      padding: 12,
-                      borderRadius: 8,
-                      background: runResult.passed ? '#f8f9fa' : '#fff5f5',
-                      color: runResult.passed ? '#212529' : '#c92a2a',
-                      fontSize: '0.85rem',
-                      fontFamily: 'Consolas, Monaco, monospace',
-                      border: runResult.passed ? '1px solid #e9ecef' : '1px solid #ffc9c9',
-                      maxHeight: 180,
-                      overflowY: 'auto',
-                      whiteSpace: 'pre-wrap'
-                    }}>
-                      {runResult.details}
+              {/* Tab: Code Editor (desktop: always visible; mobile: tab 1) */}
+              <div className={mobilePracticeTab !== 'code' ? 'exercise-desktop-only' : ''}>
+                {/* Multi-Modal Exercise Renderer */}
+                <ExerciseRenderer
+                  exercise={activeExercise}
+                  practiceCode={practiceCode}
+                  setPracticeCode={setPracticeCode}
+                  practiceLang={practiceLang}
+                  setPracticeLang={setPracticeLang}
+                  onRunCode={handleRunCode}
+                  running={running}
+                  runResult={runResult}
+                />
+              </div>
+
+              {/* Tab: Terminal Output & Diffs (desktop: always visible; mobile: tab 2) */}
+              <div className={mobilePracticeTab !== 'output' ? 'exercise-desktop-only' : ''}>
+                {/* Status & Output Box */}
+                {runResult && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{
+                        padding: '5px 12px',
+                        borderRadius: 6,
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        background: runResult.passed ? '#d4edda' : '#f8d7da',
+                        color: runResult.passed ? '#155724' : '#721c24'
+                      }}>
+                        {runResult.passed ? '✓ PASS' : '✗ FAIL'}
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
+                        ({runResult.durationMs}ms)
+                      </span>
                     </div>
-                  )}
-                </div>
-              )}
 
-              {/* SM-2 Retention Rating Section */}
-              {runResult?.passed && (
-                <div style={{ marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', marginBottom: 10, textAlign: 'center' }}>
-                    Rate your recall performance for SRS schedule:
+                    {runResult.details && (
+                      <div style={{
+                        padding: 12,
+                        borderRadius: 8,
+                        background: runResult.passed ? '#f8f9fa' : '#fff5f5',
+                        color: runResult.passed ? '#212529' : '#c92a2a',
+                        fontSize: '0.85rem',
+                        fontFamily: 'Consolas, Monaco, monospace',
+                        border: runResult.passed ? '1px solid #e9ecef' : '1px solid #ffc9c9',
+                        maxHeight: 180,
+                        overflowY: 'auto',
+                        whiteSpace: 'pre-wrap'
+                      }}>
+                        {runResult.details}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                    <button className="btn-rating again" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Again')}>Again (&lt;1m)</button>
-                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Hard')}>Hard (&lt;1m)</button>
-                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Good')}>Good (&lt;10m)</button>
-                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Easy')}>Easy (1d+)</button>
+                )}
+
+                {/* SM-2 Retention Rating Section */}
+                {runResult?.passed && (
+                  <div style={{ marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', marginBottom: 10, textAlign: 'center' }}>
+                      Rate your recall performance for SRS schedule:
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <button className="btn-rating again" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Again')}>Again (&lt;1m)</button>
+                      <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Hard')}>Hard (&lt;1m)</button>
+                      <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Good')}>Good (&lt;10m)</button>
+                      <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Easy')}>Easy (1d+)</button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Floating ▶ Run Code FAB (mobile only, shown via CSS) */}
+          <button
+            className="exercise-fab"
+            onClick={() => handleRunCode(practiceCode)}
+            disabled={running}
+          >
+            {running ? '⏳ Running...' : '▶ Run Code'}
+          </button>
         </div>
       )}
 
@@ -870,3 +901,31 @@ export default function Exercises() {
   )
 }
 
+/**
+ * MobilePracticeTabBar — 3-tab nav for the exercise practice modal on mobile.
+ * Hidden on desktop via `.exercise-mobile-tabs { display: none }` (in CSS media query).
+ */
+function MobilePracticeTabBar({ activeTab, onTabChange, hasResult }) {
+  return (
+    <div className="exercise-mobile-tabs">
+      <button
+        className={`exercise-mobile-tab-btn${activeTab === 'problem' ? ' active' : ''}`}
+        onClick={() => onTabChange('problem')}
+      >
+        📋 Problem
+      </button>
+      <button
+        className={`exercise-mobile-tab-btn${activeTab === 'code' ? ' active' : ''}`}
+        onClick={() => onTabChange('code')}
+      >
+        ⌨️ Code
+      </button>
+      <button
+        className={`exercise-mobile-tab-btn${activeTab === 'output' ? ' active' : ''}`}
+        onClick={() => onTabChange('output')}
+      >
+        {hasResult ? '✅ Output' : '📤 Output'}
+      </button>
+    </div>
+  )
+}

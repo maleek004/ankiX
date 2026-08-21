@@ -1159,76 +1159,83 @@ public sealed class StudyGroupsController : ControllerBase
             return Forbid();
         }
 
-        using var transaction = await dbContext.Database.BeginTransactionAsync();
-        try
+        IActionResult? actionResult = null;
+        var executionStrategy = dbContext.Database.CreateExecutionStrategy();
+        await executionStrategy.ExecuteAsync(async () =>
         {
-            int groupId = studyGroup.Id;
-
-            // Decks & Cards
-            var deckIds = await dbContext.Decks.Where(d => d.StudyGroupId == groupId).Select(d => d.Id).ToListAsync();
-            var cardIds = await dbContext.Cards.Where(c => deckIds.Contains(c.DeckId)).Select(c => c.Id).ToListAsync();
-
-            // Exercises
-            var exerciseIds = await dbContext.Exercises.Where(e => e.StudyGroupId == groupId).Select(e => e.Id).ToListAsync();
-
-            // Cascade wipe review records, followups, junction records
-            if (cardIds.Count > 0)
+            await using var transaction = await dbContext.Database.BeginTransactionAsync();
+            try
             {
-                var reviewRecords = dbContext.ReviewRecords.Where(r => cardIds.Contains(r.CardId));
-                dbContext.ReviewRecords.RemoveRange(reviewRecords);
+                int groupId = studyGroup.Id;
 
-                var cardFollowups = dbContext.CardFollowups.Where(f => cardIds.Contains(f.CardId));
-                dbContext.CardFollowups.RemoveRange(cardFollowups);
+                // Decks & Cards
+                var deckIds = await dbContext.Decks.Where(d => d.StudyGroupId == groupId).Select(d => d.Id).ToListAsync();
+                var cardIds = await dbContext.Cards.Where(c => deckIds.Contains(c.DeckId)).Select(c => c.Id).ToListAsync();
+
+                // Exercises
+                var exerciseIds = await dbContext.Exercises.Where(e => e.StudyGroupId == groupId).Select(e => e.Id).ToListAsync();
+
+                // Cascade wipe review records, followups, junction records
+                if (cardIds.Count > 0)
+                {
+                    var reviewRecords = dbContext.ReviewRecords.Where(r => cardIds.Contains(r.CardId));
+                    dbContext.ReviewRecords.RemoveRange(reviewRecords);
+
+                    var cardFollowups = dbContext.CardFollowups.Where(f => cardIds.Contains(f.CardId));
+                    dbContext.CardFollowups.RemoveRange(cardFollowups);
+                }
+
+                if (cardIds.Count > 0 || exerciseIds.Count > 0)
+                {
+                    var cardExercises = dbContext.CardExercises.Where(ce => cardIds.Contains(ce.CardId) || exerciseIds.Contains(ce.ExerciseId));
+                    dbContext.CardExercises.RemoveRange(cardExercises);
+                }
+
+                if (exerciseIds.Count > 0)
+                {
+                    var userExercises = dbContext.UserExercises.Where(ue => exerciseIds.Contains(ue.ExerciseId));
+                    dbContext.UserExercises.RemoveRange(userExercises);
+
+                    var exerciseReviewRecords = dbContext.ExerciseReviewRecords.Where(er => exerciseIds.Contains(er.ExerciseId));
+                    dbContext.ExerciseReviewRecords.RemoveRange(exerciseReviewRecords);
+                }
+
+                if (cardIds.Count > 0)
+                {
+                    var cards = dbContext.Cards.Where(c => deckIds.Contains(c.DeckId));
+                    dbContext.Cards.RemoveRange(cards);
+                }
+
+                if (deckIds.Count > 0)
+                {
+                    var decks = dbContext.Decks.Where(d => d.StudyGroupId == groupId);
+                    dbContext.Decks.RemoveRange(decks);
+                }
+
+                if (exerciseIds.Count > 0)
+                {
+                    var exercises = dbContext.Exercises.Where(e => e.StudyGroupId == groupId);
+                    dbContext.Exercises.RemoveRange(exercises);
+                }
+
+                var members = dbContext.StudyGroupMembers.Where(m => m.StudyGroupId == groupId);
+                dbContext.StudyGroupMembers.RemoveRange(members);
+
+                dbContext.StudyGroups.Remove(studyGroup);
+
+                await dbContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                actionResult = Ok(new { message = $"Study group '{studyGroup.Name}' and all its content have been permanently erased." });
             }
-
-            if (cardIds.Count > 0 || exerciseIds.Count > 0)
+            catch (Exception ex)
             {
-                var cardExercises = dbContext.CardExercises.Where(ce => cardIds.Contains(ce.CardId) || exerciseIds.Contains(ce.ExerciseId));
-                dbContext.CardExercises.RemoveRange(cardExercises);
+                await transaction.RollbackAsync();
+                actionResult = StatusCode(StatusCodes.Status500InternalServerError, $"Failed to delete study group: {ex.Message}");
             }
+        });
 
-            if (exerciseIds.Count > 0)
-            {
-                var userExercises = dbContext.UserExercises.Where(ue => exerciseIds.Contains(ue.ExerciseId));
-                dbContext.UserExercises.RemoveRange(userExercises);
-
-                var exerciseReviewRecords = dbContext.ExerciseReviewRecords.Where(er => exerciseIds.Contains(er.ExerciseId));
-                dbContext.ExerciseReviewRecords.RemoveRange(exerciseReviewRecords);
-            }
-
-            if (cardIds.Count > 0)
-            {
-                var cards = dbContext.Cards.Where(c => deckIds.Contains(c.DeckId));
-                dbContext.Cards.RemoveRange(cards);
-            }
-
-            if (deckIds.Count > 0)
-            {
-                var decks = dbContext.Decks.Where(d => d.StudyGroupId == groupId);
-                dbContext.Decks.RemoveRange(decks);
-            }
-
-            if (exerciseIds.Count > 0)
-            {
-                var exercises = dbContext.Exercises.Where(e => e.StudyGroupId == groupId);
-                dbContext.Exercises.RemoveRange(exercises);
-            }
-
-            var members = dbContext.StudyGroupMembers.Where(m => m.StudyGroupId == groupId);
-            dbContext.StudyGroupMembers.RemoveRange(members);
-
-            dbContext.StudyGroups.Remove(studyGroup);
-
-            await dbContext.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            return Ok(new { message = $"Study group '{studyGroup.Name}' and all its content have been permanently erased." });
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            return StatusCode(StatusCodes.Status500InternalServerError, $"Failed to delete study group: {ex.Message}");
-        }
+        return actionResult!;
     }
 
     private int? GetCurrentUserId()

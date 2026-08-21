@@ -68,7 +68,7 @@ export default function Home() {
         </p>
 
         {/* Primary Action Buttons */}
-        <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 28 }}>
+        <div className="hero-action-buttons" style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 28 }}>
           <Link
             to="/register"
             className="btn btn-primary"

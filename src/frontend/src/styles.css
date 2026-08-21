@@ -559,4 +559,352 @@ main.main-content {
   margin: 8px 0 0;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   MOBILE-FIRST RESPONSIVE SYSTEM (Story 7.0)
+   Breakpoint: 768px
+   ───────────────────────────────────────────────────────────── */
 
+/* ── Mobile Nav: Hamburger Button ── */
+.navbar-hamburger {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  color: #212529;
+  border-radius: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.navbar-hamburger:hover {
+  background-color: #e9ecef;
+}
+
+/* ── Mobile Nav: Slide-Out Drawer Backdrop ── */
+.mobile-nav-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1040;
+}
+
+.mobile-nav-backdrop.open {
+  display: block;
+}
+
+/* ── Mobile Nav: Slide-Out Drawer ── */
+.mobile-nav-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 280px;
+  max-width: 85vw;
+  background: #fff;
+  z-index: 1050;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  overflow-y: auto;
+}
+
+.mobile-nav-drawer.open {
+  transform: translateX(0);
+}
+
+.mobile-nav-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+}
+
+.mobile-nav-drawer-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.4rem;
+  color: #6c757d;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+.mobile-nav-drawer-close:hover {
+  background: #e9ecef;
+  color: #212529;
+}
+
+.mobile-nav-links {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
+  flex: 1;
+}
+
+.mobile-nav-links li {
+  border-bottom: 1px solid #f1f3f5;
+}
+
+.mobile-nav-links .nav-link,
+.mobile-nav-links a {
+  display: block;
+  padding: 14px 20px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #212529;
+  text-decoration: none;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  transition: background 0.15s;
+}
+
+.mobile-nav-links .nav-link:hover,
+.mobile-nav-links a:hover {
+  background: #f8f9fa;
+  color: #0d6efd;
+}
+
+.mobile-nav-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #e9ecef;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-nav-user-info {
+  font-size: 0.9rem;
+  color: #6c757d;
+  font-weight: 500;
+  padding: 4px 0;
+}
+
+/* ── Mobile Bottom Sheet Modals ── */
+@media (max-width: 768px) {
+  /* Mobile viewport resets */
+  html, body {
+    overflow-x: hidden;
+  }
+
+  main.main-content {
+    padding: 16px 12px;
+    max-width: 100%;
+  }
+
+  /* iOS Safari: prevent auto-zoom on form field focus */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Mobile Navigation: hide desktop nav, show hamburger */
+  .navbar {
+    padding: 10px 16px;
+  }
+
+  .navbar > div:first-child nav,
+  .navbar-right {
+    display: none !important;
+  }
+
+  .navbar-hamburger {
+    display: flex;
+  }
+
+  /* Study card: full viewport width, no horizontal blowout */
+  .card-viewer-area {
+    max-width: 100%;
+    padding: 20px 12px 100px; /* bottom padding for sticky bar */
+  }
+
+  .card-prompt,
+  .card-divider,
+  .card-answer,
+  .followups-wrapper {
+    max-width: 100%;
+  }
+
+  /* Sticky study bottom bar on mobile */
+  .study-bottom-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: #fff;
+    border-top: 1px solid #dee2e6;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+    justify-content: stretch;
+  }
+
+  .btn-show-answer {
+    width: 100%;
+    min-height: 48px;
+    font-size: 1.05rem;
+  }
+
+  .rating-buttons-group {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .rating-col {
+    flex: 1;
+  }
+
+  .btn-rating {
+    width: 100%;
+    min-width: unset;
+    min-height: 44px;
+    font-size: 0.9rem;
+    padding: 8px 4px;
+  }
+
+  /* Bottom sheet: modals become full-width bottom sheets on mobile */
+  .mobile-bottom-sheet-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .mobile-bottom-sheet-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    max-height: 90vh !important;
+    overflow-y: auto;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+  }
+
+  /* Home hero: stack action buttons vertically */
+  .hero-action-buttons {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .hero-action-buttons a,
+  .hero-action-buttons button {
+    width: 100% !important;
+    min-height: 48px !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  /* Touch targets: all interactive elements ≥ 44px */
+  .btn-study-tool,
+  .btn-primary,
+  .btn-logout,
+  .btn-followups-toggle,
+  .dropdown-item {
+    min-height: 44px;
+  }
+
+  /* Decks header: wrap on mobile */
+  .decks-header-bar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* Exercises mobile: floating run button */
+  .exercise-fab {
+    position: fixed;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    right: 20px;
+    z-index: 200;
+    background: #0d6efd;
+    color: #fff;
+    border: none;
+    border-radius: 28px;
+    padding: 12px 20px;
+    font-size: 1rem;
+    font-weight: 700;
+    box-shadow: 0 4px 16px rgba(13, 110, 253, 0.4);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 52px;
+  }
+
+  .exercise-fab:hover {
+    background: #0b5ed7;
+  }
+
+  /* Exercise 3-tab mobile nav */
+  .exercise-mobile-tabs {
+    display: flex;
+    border-bottom: 2px solid #dee2e6;
+    background: #f8f9fa;
+  }
+
+  .exercise-mobile-tab-btn {
+    flex: 1;
+    padding: 12px 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: #6c757d;
+    border-bottom: 3px solid transparent;
+    min-height: 44px;
+    transition: all 0.15s;
+  }
+
+  .exercise-mobile-tab-btn.active {
+    color: #0d6efd;
+    border-bottom-color: #0d6efd;
+    background: #fff;
+  }
+
+  /* Code block horizontal scroll in MarkdownViewer */
+  .markdown-code-block {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+}
+
+/* Desktop: hide mobile-only elements */
+@media (min-width: 769px) {
+  .exercise-fab {
+    display: none;
+  }
+
+  .exercise-mobile-tabs {
+    display: none;
+  }
+
+  /* On desktop, ALL tab panes are always visible regardless of tab state */
+  .exercise-desktop-only {
+    display: block !important;
+  }
+
+  .mobile-nav-backdrop,
+  .mobile-nav-drawer {
+    display: none !important;
+  }
+}
+
+/* On mobile, tab pane visibility is controlled by the absence/presence of the class */
+@media (max-width: 768px) {
+  .exercise-desktop-only {
+    display: none !important;
+  }
+}

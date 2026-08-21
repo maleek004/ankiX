@@ -364,9 +364,17 @@ export default function Deck(){
         </div>
       </div>
 
-      {/* Add Card Drawer */}
+      {/* Add Card Drawer — bottom sheet on mobile */}
       {isAddDrawerOpen && canCreate && (
-        <div className="form-card" style={{ marginBottom: 24 }}>
+        <div
+          className="mobile-bottom-sheet-overlay"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 500, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setIsAddDrawerOpen(false) }}
+        >
+          <div
+            className="mobile-bottom-sheet-content"
+            style={{ background: '#fff', borderRadius: '12px 12px 0 0', width: '100%', maxWidth: 750, maxHeight: '85vh', overflowY: 'auto', padding: 20, boxShadow: '0 -4px 20px rgba(0,0,0,0.15)' }}
+          >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <h3 style={{ margin: 0 }}>Add New Card to Deck</h3>
             <button
@@ -408,6 +416,7 @@ export default function Deck(){
               </span>
             </div>
           </form>
+          </div>
         </div>
       )}
 
@@ -1896,8 +1905,8 @@ function ImportCardsModal({ deckId, onClose, onImportSuccess }) {
   }
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ background: '#fff', borderRadius: 12, width: '90%', maxWidth: 620, maxHeight: '90vh', overflowY: 'auto', padding: 24, boxShadow: '0 20px 40px rgba(0,0,0,0.35)' }}>
+    <div className="mobile-bottom-sheet-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div className="mobile-bottom-sheet-content" style={{ background: '#fff', borderRadius: 12, width: '90%', maxWidth: 620, maxHeight: '90vh', overflowY: 'auto', padding: 24, boxShadow: '0 20px 40px rgba(0,0,0,0.35)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, pb: 12, borderBottom: '1px solid #e9ecef' }}>
           <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>📥 Import Cards into Deck</h3>
           <button style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.4rem', color: '#6c757d' }} onClick={onClose}>✕</button>
