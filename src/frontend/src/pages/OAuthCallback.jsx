@@ -33,7 +33,7 @@ export default function OAuthCallback() {
         } else {
           await auth.oauthLogin('github', { code, redirectUri })
         }
-        window.location.href = resolvePostLoginRedirect('/decks')
+        window.location.href = resolvePostLoginRedirect()
       } catch (err) {
         setStatus(`Social sign-in failed: ${err.message || err}`)
       }

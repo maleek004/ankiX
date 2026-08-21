@@ -2,7 +2,7 @@ import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { MemoryRouter } from 'react-router-dom'
-import { parseApiError } from '../api'
+import { parseApiError, logout } from '../api'
 import Login from '../pages/Login'
 import Register from '../pages/Register'
 import * as authModule from '../auth/AuthProvider'
@@ -119,3 +119,27 @@ describe('Login Component Error Handling', () => {
     })
   })
 })
+
+describe('Session Cleanup on Logout', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+  })
+
+  it('purges auth tokens, study group context, and session intents on api.logout()', () => {
+    localStorage.setItem('ankix_token', 'sample-token')
+    localStorage.setItem('ankix_user', JSON.stringify({ id: 1, email: 'test@example.com' }))
+    localStorage.setItem('ankix_study_group', JSON.stringify({ id: 99, name: 'Cardiology' }))
+    localStorage.setItem('ankix_community', JSON.stringify({ id: 99, name: 'Cardiology' }))
+    sessionStorage.setItem('ankix_pending_intent', JSON.stringify({ returnUrl: '/decks/99' }))
+
+    logout()
+
+    expect(localStorage.getItem('ankix_token')).toBeNull()
+    expect(localStorage.getItem('ankix_user')).toBeNull()
+    expect(localStorage.getItem('ankix_study_group')).toBeNull()
+    expect(localStorage.getItem('ankix_community')).toBeNull()
+    expect(sessionStorage.getItem('ankix_pending_intent')).toBeNull()
+  })
+})
+

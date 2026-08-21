@@ -45,7 +45,7 @@ export default function Login(){
     setIsLoading(true)
     try{
       await auth.login(email.trim(), password)
-      window.location.href = resolvePostLoginRedirect('/decks')
+      window.location.href = resolvePostLoginRedirect()
     }catch(err){
       let msg = err.message || 'Invalid email or password. Please check your credentials.'
       try {

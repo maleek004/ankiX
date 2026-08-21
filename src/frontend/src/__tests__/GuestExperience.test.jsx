@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { MemoryRouter } from 'react-router-dom'
@@ -58,9 +58,14 @@ describe('Guest Experience & AuthModal', () => {
 
   test('resolvePostLoginRedirect retrieves returnUrl and clears storage', () => {
     savePendingIntent({ returnUrl: '/exercises', action: 'enroll' })
-    const redirectUrl = resolvePostLoginRedirect('/decks')
+    const redirectUrl = resolvePostLoginRedirect('/study-groups')
     expect(redirectUrl).toBe('/exercises')
     expect(getPendingIntent()).toBeNull()
+  })
+
+  test('resolvePostLoginRedirect defaults to /study-groups when no pending intent', () => {
+    const redirectUrl = resolvePostLoginRedirect()
+    expect(redirectUrl).toBe('/study-groups')
   })
 
   test('NavBar renders guest badge and public navigation links', () => {

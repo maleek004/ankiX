@@ -18,12 +18,13 @@ export function clearPendingIntent() {
   } catch {}
 }
 
-export function resolvePostLoginRedirect(defaultUrl = '/decks') {
+export function resolvePostLoginRedirect(defaultUrl = '/study-groups') {
   const intent = getPendingIntent()
   if (intent && typeof intent.returnUrl === 'string') {
     clearPendingIntent()
-    if (intent.returnUrl.startsWith('/') && !intent.returnUrl.startsWith('//')) {
-      return intent.returnUrl
+    const trimmed = intent.returnUrl.trim()
+    if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.startsWith('/\\')) {
+      return trimmed
     }
   }
   return defaultUrl

@@ -216,8 +216,7 @@ export function getToken(){
     if (payload && payload.exp) {
       const now = Math.floor(Date.now() / 1000)
       if (payload.exp < now) {
-        localStorage.removeItem('ankix_token')
-        localStorage.removeItem('ankix_user')
+        logout()
         return null
       }
     }
@@ -267,8 +266,15 @@ export function canCreateContent(studyGroupRole = null){
 }
 
 export function logout(){
-  localStorage.removeItem('ankix_token')
-  localStorage.removeItem('ankix_user')
+  try {
+    localStorage.removeItem('ankix_token')
+    localStorage.removeItem('ankix_user')
+    localStorage.removeItem('ankix_study_group')
+    localStorage.removeItem('ankix_community')
+  } catch {}
+  try {
+    sessionStorage.removeItem('ankix_pending_intent')
+  } catch {}
 }
 
 /**

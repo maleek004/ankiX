@@ -20,6 +20,8 @@ export function AuthProvider({ children }){
     if(data?.user){
       setUser(data.user)
       localStorage.setItem('ankix_user', JSON.stringify(data.user))
+      localStorage.removeItem('ankix_study_group')
+      localStorage.removeItem('ankix_community')
     }
     return data
   }
@@ -29,6 +31,8 @@ export function AuthProvider({ children }){
     if(data?.user){
       setUser(data.user)
       localStorage.setItem('ankix_user', JSON.stringify(data.user))
+      localStorage.removeItem('ankix_study_group')
+      localStorage.removeItem('ankix_community')
     }
     return data
   }
@@ -41,7 +45,6 @@ export function AuthProvider({ children }){
   const logout = () => {
     api.logout()
     setUser(null)
-    localStorage.removeItem('ankix_user')
     window.location.href = '/login'
   }
 
