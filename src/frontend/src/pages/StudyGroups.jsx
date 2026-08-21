@@ -583,30 +583,48 @@ export default function StudyGroups() {
                       )}
                     </>
                   ) : !token ? (
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        className="btn btn-primary"
-                        style={{ flex: 1, padding: '0.5rem', fontSize: '0.85rem' }}
-                        onClick={(e) => { e.stopPropagation(); enterStudyGroup(c) }}
-                      >
-                        Browse Decks →
-                      </button>
+                    c.isPublic || c.privacy === 'Public' ? (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          className="btn btn-primary"
+                          style={{ flex: 1, padding: '0.5rem', fontSize: '0.85rem' }}
+                          onClick={(e) => { e.stopPropagation(); enterStudyGroup(c) }}
+                        >
+                          Browse Decks →
+                        </button>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ flex: 1, padding: '0.5rem', fontSize: '0.85rem' }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setAuthModalConfig({
+                              isOpen: true,
+                              title: `Join ${c.name}`,
+                              subtitle: 'Sign in or register to join this study group, sync your SRS reviews, and track daily learning streaks.',
+                              intent: { returnUrl: '/study-groups', action: 'join', slug: c.slug }
+                            })
+                          }}
+                        >
+                          Join Group
+                        </button>
+                      </div>
+                    ) : (
                       <button
                         className="btn btn-secondary"
-                        style={{ flex: 1, padding: '0.5rem', fontSize: '0.85rem' }}
+                        style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem' }}
                         onClick={(e) => {
                           e.stopPropagation()
                           setAuthModalConfig({
                             isOpen: true,
                             title: `Join ${c.name}`,
-                            subtitle: 'Sign in or register to join this study group, sync your SRS reviews, and track daily learning streaks.',
+                            subtitle: 'Sign in or register to request access to this private study group.',
                             intent: { returnUrl: '/study-groups', action: 'join', slug: c.slug }
                           })
                         }}
                       >
-                        {c.privacy === 'Private' ? 'Request Join' : 'Join Group'}
+                        {c.privacy === 'Locked' ? '🔒 Invite Only (Sign In)' : '🔒 Request Join (Sign In)'}
                       </button>
-                    </div>
+                    )
                   ) : c.privacy === 'Private' ? (
                     isPendingRequest ? (
                       <button
