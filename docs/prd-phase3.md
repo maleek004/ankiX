@@ -77,6 +77,10 @@ Key focus areas for Phase 3:
   * **Locked Execution Runtime:** Code execution exercises strictly execute in the exact language chosen at creation time (Python, C#, JavaScript, Go); runtime switching dropdown during practice is disabled.
   * **Custom Topic & Domain Tags:** MCQ and Short Answer exercises allow custom topic tagging (e.g., Linux, Networking, SQL, DevOps, Architecture, General) rather than forcing programming language assignments.
   * **Deduplicated Action Controls:** Action buttons (`▶ Run Solution`, `Check Answer`, `Submit Answer`) render as single, unified controls across standalone views and linked card modals.
+* **FR35:** Exercise Management & Rich Markdown Rendering across Modalities:
+  * **UI Exercise Editing:** Allow study group admins and contributors (with content creation permissions) to edit existing exercises directly in the UI with a modal preloaded with full exercise data (title, tag, type, description, specs, code).
+  * **Full Markdown Support:** Exercise inputs (descriptions, instructions, prompts, and MCQ option choices) accept full Markdown syntax and render cleanly via `MarkdownViewer` across all exercise practice views, dialogs, and catalog lists.
+
 
 
 ### Analytics & Gamification

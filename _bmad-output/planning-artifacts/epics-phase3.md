@@ -29,7 +29,9 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 | **FR22** | Dark / Light mode theme switcher engine | Epic 7 (Story 7.3) |
 | **FR33** | Universal Mobile-First Responsiveness & Touch Adaptive UX | Epic 7 (Story 7.0) |
 | **FR34** | Multi-Modal Exercise Integrity & Custom Topic Tagging | Epic 7 (Story 7.4) |
+| **FR35** | Exercise Editing UI & Rich Markdown Rendering across Modalities | Epic 7 (Story 7.5) |
 | **FR23** | GitHub-style study activity heatmap | Epic 8 (Story 8.1) |
+
 | **FR24** | Daily study streak tracking & milestone badges | Epic 8 (Story 8.2) |
 | **FR25** | Health probe endpoints (`GET /healthz`) & Load Balancer setup | Epic 9 (Story 9.1) |
 | **FR26** | Redis distributed caching for SRS queues & sessions | Epic 9 (Story 9.2) |
@@ -223,9 +225,23 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
   * **Custom Topic & Domain Tags for Non-Coding Exercises:** MCQ and Short Answer creation and editing interfaces allow authors to specify custom topic/domain tags (e.g. `Linux`, `Networking`, `DevOps`, `SQL`, `Architecture`, `General`) instead of forcing programming language tags.
   * **Polished Tag Badge Rendering:** Non-coding exercises display their custom topic badge with a clean, neutral theme rather than defaulting to a purple `C#` badge.
 
+#### Story 7.5: UI Exercise Management & Rich Markdown Rendering across Modalities
+
+**As an** admin or contributor authoring exercises and a learner practicing them,  
+**I want to** edit existing exercises directly from the UI and compose descriptions, instructions, prompts, and MCQ options with rich Markdown formatting,  
+**So that** exercise content is easily maintainable and renders formatted code snippets, lists, emphasis, and diagrams cleanly.  
+
+* **Acceptance Criteria:**
+  * **UI Exercise Editing Modal:** Study group admins and contributors (with manage/create permissions) see an "✏️ Edit" button on exercise cards in `Exercises.jsx`. Clicking opens an Edit Exercise modal preloaded with title, modality (Code Execution, MCQ, Exact String), topic tag/language, description, starter/solution code, test specs, and MCQ options.
+  * **Frontend API Integration:** Add `updateExercise(id, payload)` in `src/frontend/src/api.js` calling `PUT /api/exercises/{id}` with proper auth headers and error handling.
+  * **Rich Markdown Input Fields:** Replace plain textareas for Exercise Description / Instructions and MCQ options in both Create and Edit modals with `MarkdownField` (providing live preview, syntax hint, and tab switching).
+  * **Rich Markdown Display across Modalities:** Use `MarkdownViewer` to render exercise descriptions, instructions, prompts, and MCQ option choices in both standalone exercise views (`Exercises.jsx`) and linked card modals (`ExercisePracticeModal` in `Deck.jsx`), supporting inline code, multi-line code blocks, bold/italics, and lists.
+  * **Permissions & State Synchronization:** Submitting an exercise edit updates the exercise state in-place in both the catalog and active practice workspace without requiring a full page refresh.
+
 ---
 
 ### Epic 8: Spaced Repetition Analytics & Gamification
+
 
 
 #### Story 8.1: GitHub-Style Study Activity Heatmap
