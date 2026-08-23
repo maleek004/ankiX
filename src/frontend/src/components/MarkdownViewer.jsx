@@ -127,8 +127,9 @@ function CodeBlock({ node, inline, className, children, ...props }) {
   )
 }
 
-export default function MarkdownViewer({ content = '', className = '', style = {} }) {
-  if (!content) return null
+export default function MarkdownViewer({ content = '', className = '', style = {}, compact = false }) {
+  const safeContent = typeof content === 'string' ? content : String(content ?? '')
+  if (!safeContent) return null
 
   return (
     <div
@@ -146,7 +147,14 @@ export default function MarkdownViewer({ content = '', className = '', style = {
         rehypePlugins={[rehypeHighlight]}
         components={{
           code: CodeBlock,
-          p: ({ children }) => <p style={{ margin: '0 0 10px 0', lineHeight: 1.6 }}>{children}</p>,
+          p: ({ children }) => (
+            <p style={{
+              margin: (style?.margin === 0 || compact) ? 0 : '0 0 10px 0',
+              lineHeight: style?.lineHeight || 1.6
+            }}>
+              {children}
+            </p>
+          ),
           h1: ({ children }) => <h1 style={{ fontSize: '1.4rem', margin: '16px 0 8px 0', fontWeight: 700 }}>{children}</h1>,
           h2: ({ children }) => <h2 style={{ fontSize: '1.25rem', margin: '14px 0 8px 0', fontWeight: 600 }}>{children}</h2>,
           h3: ({ children }) => <h3 style={{ fontSize: '1.1rem', margin: '12px 0 6px 0', fontWeight: 600 }}>{children}</h3>,

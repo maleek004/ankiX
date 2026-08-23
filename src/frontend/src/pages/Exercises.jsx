@@ -5,6 +5,7 @@ import {
   getExercises,
   getExercise,
   createExercise,
+  updateExercise,
   deleteExercise,
   runExerciseCode,
   submitExerciseReview,
@@ -17,6 +18,8 @@ import {
 import ExerciseRenderer from '../components/ExerciseComponents'
 import CopyModal from '../components/CopyModal'
 import AuthModal from '../components/AuthModal'
+import MarkdownViewer from '../components/MarkdownViewer'
+import MarkdownField from '../components/MarkdownField'
 
 export default function Exercises() {
   const { activeStudyGroup } = useStudyGroup() || {}
@@ -50,16 +53,38 @@ export default function Exercises() {
   const [solutionCode, setSolutionCode] = useState('')
   const [testCasesSpec, setTestCasesSpec] = useState('')
 
-  // MCQ state
+  // MCQ state for Add
   const [mcqOpt1, setMcqOpt1] = useState('')
   const [mcqOpt2, setMcqOpt2] = useState('')
   const [mcqOpt3, setMcqOpt3] = useState('')
   const [mcqOpt4, setMcqOpt4] = useState('')
   const [mcqCorrect, setMcqCorrect] = useState(0)
 
-  // Exact String state
+  // Exact String state for Add
   const [exactAnswer, setExactAnswer] = useState('')
   const [exactCaseSensitive, setExactCaseSensitive] = useState(false)
+
+  // Edit Exercise state
+  const [editingExercise, setEditingExercise] = useState(null)
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
+
+  const [editTitle, setEditTitle] = useState('')
+  const [editLanguage, setEditLanguage] = useState('csharp')
+  const [editExerciseType, setEditExerciseType] = useState('CodeExecution')
+  const [editDescription, setEditDescription] = useState('')
+  const [editStarterCode, setEditStarterCode] = useState('')
+  const [editSolutionCode, setEditSolutionCode] = useState('')
+  const [editTestCasesSpec, setEditTestCasesSpec] = useState('')
+
+  const [editMcqOpt1, setEditMcqOpt1] = useState('')
+  const [editMcqOpt2, setEditMcqOpt2] = useState('')
+  const [editMcqOpt3, setEditMcqOpt3] = useState('')
+  const [editMcqOpt4, setEditMcqOpt4] = useState('')
+  const [editMcqCorrect, setEditMcqCorrect] = useState(0)
+
+  const [editExactAnswer, setEditExactAnswer] = useState('')
+  const [editExactCaseSensitive, setEditExactCaseSensitive] = useState(false)
 
   // Active practice workspace state
   const [activeExercise, setActiveExercise] = useState(null)
@@ -147,7 +172,8 @@ export default function Exercises() {
         alert('Please provide at least 2 options for Multiple Choice exercise.')
         return
       }
-      exerciseSpec = JSON.stringify({ options: opts, correctIndex: Number(mcqCorrect) })
+      const validCorrectIdx = Math.min(Number(mcqCorrect), opts.length - 1)
+      exerciseSpec = JSON.stringify({ options: opts, correctIndex: Math.max(0, validCorrectIdx) })
     } else if (exerciseType === 'ExactString') {
       if (!exactAnswer.trim()) {
         alert('Please provide the correct answer for Exact String exercise.')
@@ -202,6 +228,122 @@ export default function Exercises() {
       alert('Delete exercise failed: ' + (err.message || err))
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const handleOpenEdit = async (ex, e) => {
+    if (e) e.stopPropagation()
+    try {
+      let fullEx = ex
+      if (!ex.starterCode && !ex.solutionCode && !ex.testCasesSpec) {
+        try {
+          fullEx = await getExercise(ex.id)
+        } catch {
+          fullEx = ex
+        }
+      }
+      setEditingExercise(fullEx)
+      setEditTitle(fullEx.title || '')
+      setEditLanguage(fullEx.language || 'csharp')
+      const exType = fullEx.exerciseType || 'CodeExecution'
+      setEditExerciseType(exType)
+      setEditDescription(fullEx.description || '')
+      setEditStarterCode(fullEx.starterCode || '')
+      setEditSolutionCode(fullEx.solutionCode || '')
+      setEditTestCasesSpec(fullEx.testCasesSpec || '')
+
+      if (exType === 'MultipleChoice') {
+        let spec = { options: [], correctIndex: 0 }
+        try {
+          if (fullEx.exerciseSpec) {
+            spec = typeof fullEx.exerciseSpec === 'string' ? JSON.parse(fullEx.exerciseSpec) : fullEx.exerciseSpec
+          }
+        } catch (err) {
+          console.error('Failed to parse MCQ spec for edit:', err)
+        }
+        const opts = spec.options || []
+        setEditMcqOpt1(opts[0] || '')
+        setEditMcqOpt2(opts[1] || '')
+        setEditMcqOpt3(opts[2] || '')
+        setEditMcqOpt4(opts[3] || '')
+        setEditMcqCorrect(Number(spec.correctIndex) || 0)
+      } else {
+        setEditMcqOpt1('')
+        setEditMcqOpt2('')
+        setEditMcqOpt3('')
+        setEditMcqOpt4('')
+        setEditMcqCorrect(0)
+      }
+
+      if (exType === 'ExactString') {
+        let spec = { acceptedAnswers: [], caseSensitive: false }
+        try {
+          if (fullEx.exerciseSpec) {
+            spec = typeof fullEx.exerciseSpec === 'string' ? JSON.parse(fullEx.exerciseSpec) : fullEx.exerciseSpec
+          }
+        } catch (err) {
+          console.error('Failed to parse ExactString spec for edit:', err)
+        }
+        setEditExactAnswer(spec.acceptedAnswers?.[0] || '')
+        setEditExactCaseSensitive(Boolean(spec.caseSensitive))
+      } else {
+        setEditExactAnswer('')
+        setEditExactCaseSensitive(false)
+      }
+
+      setShowEditForm(true)
+    } catch (err) {
+      alert('Failed to open exercise for editing: ' + (err.message || err))
+    }
+  }
+
+  const handleUpdate = async (e) => {
+    e.preventDefault()
+    if (!editingExercise || !editTitle.trim()) return
+
+    let exerciseSpec = null
+    if (editExerciseType === 'MultipleChoice') {
+      const opts = [editMcqOpt1, editMcqOpt2, editMcqOpt3, editMcqOpt4].map(s => s.trim()).filter(Boolean)
+      if (opts.length < 2) {
+        alert('Please provide at least 2 options for Multiple Choice exercise.')
+        return
+      }
+      const validCorrectIdx = Math.min(Number(editMcqCorrect), opts.length - 1)
+      exerciseSpec = JSON.stringify({ options: opts, correctIndex: Math.max(0, validCorrectIdx) })
+    } else if (editExerciseType === 'ExactString') {
+      if (!editExactAnswer.trim()) {
+        alert('Please provide the correct answer for Exact String exercise.')
+        return
+      }
+      exerciseSpec = JSON.stringify({ acceptedAnswers: [editExactAnswer.trim()], caseSensitive: editExactCaseSensitive })
+    }
+
+    setIsUpdating(true)
+    try {
+      const payload = {
+        title: editTitle.trim(),
+        language: editLanguage,
+        exerciseType: editExerciseType,
+        exerciseSpec,
+        description: editDescription,
+        starterCode: editStarterCode,
+        solutionCode: editSolutionCode,
+        testCasesSpec: editTestCasesSpec
+      }
+      await updateExercise(editingExercise.id, payload)
+
+      const updatedExercise = { ...editingExercise, ...payload }
+      setExercises(prev => prev.map(ex => ex.id === editingExercise.id ? { ...ex, ...updatedExercise } : ex))
+      setDueQueue(prev => prev.map(ex => ex.id === editingExercise.id ? { ...ex, ...updatedExercise } : ex))
+      if (activeExercise?.id === editingExercise.id) {
+        setActiveExercise(prev => ({ ...prev, ...updatedExercise }))
+      }
+      setShowEditForm(false)
+      setEditingExercise(null)
+    } catch (err) {
+      alert('Update exercise failed: ' + (err.message || err))
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -463,6 +605,15 @@ export default function Exercises() {
                           </button>
                           {canCreate && (
                             <button
+                              style={{ padding: '6px 10px', fontSize: '0.8rem', background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                              onClick={(e) => handleOpenEdit(ex, e)}
+                              title="Edit exercise"
+                            >
+                              ✏️ Edit
+                            </button>
+                          )}
+                          {canCreate && (
+                            <button
                               style={{ padding: '6px 10px', fontSize: '0.8rem', background: '#fff5f5', color: '#e03131', border: '1px solid #ffc9c9', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
                               disabled={deletingId === ex.id}
                               onClick={(e) => handleDelete(ex.id, ex.title, e)}
@@ -598,6 +749,15 @@ export default function Exercises() {
                         </button>
                         {canCreate && (
                           <button
+                            style={{ padding: '6px 10px', fontSize: '0.8rem', background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                            onClick={(e) => handleOpenEdit(ex, e)}
+                            title="Edit exercise"
+                          >
+                            ✏️ Edit
+                          </button>
+                        )}
+                        {canCreate && (
+                          <button
                             style={{ padding: '6px 10px', fontSize: '0.8rem', background: '#fff5f5', color: '#e03131', border: '1px solid #ffc9c9', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
                             disabled={deletingId === ex.id}
                             onClick={(e) => handleDelete(ex.id, ex.title, e)}
@@ -615,7 +775,6 @@ export default function Exercises() {
                 )
               })}
             </div>
-
           )}
         </div>
       )}
@@ -676,8 +835,13 @@ export default function Exercises() {
               </div>
 
               <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Instructions / Problem Statement</label>
-                <textarea className="form-control" rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="Exercise instructions or question text..." />
+                <MarkdownField
+                  label="Instructions / Problem Statement"
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder="Exercise instructions, markdown formatting, or question text..."
+                  rows={3}
+                />
               </div>
 
               {/* Dynamic inputs based on exerciseType */}
@@ -696,8 +860,8 @@ export default function Exercises() {
 
               {exerciseType === 'MultipleChoice' && (
                 <div style={{ background: '#f8f9fa', padding: 14, borderRadius: 8, border: '1px solid #dee2e6', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Multiple Choice Options:</label>
-                  <input className="form-control" placeholder="Option A" value={mcqOpt1} onChange={e => setMcqOpt1(e.target.value)} required />
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Multiple Choice Options (Supports Markdown):</label>
+                  <input className="form-control" placeholder="Option A (e.g. `const` keyword)" value={mcqOpt1} onChange={e => setMcqOpt1(e.target.value)} required />
                   <input className="form-control" placeholder="Option B" value={mcqOpt2} onChange={e => setMcqOpt2(e.target.value)} required />
                   <input className="form-control" placeholder="Option C (Optional)" value={mcqOpt3} onChange={e => setMcqOpt3(e.target.value)} />
                   <input className="form-control" placeholder="Option D (Optional)" value={mcqOpt4} onChange={e => setMcqOpt4(e.target.value)} />
@@ -731,6 +895,128 @@ export default function Exercises() {
                 <button type="button" className="btn-study-tool" onClick={() => setShowAddForm(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={isCreating}>
                   {isCreating ? 'Saving...' : 'Save & Add to Collection'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Exercise Modal */}
+      {showEditForm && editingExercise && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', padding: 24, borderRadius: 12, width: '90%', maxWidth: 620, maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 style={{ margin: '0 0 16px 0' }}>✏️ Edit Exercise</h3>
+            <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Title</label>
+                <input className="form-control" value={editTitle} onChange={e => setEditTitle(e.target.value)} required placeholder="e.g. Reverse String in Python" />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: editExerciseType === 'CodeExecution' ? '1fr 1fr' : '1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Exercise Format</label>
+                  <select className="form-control" value={editExerciseType} onChange={e => {
+                    setEditExerciseType(e.target.value)
+                    if (e.target.value !== 'CodeExecution') {
+                      setEditLanguage('general')
+                    } else {
+                      setEditLanguage('csharp')
+                    }
+                  }}>
+                    <option value="CodeExecution">⚡ Code Execution</option>
+                    <option value="MultipleChoice">🔘 Multiple Choice (MCQ)</option>
+                    <option value="ExactString">✏️ Exact String / Short Answer</option>
+                  </select>
+                </div>
+                {editExerciseType === 'CodeExecution' ? (
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language Tag</label>
+                    <select className="form-control" value={editLanguage} onChange={e => setEditLanguage(e.target.value)}>
+                      <option value="csharp">C#</option>
+                      <option value="python">Python</option>
+                      <option value="javascript">JavaScript</option>
+                      <option value="go">Go</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Topic Tag</label>
+                    <select className="form-control" value={editLanguage} onChange={e => setEditLanguage(e.target.value)}>
+                      <option value="general">🏷️ General</option>
+                      <option value="linux">🐧 Linux</option>
+                      <option value="networking">🌐 Networking</option>
+                      <option value="devops">⚙️ DevOps</option>
+                      <option value="sql">🗄️ SQL</option>
+                      <option value="architecture">🏛️ Architecture</option>
+                      <option value="security">🔐 Security</option>
+                      <option value="algorithms">🧮 Algorithms</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <MarkdownField
+                  label="Instructions / Problem Statement"
+                  value={editDescription}
+                  onChange={e => setEditDescription(e.target.value)}
+                  placeholder="Exercise instructions, markdown formatting, or question text..."
+                  rows={3}
+                />
+              </div>
+
+              {/* Dynamic inputs based on editExerciseType */}
+              {editExerciseType === 'CodeExecution' && (
+                <>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Starter Code</label>
+                    <textarea className="form-control" rows={3} style={{ fontFamily: 'monospace' }} value={editStarterCode} onChange={e => setEditStarterCode(e.target.value)} placeholder="def solution():..." />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Solution Code (Test Assertions)</label>
+                    <textarea className="form-control" rows={3} style={{ fontFamily: 'monospace' }} value={editSolutionCode} onChange={e => setEditSolutionCode(e.target.value)} placeholder="reference solution or assertion code..." />
+                  </div>
+                </>
+              )}
+
+              {editExerciseType === 'MultipleChoice' && (
+                <div style={{ background: '#f8f9fa', padding: 14, borderRadius: 8, border: '1px solid #dee2e6', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Multiple Choice Options (Supports Markdown):</label>
+                  <input className="form-control" placeholder="Option A (e.g. `const` keyword)" value={editMcqOpt1} onChange={e => setEditMcqOpt1(e.target.value)} required />
+                  <input className="form-control" placeholder="Option B" value={editMcqOpt2} onChange={e => setEditMcqOpt2(e.target.value)} required />
+                  <input className="form-control" placeholder="Option C (Optional)" value={editMcqOpt3} onChange={e => setEditMcqOpt3(e.target.value)} />
+                  <input className="form-control" placeholder="Option D (Optional)" value={editMcqOpt4} onChange={e => setEditMcqOpt4(e.target.value)} />
+                  
+                  <div style={{ marginTop: 4 }}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 4 }}>Correct Option:</label>
+                    <select className="form-control" value={editMcqCorrect} onChange={e => setEditMcqCorrect(Number(e.target.value))}>
+                      <option value={0}>Option A (First Option)</option>
+                      <option value={1}>Option B (Second Option)</option>
+                      {editMcqOpt3 && <option value={2}>Option C (Third Option)</option>}
+                      {editMcqOpt4 && <option value={3}>Option D (Fourth Option)</option>}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {editExerciseType === 'ExactString' && (
+                <div style={{ background: '#f8f9fa', padding: 14, borderRadius: 8, border: '1px solid #dee2e6', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', display: 'block', marginBottom: 4 }}>Correct Answer (Exact Match):</label>
+                    <input className="form-control" placeholder="e.g. const" value={editExactAnswer} onChange={e => setEditExactAnswer(e.target.value)} required />
+                  </div>
+                  <label style={{ fontSize: '0.85rem', color: '#495057', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={editExactCaseSensitive} onChange={e => setEditExactCaseSensitive(e.target.checked)} />
+                    Case-sensitive matching
+                  </label>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+                <button type="button" className="btn-study-tool" onClick={() => { setShowEditForm(false); setEditingExercise(null); }}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={isUpdating}>
+                  {isUpdating ? 'Saving Changes...' : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -827,8 +1113,8 @@ export default function Exercises() {
               <div className={mobilePracticeTab !== 'problem' ? 'exercise-desktop-only' : ''}>
                 {activeExercise.description && (
                   <div style={{ padding: 12, background: '#f8f9fa', borderRadius: 8, fontSize: '0.9rem', border: '1px solid #e9ecef', marginBottom: 16 }}>
-                    <strong>Instructions:</strong>
-                    <p style={{ margin: '4px 0 0 0', whiteSpace: 'pre-wrap', color: '#333' }}>{activeExercise.description}</p>
+                    <strong style={{ display: 'block', marginBottom: 6 }}>Instructions:</strong>
+                    <MarkdownViewer content={activeExercise.description} style={{ color: '#333' }} />
                   </div>
                 )}
               </div>
@@ -837,6 +1123,7 @@ export default function Exercises() {
               <div className={mobilePracticeTab !== 'code' ? 'exercise-desktop-only' : ''}>
                 {/* Multi-Modal Exercise Renderer */}
                 <ExerciseRenderer
+                  key={activeExercise.id}
                   exercise={activeExercise}
                   practiceCode={practiceCode}
                   setPracticeCode={setPracticeCode}

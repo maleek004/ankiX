@@ -569,6 +569,19 @@ export async function createExercise(exerciseData){
   return res.json()
 }
 
+export async function updateExercise(id, exerciseData){
+  const res = await safeFetch(`${API_BASE}/exercises/${id}`,{
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(exerciseData)
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to update exercise')
+    throw new Error(msg)
+  }
+  return true
+}
+
 export async function deleteExercise(id){
   const res = await fetch(`${API_BASE}/exercises/${id}`,{
     method: 'DELETE',

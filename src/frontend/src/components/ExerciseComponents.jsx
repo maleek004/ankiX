@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import MarkdownViewer from './MarkdownViewer'
 
 const LANG_BADGES = {
   csharp:     { label: 'C#',         color: '#68217a', bg: '#f3e8f8' },
@@ -13,6 +14,10 @@ function langBadgeFor(lang) {
 
 export function MultipleChoiceExercise({ exercise, onRunCode, running, runResult }) {
   const [selectedIdx, setSelectedIdx] = useState(null)
+
+  useEffect(() => {
+    setSelectedIdx(null)
+  }, [exercise?.id])
 
   let spec = { options: [], correctIndex: 0 }
   try {
@@ -56,9 +61,11 @@ export function MultipleChoiceExercise({ exercise, onRunCode, running, runResult
               name={`mcq-${exercise.id}`}
               checked={selectedIdx === idx}
               onChange={() => setSelectedIdx(idx)}
-              style={{ width: 18, height: 18, cursor: 'pointer' }}
+              style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }}
             />
-            <span style={{ fontSize: '0.95rem', color: '#212529' }}>{opt}</span>
+            <div style={{ flex: 1, fontSize: '0.95rem', color: '#212529' }}>
+              <MarkdownViewer content={opt} compact style={{ margin: 0, fontSize: 'inherit', lineHeight: 1.4 }} />
+            </div>
           </label>
         ))}
       </div>
@@ -79,6 +86,10 @@ export function MultipleChoiceExercise({ exercise, onRunCode, running, runResult
 
 export function ExactStringExercise({ exercise, onRunCode, running, runResult }) {
   const [answerInput, setAnswerInput] = useState('')
+
+  useEffect(() => {
+    setAnswerInput('')
+  }, [exercise?.id])
 
   const handleSubmit = (e) => {
     if (e) e.preventDefault()
@@ -109,7 +120,7 @@ export function ExactStringExercise({ exercise, onRunCode, running, runResult })
           disabled={running || !answerInput.trim()}
           style={{ padding: '8px 22px', fontSize: '0.9rem' }}
         >
-          {running ? 'Checking...' : 'Submit Answer ✏️'}
+          {running ? 'Verifying...' : 'Check Answer ✏️'}
         </button>
       </div>
     </form>
@@ -120,14 +131,15 @@ export function CodeEditorExercise({ exercise, practiceCode, setPracticeCode, on
   const badge = langBadgeFor(exercise.language)
 
   return (
-    <div>
-      <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057' }}>Code Solution</label>
-        {/* Runtime is locked to the exercise's authored language — read-only badge */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <label style={{ fontSize: '0.9rem', fontWeight: 600, color: '#495057' }}>
+          Your Solution Code ({badge.label}):
+        </label>
         <span style={{
           fontSize: '0.75rem',
           fontWeight: 700,
-          padding: '3px 10px',
+          padding: '2px 8px',
           borderRadius: 4,
           background: badge.bg,
           color: badge.color,
@@ -161,18 +173,19 @@ export function CodeEditorExercise({ exercise, practiceCode, setPracticeCode, on
 }
 
 export default function ExerciseRenderer({ exercise, practiceCode, setPracticeCode, practiceLang, setPracticeLang, onRunCode, running, runResult }) {
-  const type = exercise.exerciseType || 'CodeExecution'
+  const type = exercise?.exerciseType || 'CodeExecution'
 
   if (type === 'MultipleChoice') {
-    return <MultipleChoiceExercise exercise={exercise} onRunCode={onRunCode} running={running} runResult={runResult} />
+    return <MultipleChoiceExercise key={exercise?.id} exercise={exercise} onRunCode={onRunCode} running={running} runResult={runResult} />
   }
 
   if (type === 'ExactString') {
-    return <ExactStringExercise exercise={exercise} onRunCode={onRunCode} running={running} runResult={runResult} />
+    return <ExactStringExercise key={exercise?.id} exercise={exercise} onRunCode={onRunCode} running={running} runResult={runResult} />
   }
 
   return (
     <CodeEditorExercise
+      key={exercise?.id}
       exercise={exercise}
       practiceCode={practiceCode}
       setPracticeCode={setPracticeCode}
@@ -181,4 +194,3 @@ export default function ExerciseRenderer({ exercise, practiceCode, setPracticeCo
     />
   )
 }
-

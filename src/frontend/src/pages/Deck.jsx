@@ -1424,12 +1424,13 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
         <div style={{ padding: 24, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
           {currentEx.description && (
             <div style={{ padding: 12, background: '#f8f9fa', borderRadius: 8, fontSize: '0.9rem', border: '1px solid #e9ecef' }}>
-              <strong>Instructions:</strong>
-              <p style={{ margin: '4px 0 0 0', whiteSpace: 'pre-wrap', color: '#333' }}>{currentEx.description}</p>
+              <strong style={{ display: 'block', marginBottom: 6 }}>Instructions:</strong>
+              <MarkdownViewer content={currentEx.description} style={{ color: '#333' }} />
             </div>
           )}
 
           <ExerciseRenderer
+            key={currentEx.id}
             exercise={currentEx}
             practiceCode={practiceCode}
             setPracticeCode={setPracticeCode}
