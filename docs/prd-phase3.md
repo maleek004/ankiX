@@ -43,6 +43,8 @@ Key focus areas for Phase 3:
 * **FR13:** Users can register and log in using **Google OAuth2** and **GitHub OAuth2** social credentials.
 * **FR14:** System links OAuth identities to existing email accounts or provisions new learner accounts automatically.
 * **FR28:** Users can request a password reset via email (`POST /api/auth/forgot-password`) and submit a cryptographically secure, time-limited token to update their password (`POST /api/auth/reset-password`).
+* **FR36:** Registered users can access a dedicated **User Profile Center** (`/profile`) to view account metadata (Email, OAuth link status, Joined Date, Role) and customize their public **Display Name** across the platform.
+
 
 ### Anonymous Guest Access & Ephemeral Discovery Funnel
 * **FR29:** Unregistered visitors can browse, search, and preview public study groups, public decks, cards, and standalone exercises. Private study groups remain strictly invisible to guest sessions at the query level.

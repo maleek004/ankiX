@@ -19,6 +19,7 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 | **FR13** | Register and log in via Google and GitHub OAuth2 | Epic 5 (Story 5.1) |
 | **FR14** | Auto-provisioning & linking OAuth accounts to user identities | Epic 5 (Story 5.1) |
 | **FR28** | Self-service password reset via secure email tokens | Epic 5 (Story 5.4) |
+| **FR36** | User Profile Center & Display Name Customization | Epic 5 (Story 5.5) |
 | **FR15** | In-app notification when card follow-up is created | Epic 6 (Story 6.1) |
 | **FR16** | In-app notification when exercise is linked to follow-up | Epic 6 (Story 6.1) |
 | **FR17** | Header Notification Bell icon with unread badge & drawer | Epic 6 (Story 6.2, 6.3) |
@@ -45,9 +46,10 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 
 ## Epic List
 
-* **Epic 5: Social Authentication, Self-Service Password Reset & Platform Super-Admin Operations** (FR13, FR14, FR28, FR18, FR19)
+* **Epic 5: Social Authentication, Self-Service Password Reset, User Profiles & Platform Super-Admin Operations** (FR13, FR14, FR28, FR36, FR18, FR19)
 * **Epic 6: In-App Notification Center & Event Engine** (FR15, FR16, FR17)
-* **Epic 7: Modernized UI/UX Design System, Mobile Responsiveness & Workspace** (FR33, FR34, FR20, FR21, FR22)
+* **Epic 7: Modernized UI/UX Design System, Mobile Responsiveness & Workspace** (FR33, FR34, FR35, FR20, FR21, FR22)
+
 
 
 * **Epic 8: Spaced Repetition Analytics & Gamification** (FR23, FR24)
@@ -121,9 +123,30 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
     **When** submitted to `/api/auth/reset-password`,  
     **Then** the request is rejected with `400 Bad Request` and a clear error message.
 
+#### Story 5.5: User Profile Center & Display Name Customization
+
+**As a** registered learner,  
+**I want to** visit a dedicated `/profile` section and edit my display name,  
+**So that** my profile, comments, cards, and presence accurately reflect my identity across AnkiX.  
+
+* **Acceptance Criteria:**
+  * **Given** an authenticated user,  
+    **When** navigating to `/profile` (via navigation user dropdown, mobile hamburger menu, or direct route),  
+    **Then** a clean profile view renders their account email, current display name, assigned roles, auth provider badge (Local Email, Google, or GitHub), member since date, and study stats.
+  * **Given** an updated display name input (`2–50 characters`),  
+    **When** submitted (`PUT /api/auth/profile`),  
+    **Then** the backend validates and updates `User.DisplayName`, returns the updated user object, and sanitizes input.
+  * **Given** a successful profile update response,  
+    **When** received by the frontend,  
+    **Then** the local storage user session (`ankix_user`), context, and navigation avatar/label update immediately without requiring a full logout or page reload.
+  * **Given** an unauthenticated visitor attempting to access `/profile`,  
+    **When** loaded,  
+    **Then** they are redirected to `/login` with an intent redirect back to `/profile` post-authentication.
+
 ---
 
 ### Epic 6: In-App Notification Center & Event Engine
+
 
 #### Story 6.1: Notification Event Dispatcher
 **As a** learner or content author,  
