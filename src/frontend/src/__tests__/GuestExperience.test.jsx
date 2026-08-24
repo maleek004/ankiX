@@ -29,7 +29,7 @@ describe('Guest Experience & AuthModal', () => {
     )
 
     expect(screen.getByText(/Guest Preview Mode/i)).toBeInTheDocument()
-    expect(screen.getByText(/Unlock SM-2 & Streaks/i)).toBeInTheDocument()
+    expect(screen.getByText(/Unlock Full Spaced Repetition/i)).toBeInTheDocument()
   })
 
   test('AuthModal saves intent and displays value proposition', () => {

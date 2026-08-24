@@ -100,7 +100,7 @@ export default function AuthModal({
             <span>🧠</span> <span>SM-2 Memory Engine</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>🔥</span> <span>Daily Study Streaks</span>
+            <span>⚡</span> <span>Interactive Exercises</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span>💬</span> <span>Card Q&A Follow-ups</span>

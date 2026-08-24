@@ -42,7 +42,7 @@ export default function Home() {
           fontWeight: 600,
           marginBottom: 20
         }}>
-          <span>⚡</span> Intelligent Spaced Repetition for Software Engineers
+          <span>⚡</span> Intelligent Spaced Repetition for Lifelong High-Velocity Learning
         </div>
 
         <h1 style={{
@@ -54,7 +54,7 @@ export default function Home() {
           maxWidth: 800,
           margin: '0 auto 16px'
         }}>
-          Master Complex Code & Concepts With Zero Forgetting
+          Master Complex Topics & Concepts With Zero Forgetting
         </h1>
 
         <p style={{
@@ -64,7 +64,7 @@ export default function Home() {
           margin: '0 auto 32px',
           lineHeight: 1.6
         }}>
-          Combine the proven SM-2 memory engine with interactive coding sandboxes, collaborative study groups, and daily streaks.
+          Combine the proven SM-2 memory engine with interactive exercises (and coding sandboxes) and collaborative study groups.
         </p>
 
         {/* Primary Action Buttons */}
@@ -112,16 +112,16 @@ export default function Home() {
       <section style={{ marginBottom: 48 }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <h2 style={{ fontSize: '1.8rem', fontWeight: 700, color: '#1e293b', margin: '0 0 8px 0' }}>
-            Built for High-Velocity Engineering Retention
+            Built for High-Velocity Retention
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.95rem', margin: 0 }}>
-            Everything you need to retain frameworks, algorithms, syntax, and system architecture.
+            Everything you need to retain complex concepts, languages, skills, and specialized knowledge.
           </p>
         </div>
 
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
           gap: 20
         }}>
           <div style={{
@@ -146,9 +146,9 @@ export default function Home() {
             boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
           }}>
             <div style={{ fontSize: '2rem', marginBottom: 12 }}>⚡</div>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#0f172a', margin: '0 0 8px 0' }}>Code Sandboxes</h3>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#0f172a', margin: '0 0 8px 0' }}>Interactive Exercises & Sandboxes</h3>
             <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
-              Practice active recall with executable tests in C#, Python, Go, and JavaScript directly inside flashcards.
+              Practice active recall with interactive quizzes, precision checks, and executable coding sandboxes directly inside flashcards.
             </p>
           </div>
 
@@ -162,21 +162,7 @@ export default function Home() {
             <div style={{ fontSize: '2rem', marginBottom: 12 }}>👥</div>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#0f172a', margin: '0 0 8px 0' }}>Study Groups & Cohorts</h3>
             <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
-              Join open community learning groups or collaborate in private, invite-only engineering cohorts.
-            </p>
-          </div>
-
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e2e8f0',
-            borderRadius: 14,
-            padding: 24,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-          }}>
-            <div style={{ fontSize: '2rem', marginBottom: 12 }}>🔥</div>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#0f172a', margin: '0 0 8px 0' }}>Streaks & Heatmaps</h3>
-            <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
-              Stay consistent with automated daily streaks, review logs, and visual progress heatmaps.
+              Join open community learning groups or collaborate in private, invite-only study cohorts.
             </p>
           </div>
         </div>
@@ -212,9 +198,8 @@ export default function Home() {
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.9rem', color: '#64748b' }}>
               <li>✓ Browse public study groups & decks</li>
               <li>✓ Preview flashcards & test runner</li>
-              <li>✓ Ephemeral code sandbox runs (10/10m)</li>
+              <li>✓ Ephemeral sandbox & exercise runs (10/10m)</li>
               <li style={{ color: '#94a3b8' }}>✗ No review logs or SM-2 scheduling</li>
-              <li style={{ color: '#94a3b8' }}>✗ No daily streaks or heatmap</li>
               <li style={{ color: '#94a3b8' }}>✗ No private study groups or Q&A</li>
             </ul>
             <div style={{ marginTop: 20 }}>
@@ -250,7 +235,7 @@ export default function Home() {
             </div>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.9rem', color: '#1e3a8a' }}>
               <li>✓ Full SM-2 spaced repetition tracking</li>
-              <li>✓ Daily streaks & mastery statistics</li>
+              <li>✓ Active recall & mastery tracking</li>
               <li>✓ Higher sandbox execution limits (60/10m)</li>
               <li>✓ Create & join private study groups</li>
               <li>✓ Ask follow-up questions & author cards</li>

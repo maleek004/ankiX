@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import AuthModal from './AuthModal'
@@ -47,7 +47,7 @@ export default function GuestBanner() {
               cursor: 'pointer'
             }}
           >
-            Unlock SM-2 & Streaks
+            Unlock Full Spaced Repetition
           </button>
           <button
             onClick={() => setDismissed(true)}

@@ -10,5 +10,5 @@ test('Home shows welcome hero section', () => {
       <Home />
     </BrowserRouter>
   )
-  expect(screen.getByText(/Master Complex Code & Concepts With Zero Forgetting/i)).toBeInTheDocument()
+  expect(screen.getByText(/Master Complex Topics & Concepts With Zero Forgetting/i)).toBeInTheDocument()
 })
