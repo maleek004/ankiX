@@ -20,6 +20,7 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 | **FR14** | Auto-provisioning & linking OAuth accounts to user identities | Epic 5 (Story 5.1) |
 | **FR28** | Self-service password reset via secure email tokens | Epic 5 (Story 5.4) |
 | **FR36** | User Profile Center & Display Name Customization | Epic 5 (Story 5.5) |
+| **FR37** | Persistent Session Resiliency, Silent Refresh Tokens & 401 Interceptor | Epic 5 (Story 5.6) |
 | **FR15** | In-app notification when card follow-up is created | Epic 6 (Story 6.1) |
 | **FR16** | In-app notification when exercise is linked to follow-up | Epic 6 (Story 6.1) |
 | **FR17** | Header Notification Bell icon with unread badge & drawer | Epic 6 (Story 6.2, 6.3) |
@@ -46,9 +47,10 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 
 ## Epic List
 
-* **Epic 5: Social Authentication, Self-Service Password Reset, User Profiles & Platform Super-Admin Operations** (FR13, FR14, FR28, FR36, FR18, FR19)
+* **Epic 5: Social Authentication, Self-Service Password Reset, User Profiles, Session Resiliency & Platform Super-Admin Operations** (FR13, FR14, FR28, FR36, FR37, FR18, FR19)
 * **Epic 6: In-App Notification Center & Event Engine** (FR15, FR16, FR17)
 * **Epic 7: Modernized UI/UX Design System, Mobile Responsiveness & Workspace** (FR33, FR34, FR35, FR20, FR21, FR22)
+
 
 
 
@@ -143,9 +145,22 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
     **When** loaded,  
     **Then** they are redirected to `/login` with an intent redirect back to `/profile` post-authentication.
 
+#### Story 5.6: Persistent Active Session Resiliency, Silent Refresh Tokens & Seamless Retry Interceptor
+
+**As a** learner actively studying decks or an author writing rich markdown exercises,  
+**I want** my authenticated session to persist reliably across long active sessions with silent token refresh and zero-disruption retry on expired tokens,  
+**So that** I am never unexpectedly logged out or blocked from saving my work with a `401 Unauthorized` error in the middle of active engagement.  
+
+* **Acceptance Criteria:**
+  * **Silent Token Refresh Engine (`POST /api/auth/refresh-token`):** The backend issues a cryptographically secure refresh token stored in PostgreSQL with token rotation and revocation support. A dedicated endpoint `POST /api/auth/refresh-token` validates the refresh token and returns a new JWT access token without requiring manual user re-login.
+  * **Extended Session Lifetimes:** Increase standard JWT access token lifetime or sliding session renewal window so active users browsing for hours or days do not face hard cut-offs.
+  * **Transparent 401 Client Interceptor (`safeFetch`):** In `src/frontend/src/api.js`, wrap authenticated requests with a silent refresh retry mechanism: when an API call returns `401 Unauthorized`, `safeFetch` intercepts the error, calls `POST /api/auth/refresh-token`, updates the stored JWT token, and transparently retries the original pending request with the fresh token.
+  * **Zero Work Discard & In-Place Re-Auth:** If a session is genuinely expired or revoked beyond refresh limits, the UI triggers a non-destructive contextual re-auth modal that saves the in-flight form data (e.g. exercise drafting in progress) and completes the original submission immediately upon successful login.
+
 ---
 
 ### Epic 6: In-App Notification Center & Event Engine
+
 
 
 #### Story 6.1: Notification Event Dispatcher

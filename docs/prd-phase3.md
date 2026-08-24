@@ -44,6 +44,11 @@ Key focus areas for Phase 3:
 * **FR14:** System links OAuth identities to existing email accounts or provisions new learner accounts automatically.
 * **FR28:** Users can request a password reset via email (`POST /api/auth/forgot-password`) and submit a cryptographically secure, time-limited token to update their password (`POST /api/auth/reset-password`).
 * **FR36:** Registered users can access a dedicated **User Profile Center** (`/profile`) to view account metadata (Email, OAuth link status, Joined Date, Role) and customize their public **Display Name** across the platform.
+* **FR37:** Seamless session persistence and silent token refresh:
+  * **Sliding Session / Refresh Token Rotation:** The auth engine provides silent token refreshing (`POST /api/auth/refresh-token`) with extended persistent session lifetimes (e.g. 7–30 days) and rotating refresh tokens stored securely in PostgreSQL.
+  * **Zero-Disruption 401 Interceptor:** Client network wrapper (`safeFetch`) catches 401 Unauthorized responses, silently requests a refreshed access token, and transparently retries the in-flight request without aborting user operations or clearing unsubmitted forms.
+  * **In-Place Re-Auth Modal & Form State Preservation:** In the event of an unrecoverable auth expiry, the UI opens a lightweight modal to re-authenticate without navigating away or discarding active form drafts (e.g., markdown exercise editor or card creator).
+
 
 
 ### Anonymous Guest Access & Ephemeral Discovery Funnel
