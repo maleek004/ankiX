@@ -77,7 +77,37 @@ export default function NavBar() {
         <div className="navbar-right">
           {auth?.user ? (
             <>
-              <span>{getEffectiveDisplayName(auth.user.displayName, auth.user.email)}</span>
+              <Link
+                to="/profile"
+                className="nav-link user-profile-link"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  padding: '4px 8px',
+                  borderRadius: 6
+                }}
+                title="View & Edit Profile"
+              >
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  background: '#6366f1',
+                  color: '#fff',
+                  fontSize: '0.75rem',
+                  fontWeight: 700
+                }}>
+                  {(Array.from(getEffectiveDisplayName(auth.user.displayName, auth.user.email) || 'U')[0] || 'U').toUpperCase()}
+                </span>
+                <span>{getEffectiveDisplayName(auth.user.displayName, auth.user.email)}</span>
+              </Link>
               <button className="btn-logout" onClick={auth.logout}>Log Out</button>
             </>
           ) : (
@@ -145,6 +175,9 @@ export default function NavBar() {
               <li><Link to="/exercises" className="nav-link" onClick={closeDrawer}>⚡ Exercises</Link></li>
             </>
           )}
+          {auth?.user && (
+            <li><Link to="/profile" className="nav-link" onClick={closeDrawer}>👤 My Profile</Link></li>
+          )}
           {isAdmin && (
             <li><Link to="/admin" className="nav-link" onClick={closeDrawer}>🛡️ Admin</Link></li>
           )}
@@ -154,9 +187,36 @@ export default function NavBar() {
         <div className="mobile-nav-footer">
           {auth?.user ? (
             <>
-              <span className="mobile-nav-user-info">
-                {getEffectiveDisplayName(auth.user.displayName, auth.user.email)}
-              </span>
+              <Link
+                to="/profile"
+                className="mobile-nav-user-info"
+                onClick={closeDrawer}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  marginBottom: 10,
+                  fontWeight: 600
+                }}
+              >
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  background: '#6366f1',
+                  color: '#fff',
+                  fontSize: '0.85rem',
+                  fontWeight: 700
+                }}>
+                  {(Array.from(getEffectiveDisplayName(auth.user.displayName, auth.user.email) || 'U')[0] || 'U').toUpperCase()}
+                </span>
+                <span>{getEffectiveDisplayName(auth.user.displayName, auth.user.email)}</span>
+              </Link>
               <button
                 className="btn-logout"
                 style={{ width: '100%', minHeight: 44, textAlign: 'center' }}

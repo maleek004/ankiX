@@ -130,6 +130,28 @@ export async function verifyEmail(token){
   return res.json()
 }
 
+export async function getProfile(){
+  const res = await safeFetch(`${API_BASE}/auth/profile`, { headers: authHeaders() })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to fetch user profile')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function updateProfile(displayName){
+  const res = await safeFetch(`${API_BASE}/auth/profile`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ displayName })
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to update profile')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
 export async function getAdminUsers(){
   const res = await safeFetch(`${API_BASE}/admin/users`, { headers: authHeaders() })
   if(!res.ok){

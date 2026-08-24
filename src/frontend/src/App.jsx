@@ -21,6 +21,7 @@ import AdminUsers from './pages/AdminUsers'
 import AdminDashboard from './pages/AdminDashboard'
 import Search from './pages/Search'
 import StudyGroups from './pages/StudyGroups'
+import Profile from './pages/Profile'
 
 export default function App(){
   return (
@@ -47,6 +48,7 @@ export default function App(){
                 <Route path="/decks" element={<Decks/>} />
                 <Route path="/decks/:id" element={<Deck/>} />
                 <Route path="/exercises" element={<Exercises/>} />
+                <Route path="/profile" element={<RequireAuth><Profile/></RequireAuth>} />
                 <Route path="/admin" element={<RequireAuth><AdminDashboard/></RequireAuth>} />
                 <Route path="/admin/dashboard" element={<Navigate to="/admin" replace />} />
                 <Route path="/admin/users" element={<RequireAuth><AdminUsers/></RequireAuth>} />

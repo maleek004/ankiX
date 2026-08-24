@@ -54,6 +54,15 @@ export function AuthProvider({ children }){
     return data
   }
 
+  const updateUser = (updatedUserData) => {
+    setUser(prev => {
+      if (!prev) return prev
+      const merged = { ...prev, ...updatedUserData }
+      localStorage.setItem('ankix_user', JSON.stringify(merged))
+      return merged
+    })
+  }
+
   const logout = () => {
     api.logout()
     setUser(null)
@@ -61,7 +70,7 @@ export function AuthProvider({ children }){
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, oauthLogin, logout, register }}>
+    <AuthContext.Provider value={{ user, login, oauthLogin, logout, register, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using System.Security.Cryptography;
 using AnkiX.Api.Contracts.Auth;
 using AnkiX.Api.Data;
 using AnkiX.Api.Helpers;
 using AnkiX.Api.Models;
 using AnkiX.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -417,6 +419,124 @@ public sealed class AuthController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { message = "Email verification failure: " + ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpGet("profile")]
+    public async Task<IActionResult> GetProfile()
+    {
+        try
+        {
+            string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+            {
+                return Unauthorized(new { message = "User is not authenticated." });
+            }
+
+            await EnsureUserColumnsAsync();
+            User? user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user is null)
+            {
+                return NotFound(new { message = "User not found." });
+            }
+
+            int reviewsCount = await dbContext.ReviewRecords.CountAsync(r => r.UserId == userId) +
+                               await dbContext.ExerciseReviewRecords.CountAsync(r => r.UserId == userId);
+            int decksCreatedCount = await dbContext.Decks.CountAsync(d => d.CreatedByUserId == userId);
+
+            UserProfileResponse response = new UserProfileResponse
+            {
+                Id = user.Id,
+                Email = user.Email,
+                DisplayName = UserHelper.GetEffectiveDisplayName(user.DisplayName, user.Email),
+                Role = user.Role,
+                AuthProvider = user.AuthProvider,
+                IsEmailVerified = user.IsEmailVerified,
+                CreatedAt = user.CreatedAt,
+                LastActiveAt = user.LastActiveAt,
+                Stats = new UserStudyStatsDto
+                {
+                    ReviewsCount = reviewsCount,
+                    DecksCreatedCount = decksCreatedCount
+                }
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Failed to retrieve profile: " + ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpPut("profile")]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
+    {
+        try
+        {
+            string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+            {
+                return Unauthorized(new { message = "User is not authenticated." });
+            }
+
+            if (request is null || string.IsNullOrWhiteSpace(request.DisplayName))
+            {
+                return BadRequest(new { message = "Display name cannot be empty." });
+            }
+
+            string trimmedDisplayName = request.DisplayName.Trim();
+            if (trimmedDisplayName.Length < 2 || trimmedDisplayName.Length > 50)
+            {
+                return BadRequest(new { message = "Display name must be between 2 and 50 characters." });
+            }
+
+            string sanitizedDisplayName = System.Text.RegularExpressions.Regex.Replace(trimmedDisplayName, @"[<>]", "").Trim();
+            sanitizedDisplayName = System.Text.RegularExpressions.Regex.Replace(sanitizedDisplayName, @"[\r\n\t\f\v]+", " ");
+            sanitizedDisplayName = System.Text.RegularExpressions.Regex.Replace(sanitizedDisplayName, @"\s+", " ").Trim();
+            if (sanitizedDisplayName.Length < 2)
+            {
+                return BadRequest(new { message = "Display name contains invalid characters." });
+            }
+
+            await EnsureUserColumnsAsync();
+            User? user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user is null)
+            {
+                return NotFound(new { message = "User not found." });
+            }
+
+            user.DisplayName = sanitizedDisplayName;
+            await dbContext.SaveChangesAsync();
+
+            int reviewsCount = await dbContext.ReviewRecords.CountAsync(r => r.UserId == userId) +
+                               await dbContext.ExerciseReviewRecords.CountAsync(r => r.UserId == userId);
+            int decksCreatedCount = await dbContext.Decks.CountAsync(d => d.CreatedByUserId == userId);
+
+            UserProfileResponse response = new UserProfileResponse
+            {
+                Id = user.Id,
+                Email = user.Email,
+                DisplayName = user.DisplayName,
+                Role = user.Role,
+                AuthProvider = user.AuthProvider,
+                IsEmailVerified = user.IsEmailVerified,
+                CreatedAt = user.CreatedAt,
+                LastActiveAt = user.LastActiveAt,
+                Stats = new UserStudyStatsDto
+                {
+                    ReviewsCount = reviewsCount,
+                    DecksCreatedCount = decksCreatedCount
+                }
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Failed to update profile: " + ex.Message });
         }
     }
 
