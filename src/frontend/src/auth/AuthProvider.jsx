@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import * as api from '../api'
+import ReAuthModal from '../components/ReAuthModal'
 
 const AuthContext = createContext(null)
 
@@ -7,6 +8,16 @@ export function AuthProvider({ children }){
   const [user, setUser] = useState(() => {
     try{ return JSON.parse(localStorage.getItem('ankix_user') || 'null') }catch{ return null }
   })
+  const [isReAuthOpen, setIsReAuthOpen] = useState(false)
+
+  useEffect(() => {
+    const unsubscribe = api.onAuthFailure(() => {
+      if (user) {
+        setIsReAuthOpen(true)
+      }
+    })
+    return () => unsubscribe()
+  }, [user])
 
   useEffect(() => {
     if (!user) return
@@ -24,9 +35,6 @@ export function AuthProvider({ children }){
     return () => clearInterval(interval)
   }, [user])
 
-
-
-
   const login = async (email, password) => {
     const data = await api.login(email, password)
     if(data?.user){
@@ -34,6 +42,7 @@ export function AuthProvider({ children }){
       localStorage.setItem('ankix_user', JSON.stringify(data.user))
       localStorage.removeItem('ankix_study_group')
       localStorage.removeItem('ankix_community')
+      setIsReAuthOpen(false)
     }
     return data
   }
@@ -45,6 +54,7 @@ export function AuthProvider({ children }){
       localStorage.setItem('ankix_user', JSON.stringify(data.user))
       localStorage.removeItem('ankix_study_group')
       localStorage.removeItem('ankix_community')
+      setIsReAuthOpen(false)
     }
     return data
   }
@@ -66,16 +76,24 @@ export function AuthProvider({ children }){
   const logout = () => {
     api.logout()
     setUser(null)
+    setIsReAuthOpen(false)
     window.location.href = '/login'
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, oauthLogin, logout, register, updateUser }}>
+    <AuthContext.Provider value={{ user, login, oauthLogin, logout, register, updateUser, isReAuthOpen, setIsReAuthOpen }}>
       {children}
+      <ReAuthModal
+        isOpen={isReAuthOpen}
+        onClose={() => {
+          setIsReAuthOpen(false)
+          logout()
+        }}
+        onSuccess={() => setIsReAuthOpen(false)}
+      />
     </AuthContext.Provider>
   )
 }
-
 
 export function useAuth(){
   return useContext(AuthContext)

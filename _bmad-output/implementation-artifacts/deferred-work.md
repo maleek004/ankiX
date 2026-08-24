@@ -8,6 +8,7 @@
 - [x] [Review][Defer] Sensitive answer exposure in `ExerciseSpec` on read/projection endpoints (`ExercisesController.cs:330`) — deferred, pre-existing exercise spec payload contract.
 - [x] [Review][Defer] Dual-use schema of `Language` column for topic tags vs runtime execution selectors (`Exercise.cs:21`) — deferred, intentional Phase 3 pragmatic schema design.
 
-## Deferred from: code review of 7-5-exercise-editing-ui-and-rich-markdown-rendering.md (2026-08-23)
-- [x] [Review][Defer] `CardExerciseLinkerModal` in `Deck.jsx` uses plain textarea for creating new linked exercises (`Deck.jsx:1190`) — deferred, pre-existing modal from earlier epics.
+## Deferred from: code review of 5-6-persistent-active-session-resiliency-and-silent-jwt-refresh-engine.md (2026-08-24)
+- [x] [Review][Defer] Implement background hosted service to prune expired/revoked refresh tokens — deferred, maintenance task.
+- [x] [Review][Defer] Evaluate HttpOnly cookie storage migration for refresh tokens in future architecture review — deferred, architectural enhancement.
 

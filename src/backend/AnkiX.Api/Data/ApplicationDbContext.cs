@@ -33,6 +33,8 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<StudyGroupMember> StudyGroupMembers => Set<StudyGroupMember>();
 
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>()
@@ -86,5 +88,15 @@ public sealed class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<CardFollowup>()
             .HasIndex(f => f.AuthorUserId);
+
+        modelBuilder.Entity<RefreshToken>()
+            .HasIndex(rt => new { rt.UserId, rt.TokenHash });
+
+        modelBuilder.Entity<RefreshToken>()
+            .HasIndex(rt => rt.TokenHash)
+            .IsUnique();
+
+        modelBuilder.Entity<RefreshToken>()
+            .HasIndex(rt => rt.ExpiresAt);
     }
 }

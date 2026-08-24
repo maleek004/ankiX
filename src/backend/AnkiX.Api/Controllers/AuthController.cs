@@ -121,9 +121,12 @@ public sealed class AuthController : ControllerBase
             }
 
             string token = tokenService.CreateToken(user);
+            string rawRefreshToken = await IssueRefreshTokenAsync(user);
+
             AuthResponse response = new AuthResponse
             {
                 AccessToken = token,
+                RefreshToken = rawRefreshToken,
                 ExpiresInSeconds = tokenService.GetExpiresInSeconds(),
                 User = new AuthUserResponse
                 {
@@ -216,9 +219,12 @@ public sealed class AuthController : ControllerBase
             }
 
             string token = tokenService.CreateToken(user);
+            string rawRefreshToken = await IssueRefreshTokenAsync(user);
+
             AuthResponse response = new AuthResponse
             {
                 AccessToken = token,
+                RefreshToken = rawRefreshToken,
                 ExpiresInSeconds = tokenService.GetExpiresInSeconds(),
                 User = new AuthUserResponse
                 {
@@ -235,6 +241,163 @@ public sealed class AuthController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { message = "OAuth failure: " + ex.Message });
+        }
+    }
+
+    [HttpPost("refresh-token")]
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+    {
+        try
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.RefreshToken))
+            {
+                return BadRequest(new { message = "Refresh token is required." });
+            }
+
+            await EnsureUserColumnsAsync();
+
+            string rawToken = request.RefreshToken.Trim();
+            string tokenHash = tokenService.HashToken(rawToken);
+
+            RefreshToken? tokenRecord = await dbContext.RefreshTokens
+                .Include(rt => rt.User)
+                .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash);
+
+            if (tokenRecord is null)
+            {
+                return Unauthorized(new { message = "Invalid refresh token." });
+            }
+
+            if (tokenRecord.IsRevoked)
+            {
+                // Rotation Grace Period: If the token was revoked within the last 30 seconds
+                // and has a valid replacement token, return the active session to handle benign multi-tab races.
+                if (tokenRecord.RevokedAt >= DateTime.UtcNow.AddSeconds(-30) && !string.IsNullOrEmpty(tokenRecord.ReplacedByTokenHash))
+                {
+                    RefreshToken? replacementToken = await dbContext.RefreshTokens
+                        .Include(rt => rt.User)
+                        .FirstOrDefaultAsync(rt => rt.TokenHash == tokenRecord.ReplacedByTokenHash && rt.RevokedAt == null && rt.ExpiresAt > DateTime.UtcNow);
+
+                    if (replacementToken is not null)
+                    {
+                        User? replacementUser = replacementToken.User ?? await dbContext.Users.FirstOrDefaultAsync(u => u.Id == replacementToken.UserId);
+                        if (replacementUser is not null)
+                        {
+                            string freshAccessToken = tokenService.CreateToken(replacementUser);
+                            return Ok(new AuthResponse
+                            {
+                                AccessToken = freshAccessToken,
+                                RefreshToken = rawToken,
+                                ExpiresInSeconds = tokenService.GetExpiresInSeconds(),
+                                User = new AuthUserResponse
+                                {
+                                    Id = replacementUser.Id,
+                                    Email = replacementUser.Email,
+                                    DisplayName = UserHelper.GetEffectiveDisplayName(replacementUser.DisplayName, replacementUser.Email),
+                                    Role = replacementUser.Role,
+                                    IsEmailVerified = replacementUser.IsEmailVerified
+                                }
+                            });
+                        }
+                    }
+                }
+
+                // Genuine compromise / reuse detection: revoke all active tokens for this user
+                var activeTokens = await dbContext.RefreshTokens
+                    .Where(rt => rt.UserId == tokenRecord.UserId && rt.RevokedAt == null)
+                    .ToListAsync();
+
+                foreach (var t in activeTokens)
+                {
+                    t.RevokedAt = DateTime.UtcNow;
+                }
+
+                await dbContext.SaveChangesAsync();
+                return Unauthorized(new { message = "Refresh token has been revoked. Re-authentication required." });
+            }
+
+            if (tokenRecord.IsExpired)
+            {
+                return Unauthorized(new { message = "Refresh token has expired. Please log in again." });
+            }
+
+            User? user = tokenRecord.User ?? await dbContext.Users.FirstOrDefaultAsync(u => u.Id == tokenRecord.UserId);
+            if (user is null)
+            {
+                return Unauthorized(new { message = "User associated with refresh token not found." });
+            }
+
+            // Rotate token
+            string newRawRefreshToken = tokenService.GenerateRefreshToken();
+            string newTokenHash = tokenService.HashToken(newRawRefreshToken);
+            string? clientIp = HttpContext?.Connection?.RemoteIpAddress?.ToString();
+
+            tokenRecord.RevokedAt = DateTime.UtcNow;
+            tokenRecord.ReplacedByTokenHash = newTokenHash;
+
+            RefreshToken newRecord = new RefreshToken
+            {
+                UserId = user.Id,
+                TokenHash = newTokenHash,
+                ExpiresAt = DateTime.UtcNow.AddDays(tokenService.GetRefreshTokenExpiresInDays()),
+                CreatedAt = DateTime.UtcNow,
+                CreatedByIp = clientIp
+            };
+
+            dbContext.RefreshTokens.Add(newRecord);
+            await dbContext.SaveChangesAsync();
+
+            string newAccessToken = tokenService.CreateToken(user);
+            AuthResponse response = new AuthResponse
+            {
+                AccessToken = newAccessToken,
+                RefreshToken = newRawRefreshToken,
+                ExpiresInSeconds = tokenService.GetExpiresInSeconds(),
+                User = new AuthUserResponse
+                {
+                    Id = user.Id,
+                    Email = user.Email,
+                    DisplayName = UserHelper.GetEffectiveDisplayName(user.DisplayName, user.Email),
+                    Role = user.Role,
+                    IsEmailVerified = user.IsEmailVerified
+                }
+            };
+
+            return Ok(response);
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "An error occurred while refreshing your session. Please try again later." });
+        }
+    }
+
+    [HttpPost("revoke-token")]
+    public async Task<IActionResult> RevokeToken([FromBody] RevokeTokenRequest request)
+    {
+        try
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.RefreshToken))
+            {
+                return BadRequest(new { message = "Refresh token is required." });
+            }
+
+            string rawToken = request.RefreshToken.Trim();
+            string tokenHash = tokenService.HashToken(rawToken);
+
+            RefreshToken? tokenRecord = await dbContext.RefreshTokens
+                .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash);
+
+            if (tokenRecord is not null && !tokenRecord.IsRevoked)
+            {
+                tokenRecord.RevokedAt = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync();
+            }
+
+            return Ok(new { message = "Refresh token revoked successfully." });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "An error occurred while revoking the session." });
         }
     }
 
@@ -334,6 +497,16 @@ public sealed class AuthController : ControllerBase
             user.PasswordResetToken = null;
             user.PasswordResetExpiresAt = null;
 
+            // Invalidate all active refresh tokens for the user to terminate unauthorized sessions
+            var activeTokens = await dbContext.RefreshTokens
+                .Where(rt => rt.UserId == user.Id && rt.RevokedAt == null)
+                .ToListAsync();
+
+            foreach (var token in activeTokens)
+            {
+                token.RevokedAt = DateTime.UtcNow;
+            }
+
             await dbContext.SaveChangesAsync();
 
             return Ok(new
@@ -341,9 +514,9 @@ public sealed class AuthController : ControllerBase
                 message = "Password has been successfully reset. You may now log in."
             });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return StatusCode(500, new { message = "Reset password failure: " + ex.Message });
+            return StatusCode(500, new { message = "An error occurred while resetting your password. Please try again." });
         }
     }
 
@@ -538,6 +711,27 @@ public sealed class AuthController : ControllerBase
         {
             return StatusCode(500, new { message = "Failed to update profile: " + ex.Message });
         }
+    }
+
+    private async Task<string> IssueRefreshTokenAsync(User user)
+    {
+        string rawRefreshToken = tokenService.GenerateRefreshToken();
+        string refreshTokenHash = tokenService.HashToken(rawRefreshToken);
+        string? clientIp = HttpContext?.Connection?.RemoteIpAddress?.ToString();
+
+        RefreshToken refreshTokenEntity = new RefreshToken
+        {
+            UserId = user.Id,
+            TokenHash = refreshTokenHash,
+            ExpiresAt = DateTime.UtcNow.AddDays(tokenService.GetRefreshTokenExpiresInDays()),
+            CreatedAt = DateTime.UtcNow,
+            CreatedByIp = clientIp
+        };
+
+        dbContext.RefreshTokens.Add(refreshTokenEntity);
+        await dbContext.SaveChangesAsync();
+
+        return rawRefreshToken;
     }
 
     private static string GenerateSecureToken()

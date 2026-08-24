@@ -53,4 +53,22 @@ public sealed class TokenService : ITokenService
     {
         return jwtOptions.ExpiresInMinutes * 60;
     }
+
+    public string GenerateRefreshToken()
+    {
+        byte[] bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    public string HashToken(string token)
+    {
+        byte[] inputBytes = Encoding.UTF8.GetBytes(token);
+        byte[] hashBytes = System.Security.Cryptography.SHA256.HashData(inputBytes);
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
+    }
+
+    public int GetRefreshTokenExpiresInDays()
+    {
+        return jwtOptions.RefreshTokenExpiresInDays > 0 ? jwtOptions.RefreshTokenExpiresInDays : 30;
+    }
 }
