@@ -135,4 +135,40 @@ public class SearchControllerTests
         Assert.Empty(response.Exercises);
         Assert.Empty(response.Followups);
     }
+
+    [Fact]
+    public async Task Search_IsCaseInsensitive_ReturnsMatchesRegardlessOfCasing()
+    {
+        using var db = CreateInMemoryDbContext();
+
+        db.StudyGroups.Add(new StudyGroup { Id = 1, Name = "Study Group", Slug = "study-group", IsPublic = true });
+        db.StudyGroupMembers.Add(new StudyGroupMember { StudyGroupId = 1, UserId = 10, Role = "Member" });
+
+        db.Decks.Add(new Deck { Id = 201, Title = "C# Mastery Deck", Description = "Advanced CONCEPTS", StudyGroupId = 1 });
+        db.Cards.Add(new Card { Id = 2001, DeckId = 201, Prompt = "What is Asynchronous Programming?", Answer = "It uses async/AWAIT keywords.", Type = "basic" });
+        db.Exercises.Add(new Exercise { Id = 301, Title = "ASYNC Method Exercise", Description = "Write an async task", StudyGroupId = 1, Language = "csharp" });
+
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db, userId: 10);
+
+        // Lowercase search for uppercase content
+        var actionResult = await controller.Search(q: "async", studyGroupId: 1);
+        var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+        var response = Assert.IsType<GlobalSearchResponse>(okResult.Value);
+
+        Assert.Single(response.Cards);
+        Assert.Equal(2001, response.Cards[0].Id);
+        Assert.Single(response.Exercises);
+        Assert.Equal(301, response.Exercises[0].Id);
+
+        // Uppercase search for mixed case content
+        var actionResult2 = await controller.Search(q: "CONCEPTS", studyGroupId: 1);
+        var okResult2 = Assert.IsType<OkObjectResult>(actionResult2.Result);
+        var response2 = Assert.IsType<GlobalSearchResponse>(okResult2.Value);
+
+        Assert.Single(response2.Decks);
+        Assert.Equal(201, response2.Decks[0].Id);
+    }
 }
+

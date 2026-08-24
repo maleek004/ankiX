@@ -4,6 +4,7 @@ import { globalSearch, getEffectiveDisplayName } from '../api'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import ExercisePracticeModal from './Exercises'
 import CopyModal from '../components/CopyModal'
+import CardDetailModal from '../components/CardDetailModal'
 import MarkdownViewer from '../components/MarkdownViewer'
 
 export default function Search() {
@@ -15,12 +16,22 @@ export default function Search() {
   const [results, setResults] = useState({ decks: [], cards: [], exercises: [], followups: [] })
   const [activePracticeExercise, setActivePracticeExercise] = useState(null)
   const [copyModalData, setCopyModalData] = useState(null) // { type: 'card'|'exercise', item: obj }
+  const [previewCard, setPreviewCard] = useState(null)
 
   const navigate = useNavigate()
+
+  const handleCardUpdated = (updatedCard) => {
+    setResults(prev => ({
+      ...prev,
+      cards: (prev.cards || []).map(c => c.id === updatedCard.id ? { ...c, ...updatedCard } : c)
+    }))
+    setPreviewCard(prev => prev && prev.id === updatedCard.id ? { ...prev, ...updatedCard } : prev)
+  }
 
   const targetGroupId = (searchScope === 'current' && activeStudyGroup) ? activeStudyGroup.id : null
 
   useEffect(() => {
+    let isCurrent = true
     if (!query.trim() || query.trim().length < 2) {
       setResults({ decks: [], cards: [], exercises: [], followups: [] })
       setLoading(false)
@@ -30,12 +41,23 @@ export default function Search() {
     setLoading(true)
     const timer = setTimeout(() => {
       globalSearch(query, targetGroupId)
-        .then(data => setResults(data || { decks: [], cards: [], exercises: [], followups: [] }))
-        .catch(err => console.error(err))
-        .finally(() => setLoading(false))
+        .then(data => {
+          if (isCurrent) {
+            setResults(data || { decks: [], cards: [], exercises: [], followups: [] })
+          }
+        })
+        .catch(err => {
+          if (isCurrent) console.error(err)
+        })
+        .finally(() => {
+          if (isCurrent) setLoading(false)
+        })
     }, 300)
 
-    return () => clearTimeout(timer)
+    return () => {
+      isCurrent = false
+      clearTimeout(timer)
+    }
   }, [query, targetGroupId])
 
   const totalDecks = results.decks?.length || 0
@@ -238,10 +260,17 @@ export default function Search() {
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       <button
                         className="btn-study-tool"
-                        style={{ fontSize: '0.8rem', padding: '4px 10px', borderColor: '#0d6efd', color: '#0d6efd' }}
+                        style={{ fontSize: '0.8rem', padding: '4px 10px', borderColor: '#0d6efd', color: '#0d6efd', fontWeight: 600 }}
+                        onClick={() => setPreviewCard(c)}
+                      >
+                        👁 Preview
+                      </button>
+                      <button
+                        className="btn-study-tool"
+                        style={{ fontSize: '0.8rem', padding: '4px 10px' }}
                         onClick={(e) => { e.stopPropagation(); setCopyModalData({ type: 'card', item: c }); }}
                       >
                         📋 Copy Card
@@ -381,6 +410,15 @@ export default function Search() {
         item={copyModalData?.item}
         onSuccess={() => alert(`${copyModalData?.type === 'card' ? 'Card' : 'Exercise'} copied successfully!`)}
       />
+
+      {/* Card Detail / Preview Modal */}
+      {previewCard && (
+        <CardDetailModal
+          card={previewCard}
+          onClose={() => setPreviewCard(null)}
+          onCardUpdated={handleCardUpdated}
+        />
+      )}
     </div>
   )
 }

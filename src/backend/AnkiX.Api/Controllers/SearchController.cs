@@ -144,12 +144,18 @@ public sealed class SearchController : ControllerBase
 
         bool sampleInScope = sampleGroupId > 0 && scopedGroupIds.Contains(sampleGroupId);
 
-        string pattern = $"%{query}%";
+        string escapedQuery = query.ToLowerInvariant()
+            .Replace("\\", "\\\\")
+            .Replace("%", "\\%")
+            .Replace("_", "\\_");
+        string pattern = $"%{escapedQuery}%";
+
+        var scopedDecksQuery = dbContext.Decks.AsNoTracking()
+            .Where(d => (d.StudyGroupId.HasValue && scopedGroupIds.Contains(d.StudyGroupId.Value)) || (sampleInScope && (d.StudyGroupId == null || d.StudyGroupId == 0)));
 
         // 1. Search Decks in scoped study groups
-        List<DeckSearchResult> decks = await dbContext.Decks.AsNoTracking()
-            .Where(d => (d.StudyGroupId.HasValue && scopedGroupIds.Contains(d.StudyGroupId.Value)) || (sampleInScope && (d.StudyGroupId == null || d.StudyGroupId == 0)))
-            .Where(d => EF.Functions.Like(d.Title, pattern) || (d.Description != null && EF.Functions.Like(d.Description, pattern)))
+        List<DeckSearchResult> decks = await scopedDecksQuery
+            .Where(d => EF.Functions.Like(d.Title.ToLower(), pattern) || (d.Description != null && EF.Functions.Like(d.Description.ToLower(), pattern)))
             .Select(d => new DeckSearchResult
             {
                 Id = d.Id,
@@ -160,24 +166,20 @@ public sealed class SearchController : ControllerBase
             .Take(15)
             .ToListAsync();
 
-        List<int> scopedDeckIds = await dbContext.Decks.AsNoTracking()
-            .Where(d => (d.StudyGroupId.HasValue && scopedGroupIds.Contains(d.StudyGroupId.Value)) || (sampleInScope && (d.StudyGroupId == null || d.StudyGroupId == 0)))
-            .Select(d => d.Id)
+        // 2. Search Cards in scoped decks
+        List<Card> matchingCards = await dbContext.Cards.AsNoTracking()
+            .Where(c => scopedDecksQuery.Any(d => d.Id == c.DeckId))
+            .Where(c => EF.Functions.Like(c.Prompt.ToLower(), pattern) || (c.Answer != null && EF.Functions.Like(c.Answer.ToLower(), pattern)))
+            .Take(25)
             .ToListAsync();
 
-        Dictionary<int, string> deckTitles = await dbContext.Decks.AsNoTracking()
-            .Where(d => scopedDeckIds.Contains(d.Id))
-            .ToDictionaryAsync(d => d.Id, d => d.Title);
-
-        // 2. Search Cards in scoped decks
         List<CardSearchResult> cards = new List<CardSearchResult>();
-        if (scopedDeckIds.Count > 0)
+        if (matchingCards.Count > 0)
         {
-            List<Card> matchingCards = await dbContext.Cards.AsNoTracking()
-                .Where(c => scopedDeckIds.Contains(c.DeckId))
-                .Where(c => EF.Functions.Like(c.Prompt, pattern) || EF.Functions.Like(c.Answer, pattern))
-                .Take(25)
-                .ToListAsync();
+            List<int> resultDeckIds = matchingCards.Select(c => c.DeckId).Distinct().ToList();
+            Dictionary<int, string> deckTitles = await dbContext.Decks.AsNoTracking()
+                .Where(d => resultDeckIds.Contains(d.Id))
+                .ToDictionaryAsync(d => d.Id, d => d.Title);
 
             cards = matchingCards.Select(c => new CardSearchResult
             {
@@ -193,7 +195,7 @@ public sealed class SearchController : ControllerBase
         // 3. Search Coding Exercises in scoped study groups
         List<ExerciseSearchResult> exercises = await dbContext.Exercises.AsNoTracking()
             .Where(e => (e.StudyGroupId.HasValue && scopedGroupIds.Contains(e.StudyGroupId.Value)) || (sampleInScope && (e.StudyGroupId == null || e.StudyGroupId == 0)))
-            .Where(e => EF.Functions.Like(e.Title, pattern) || (e.Description != null && EF.Functions.Like(e.Description, pattern)) || EF.Functions.Like(e.Language, pattern))
+            .Where(e => EF.Functions.Like(e.Title.ToLower(), pattern) || (e.Description != null && EF.Functions.Like(e.Description.ToLower(), pattern)) || EF.Functions.Like(e.Language.ToLower(), pattern))
             .Take(15)
             .Select(e => new ExerciseSearchResult
             {
@@ -206,44 +208,46 @@ public sealed class SearchController : ControllerBase
             .ToListAsync();
 
         // 4. Search Follow-ups in scoped cards
-        if (scopedDeckIds.Count > 0)
+        List<CardFollowup> matchingFollowups = await dbContext.CardFollowups.AsNoTracking()
+            .Where(f => dbContext.Cards.Any(c => c.Id == f.CardId && scopedDecksQuery.Any(d => d.Id == c.DeckId)))
+            .Where(f => EF.Functions.Like(f.QuestionText.ToLower(), pattern))
+            .OrderByDescending(f => f.CreatedAt)
+            .Take(15)
+            .ToListAsync();
+
+        if (matchingFollowups.Count > 0)
         {
-            List<CardFollowup> matchingFollowups = await dbContext.CardFollowups.AsNoTracking()
-                .Where(f => dbContext.Cards.Any(c => c.Id == f.CardId && scopedDeckIds.Contains(c.DeckId)))
-                .Where(f => EF.Functions.Like(f.QuestionText, pattern))
-                .OrderByDescending(f => f.CreatedAt)
-                .Take(15)
+            List<int> authorIds = matchingFollowups.Select(f => f.AuthorUserId).Distinct().ToList();
+            var authors = await dbContext.Users.AsNoTracking()
+                .Where(u => authorIds.Contains(u.Id))
+                .Select(u => new { u.Id, u.DisplayName, u.Email })
                 .ToListAsync();
 
-            if (matchingFollowups.Count > 0)
+            Dictionary<int, string> userNames = authors.ToDictionary(
+                u => u.Id,
+                u => UserHelper.GetEffectiveDisplayName(u.DisplayName, u.Email)
+            );
+
+            List<int> cardIds = matchingFollowups.Select(f => f.CardId).Distinct().ToList();
+            Dictionary<int, int> cardDeckIds = await dbContext.Cards.AsNoTracking()
+                .Where(c => cardIds.Contains(c.Id))
+                .ToDictionaryAsync(c => c.Id, c => c.DeckId);
+
+            List<int> followupDeckIds = cardDeckIds.Values.Distinct().ToList();
+            Dictionary<int, string> followupDeckTitles = await dbContext.Decks.AsNoTracking()
+                .Where(d => followupDeckIds.Contains(d.Id))
+                .ToDictionaryAsync(d => d.Id, d => d.Title);
+
+            response.Followups = matchingFollowups.Select(f => new FollowupSearchResult
             {
-                List<int> authorIds = matchingFollowups.Select(f => f.AuthorUserId).Distinct().ToList();
-                var authors = await dbContext.Users.AsNoTracking()
-                    .Where(u => authorIds.Contains(u.Id))
-                    .Select(u => new { u.Id, u.DisplayName, u.Email })
-                    .ToListAsync();
-
-                Dictionary<int, string> userNames = authors.ToDictionary(
-                    u => u.Id,
-                    u => UserHelper.GetEffectiveDisplayName(u.DisplayName, u.Email)
-                );
-
-                List<int> cardIds = matchingFollowups.Select(f => f.CardId).Distinct().ToList();
-                Dictionary<int, int> cardDeckIds = await dbContext.Cards.AsNoTracking()
-                    .Where(c => cardIds.Contains(c.Id))
-                    .ToDictionaryAsync(c => c.Id, c => c.DeckId);
-
-                response.Followups = matchingFollowups.Select(f => new FollowupSearchResult
-                {
-                    Id = f.Id,
-                    CardId = f.CardId,
-                    DeckId = cardDeckIds.GetValueOrDefault(f.CardId, 0),
-                    DeckTitle = deckTitles.GetValueOrDefault(cardDeckIds.GetValueOrDefault(f.CardId, 0), "Deck"),
-                    QuestionText = f.QuestionText,
-                    AuthorDisplayName = userNames.GetValueOrDefault(f.AuthorUserId, "User"),
-                    IsAnswered = f.LinkedCardId.HasValue || !string.IsNullOrWhiteSpace(f.LinkedCardIds)
-                }).ToList();
-            }
+                Id = f.Id,
+                CardId = f.CardId,
+                DeckId = cardDeckIds.GetValueOrDefault(f.CardId, 0),
+                DeckTitle = followupDeckTitles.GetValueOrDefault(cardDeckIds.GetValueOrDefault(f.CardId, 0), "Deck"),
+                QuestionText = f.QuestionText,
+                AuthorDisplayName = userNames.GetValueOrDefault(f.AuthorUserId, "User"),
+                IsAnswered = f.LinkedCardId.HasValue || !string.IsNullOrWhiteSpace(f.LinkedCardIds)
+            }).ToList();
         }
 
         response.Decks = decks;
