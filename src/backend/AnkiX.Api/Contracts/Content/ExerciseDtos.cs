@@ -88,12 +88,11 @@ public sealed class UpdateExerciseRequest
     [MaxLength(4000)]
     public string? Description { get; set; }
 
-    [Required]
     [MaxLength(50)]
-    public string Language { get; set; } = "csharp";
+    public string? Language { get; set; }
 
     [MaxLength(50)]
-    public string ExerciseType { get; set; } = "CodeExecution";
+    public string? ExerciseType { get; set; }
 
     public string? ExerciseSpec { get; set; }
 

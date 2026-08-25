@@ -212,7 +212,11 @@ public sealed class ExercisesController : ControllerBase
         if (!await CanManageContentAsync(request.StudyGroupId)) return Forbid();
 
         string exerciseType = !string.IsNullOrWhiteSpace(request.ExerciseType) ? request.ExerciseType.Trim() : "CodeExecution";
-        string language = request.Language.Trim().ToLowerInvariant();
+        string rawLang = !string.IsNullOrWhiteSpace(request.Language) ? request.Language.Trim().ToLowerInvariant() : (exerciseType == "CodeExecution" ? "csharp" : "general");
+        rawLang = System.Text.RegularExpressions.Regex.Replace(rawLang, @"[^a-z0-9-_]", "");
+        if (string.IsNullOrEmpty(rawLang)) rawLang = exerciseType == "CodeExecution" ? "csharp" : "general";
+        if (rawLang.Length > 50) rawLang = rawLang.Substring(0, 50);
+        string language = rawLang;
         if (exerciseType == "CodeExecution" && language is not "csharp" and not "python" and not "javascript" and not "go")
         {
             return BadRequest(new { message = "Language for code execution must be one of: csharp, python, javascript, go." });
@@ -267,7 +271,11 @@ public sealed class ExercisesController : ControllerBase
         if (!await CanManageContentAsync(exercise.StudyGroupId)) return Forbid();
 
         string exerciseType = !string.IsNullOrWhiteSpace(request.ExerciseType) ? request.ExerciseType.Trim() : (exercise.ExerciseType ?? "CodeExecution");
-        string language = request.Language.Trim().ToLowerInvariant();
+        string rawLang = !string.IsNullOrWhiteSpace(request.Language) ? request.Language.Trim().ToLowerInvariant() : (!string.IsNullOrWhiteSpace(exercise.Language) ? exercise.Language : (exerciseType == "CodeExecution" ? "csharp" : "general"));
+        rawLang = System.Text.RegularExpressions.Regex.Replace(rawLang, @"[^a-z0-9-_]", "");
+        if (string.IsNullOrEmpty(rawLang)) rawLang = exerciseType == "CodeExecution" ? "csharp" : "general";
+        if (rawLang.Length > 50) rawLang = rawLang.Substring(0, 50);
+        string language = rawLang;
         if (exerciseType == "CodeExecution" && language is not "csharp" and not "python" and not "javascript" and not "go")
         {
             return BadRequest(new { message = "Language for code execution must be one of: csharp, python, javascript, go." });
@@ -581,7 +589,8 @@ public sealed class ExercisesController : ControllerBase
             });
         }
 
-        string lang = !string.IsNullOrWhiteSpace(request.Language) ? request.Language : exercise.Language;
+        // Lock execution strictly to the authored exercise runtime
+        string lang = exercise.Language;
 
         CodeExecutionResult execResult = await codeExecutionService.ExecuteAsync(
             request.SubmittedCode,

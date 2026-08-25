@@ -250,18 +250,19 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
     **When** clicked,  
     **Then** the theme switches instantly between dark and light palettes, saving the selection in `localStorage`.
 
-#### Story 7.4: Multi-Modal Exercise Integrity, Custom Topic Tagging & Locked Runtime Engine
+#### Story 7.4: Multi-Modal Exercise Integrity, Controlled Folksonomy Tagging & Locked Runtime Engine
 
 **As a** learner practicing exercises and a contributor authoring them,  
-**I want to** experience consistent multi-modal rendering (MCQ, Short Answer, Code), custom topic tagging, locked execution runtimes, and clean deduplicated action controls,  
-**So that** linked card exercises render faithfully and cannot be submitted in the wrong programming language or with misleading tags.  
+**I want to** experience consistent multi-modal rendering (MCQ, Short Answer, Code), controlled folksonomy topic tagging with creatable autocomplete, locked execution runtimes, dynamic catalog filtering, and clean deduplicated action controls,  
+**So that** linked card exercises render faithfully, catalog filtering adapts dynamically, and authors can tag exercises with any subject domain.  
 
 * **Acceptance Criteria:**
   * **Consistent Linked Card Exercise Projection:** `GET /api/cards/{cardId}/exercises` backend projection includes `ExerciseType` and `ExerciseSpec`, ensuring MCQ and Short Answer exercises render their respective native radio buttons and text response forms in the linked card modal (`ExercisePracticeModal`) rather than defaulting to a code editor.
   * **Deduplicated Execution & Submission Controls:** In `Deck.jsx` `ExercisePracticeModal`, the duplicate hardcoded "▶ Run Solution" button is removed, delegating action control entirely to `ExerciseRenderer` (which renders a single, clean `Check Answer`, `Submit Answer`, or `▶ Run Solution` button based on exercise modality).
   * **Locked Execution Runtime:** For Code Execution exercises, the practice view locks execution strictly to the exercise's authored language (Python, C#, JavaScript, Go) and removes the runtime `<select>` switcher, rendering the language as a read-only tag badge.
-  * **Custom Topic & Domain Tags for Non-Coding Exercises:** MCQ and Short Answer creation and editing interfaces allow authors to specify custom topic/domain tags (e.g. `Linux`, `Networking`, `DevOps`, `SQL`, `Architecture`, `General`) instead of forcing programming language tags.
-  * **Polished Tag Badge Rendering:** Non-coding exercises display their custom topic badge with a clean, neutral theme rather than defaulting to a purple `C#` badge.
+  * **Controlled Folksonomy & Creatable Autocomplete for Non-Coding Exercises:** MCQ and Short Answer creation and editing interfaces provide a smart topic tag input with `<datalist>` autocomplete suggestions from popular presets and existing catalog tags, while allowing authors to type any custom topic/domain tag (e.g. `Kubernetes`, `React`, `Neuroscience`, `Docker`). Input is automatically sanitized and normalized.
+  * **Dynamic Catalog Filter Chips & Palette Generator:** The `/exercises` catalog dynamically derives filter chips from all distinct tags in the active catalog, and renders custom badges using a deterministic, high-contrast pastel palette.
+  * **Polished Tag Badge Rendering:** Non-coding exercises display their custom topic badge with a clean, neutral or deterministically colored theme rather than defaulting to a purple `C#` badge.
 
 #### Story 7.5: UI Exercise Management & Rich Markdown Rendering across Modalities
 

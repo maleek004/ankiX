@@ -79,10 +79,11 @@ Key focus areas for Phase 3:
   * **Tabbed Mobile Coding Sandbox:** Coding challenge interface on screens `<768px` transitions from desktop side-by-side into a 3-tab workspace (`[Problem & Specs]`, `[Code Editor]`, `[Terminal Output & Diffs]`) with a persistent floating action button (`▶ Run Code`).
   * **Adaptive Modals & Bottom Sheets:** Card creation/editing drawers, study group invite modals, and dialogs render as native-feeling bottom sheets with 100% width and safe keyboard auto-scrolling.
   * **Guest Hero Touch Optimization:** Landing hero actions (`Try as Guest`, `Explore Groups`, `Sign In`) stack vertically into full-width touch targets (min 44px height) on mobile devices.
-* **FR34:** Multi-Modal Exercise Integrity & Custom Topic Tagging:
+* **FR34:** Multi-Modal Exercise Integrity & Controlled Folksonomy Topic Tagging:
   * **Consistent Multi-Modal Projection:** Linked card exercises (`GET /api/cards/{cardId}/exercises`) consistently return `ExerciseType` and `ExerciseSpec`, rendering MCQ, Short Answer, and Code Execution formats identically across card views and the catalog.
   * **Locked Execution Runtime:** Code execution exercises strictly execute in the exact language chosen at creation time (Python, C#, JavaScript, Go); runtime switching dropdown during practice is disabled.
-  * **Custom Topic & Domain Tags:** MCQ and Short Answer exercises allow custom topic tagging (e.g., Linux, Networking, SQL, DevOps, Architecture, General) rather than forcing programming language assignments.
+  * **Custom Topic & Domain Tags (Controlled Folksonomy):** MCQ and Short Answer exercises allow creators to input any custom topic/domain tag (e.g. `Kubernetes`, `React`, `Neuroscience`, `Docker`) or select from suggested presets with automatic input normalization, rather than forcing fixed programming language assignments.
+  * **Dynamic Catalog Filter & Palette Generator:** The `/exercises` catalog dynamically aggregates all active tags across exercises into filter chips, and generates deterministic, high-contrast pastel badges for arbitrary custom tags.
   * **Deduplicated Action Controls:** Action buttons (`▶ Run Solution`, `Check Answer`, `Submit Answer`) render as single, unified controls across standalone views and linked card modals.
 * **FR35:** Exercise Management & Rich Markdown Rendering across Modalities:
   * **UI Exercise Editing:** Allow study group admins and contributors (with content creation permissions) to edit existing exercises directly in the UI with a modal preloaded with full exercise data (title, tag, type, description, specs, code).

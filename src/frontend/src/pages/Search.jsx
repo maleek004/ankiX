@@ -6,6 +6,7 @@ import ExercisePracticeModal from './Exercises'
 import CopyModal from '../components/CopyModal'
 import CardDetailModal from '../components/CardDetailModal'
 import MarkdownViewer from '../components/MarkdownViewer'
+import { langBadgeFor } from '../utils/tagUtils'
 
 export default function Search() {
   const { activeStudyGroup } = useStudyGroup() || {}
@@ -312,9 +313,11 @@ export default function Search() {
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                         <strong style={{ fontSize: '0.95rem' }}>{ex.title}</strong>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: '#fff3bf', color: '#f59f00' }}>
-                          {ex.language}
-                        </span>
+                        {ex.language && (
+                          <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: langBadgeFor(ex.language).bg, color: langBadgeFor(ex.language).color }}>
+                            {langBadgeFor(ex.language).label}
+                          </span>
+                        )}
                       </div>
                       {ex.description && <p style={{ margin: 0, fontSize: '0.85rem', color: '#6c757d' }}>{ex.description}</p>}
                     </div>

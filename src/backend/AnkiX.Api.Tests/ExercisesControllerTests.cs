@@ -135,4 +135,99 @@ public class ExercisesControllerTests
         Assert.Single(listGroup1);
         Assert.Equal(1, listGroup1.First().Id);
     }
+
+    [Fact]
+    public async Task CreateExercise_MultipleChoiceWithCustomTag_Succeeds()
+    {
+        using var db = CreateInMemoryDbContext();
+        var controller = CreateController(db, userId: 10, role: "Admin");
+
+        var request = new CreateExerciseRequest
+        {
+            Title = "Kubernetes Pod Lifecycle",
+            Description = "What happens when a pod is evicted?",
+            ExerciseType = "MultipleChoice",
+            Language = "kubernetes",
+            ExerciseSpec = "{\"options\":[\"Killed\",\"Restarted\"],\"correctIndex\":0}"
+        };
+
+        var result = await controller.CreateExercise(request);
+        var createdAtAction = Assert.IsType<CreatedAtActionResult>(result.Result);
+        var detail = Assert.IsType<ExerciseDetailResponse>(createdAtAction.Value);
+
+        Assert.Equal("Kubernetes Pod Lifecycle", detail.Title);
+        Assert.Equal("MultipleChoice", detail.ExerciseType);
+        Assert.Equal("kubernetes", detail.Language);
+        Assert.Equal(1, db.Exercises.Count(e => e.Language == "kubernetes"));
+    }
+
+    [Fact]
+    public async Task GetExercises_FilterByCustomTag_ReturnsMatchingExercises()
+    {
+        using var db = CreateInMemoryDbContext();
+        int userId = 10;
+        var controller = CreateController(db, userId: userId, role: "Admin");
+
+        db.StudyGroupMembers.Add(new StudyGroupMember { StudyGroupId = 1, UserId = userId, Status = StudyGroupMemberStatus.Active, Role = "Admin" });
+        db.Exercises.Add(new Exercise { Id = 1, Title = "K8s Ingress", ExerciseType = "MultipleChoice", Language = "kubernetes", StudyGroupId = 1 });
+        db.Exercises.Add(new Exercise { Id = 2, Title = "React Hooks", ExerciseType = "ExactString", Language = "react", StudyGroupId = 1 });
+        db.Exercises.Add(new Exercise { Id = 3, Title = "C# LINQ", ExerciseType = "CodeExecution", Language = "csharp", StudyGroupId = 1 });
+        await db.SaveChangesAsync();
+
+        var result = await controller.GetExercises(language: "kubernetes", studyGroupId: 1);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var list = Assert.IsAssignableFrom<IEnumerable<ExerciseResponse>>(okResult.Value);
+
+        Assert.Single(list);
+        Assert.Equal("K8s Ingress", list.First().Title);
+        Assert.Equal("kubernetes", list.First().Language);
+    }
+
+    [Fact]
+    public async Task UpdateExercise_CustomTag_UpdatesSuccessfully()
+    {
+        using var db = CreateInMemoryDbContext();
+        var controller = CreateController(db, userId: 10, role: "Admin");
+
+        var ex = new Exercise { Id = 5, Title = "React State", ExerciseType = "MultipleChoice", Language = "general" };
+        db.Exercises.Add(ex);
+        await db.SaveChangesAsync();
+
+        var updateReq = new UpdateExerciseRequest
+        {
+            Title = "React State & Redux",
+            ExerciseType = "MultipleChoice",
+            Language = "react-redux"
+        };
+
+        var result = await controller.UpdateExercise(5, updateReq);
+        Assert.IsType<OkResult>(result);
+
+        var updated = await db.Exercises.FindAsync(5);
+        Assert.NotNull(updated);
+        Assert.Equal("React State & Redux", updated.Title);
+        Assert.Equal("react-redux", updated.Language);
+    }
+
+    [Fact]
+    public async Task CreateExercise_MultipleChoiceWithEmptyTag_DefaultsToGeneral()
+    {
+        using var db = CreateInMemoryDbContext();
+        var controller = CreateController(db, userId: 10, role: "Admin");
+
+        var request = new CreateExerciseRequest
+        {
+            Title = "General Knowledge",
+            ExerciseType = "MultipleChoice",
+            Language = "   ",
+            ExerciseSpec = "{\"options\":[\"A\",\"B\"],\"correctIndex\":0}"
+        };
+
+        var result = await controller.CreateExercise(request);
+        var createdAtAction = Assert.IsType<CreatedAtActionResult>(result.Result);
+        var detail = Assert.IsType<ExerciseDetailResponse>(createdAtAction.Value);
+
+        Assert.Equal("general", detail.Language);
+    }
 }
+

@@ -5,29 +5,8 @@ import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import CopyModal from '../components/CopyModal'
 import AuthModal from '../components/AuthModal'
 import MarkdownViewer from '../components/MarkdownViewer'
-import MarkdownField from '../components/MarkdownField'
+import { getTagBadge, langBadgeFor, normalizeTag, POPULAR_TOPIC_TAGS } from '../utils/tagUtils'
 import * as api from '../api'
-
-const LANG_BADGES = {
-  // Programming language tags (CodeExecution exercises)
-  csharp:      { label: 'C#',            color: '#68217a', bg: '#f2e6f7' },
-  python:      { label: 'Python',        color: '#3572A5', bg: '#e8f2fc' },
-  javascript:  { label: 'JavaScript',    color: '#b5a000', bg: '#fffde6' },
-  go:          { label: 'Go',            color: '#00ADD8', bg: '#e6f9fc' },
-  // Topic tags (MCQ / Short Answer exercises)
-  general:     { label: '🏷️ General',    color: '#495057', bg: '#e9ecef' },
-  linux:       { label: '🐧 Linux',      color: '#2c5282', bg: '#ebf8ff' },
-  networking:  { label: '🌐 Networking', color: '#2c5282', bg: '#e8f4fd' },
-  devops:      { label: '⚙️ DevOps',     color: '#276749', bg: '#e6fffa' },
-  sql:         { label: '🗄️ SQL',        color: '#744210', bg: '#fefcbf' },
-  architecture:{ label: '🏛️ Architecture',color: '#44337a', bg: '#faf5ff' },
-  security:    { label: '🔐 Security',   color: '#7b341e', bg: '#fff5f5' },
-  algorithms:  { label: '🧮 Algorithms', color: '#1a365d', bg: '#ebf8ff' },
-}
-
-function langBadgeFor(lang) {
-  return LANG_BADGES[lang] || { label: lang || 'General', color: '#495057', bg: '#e9ecef' }
-}
 
 export default function Deck(){
   const { activeStudyGroup } = useStudyGroup() || {}
@@ -930,10 +909,11 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
 
     setCreating(true)
     try {
+      const finalLang = exerciseType === 'CodeExecution' ? language : normalizeTag(language)
       const m = await import('../api.js')
       const newEx = await m.createExercise({
         title,
-        language,
+        language: finalLang,
         exerciseType,
         exerciseSpec,
         description,
@@ -1092,9 +1072,9 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
                             <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: typeB.bg, color: typeB.color }}>
                               {typeB.label}
                             </span>
-                            {(!ex.exerciseType || ex.exerciseType === 'CodeExecution') && (
-                              <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#eee' }}>
-                                {ex.language}
+                            {ex.language && (
+                              <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: langBadgeFor(ex.language).bg, color: langBadgeFor(ex.language).color }}>
+                                {langBadgeFor(ex.language).label}
                               </span>
                             )}
                           </div>
@@ -1152,7 +1132,7 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
                 </div>
                 {exerciseType === 'CodeExecution' ? (
                   <div>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language Tag</label>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language Runtime</label>
                     <select className="form-control" value={language} onChange={e => setLanguage(e.target.value)}>
                       <option value="csharp">C#</option>
                       <option value="python">Python</option>
@@ -1162,17 +1142,22 @@ function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
                   </div>
                 ) : (
                   <div>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Topic Tag</label>
-                    <select className="form-control" value={language} onChange={e => setLanguage(e.target.value)}>
-                      <option value="general">🏷️ General</option>
-                      <option value="linux">🐧 Linux</option>
-                      <option value="networking">🌐 Networking</option>
-                      <option value="devops">⚙️ DevOps</option>
-                      <option value="sql">🗄️ SQL</option>
-                      <option value="architecture">🏛️ Architecture</option>
-                      <option value="security">🔐 Security</option>
-                      <option value="algorithms">🧮 Algorithms</option>
-                    </select>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                      Topic / Domain Tag <span style={{ fontSize: '0.75rem', fontWeight: 400, color: '#6c757d' }}>(Select or type custom tag)</span>
+                    </label>
+                    <input
+                      list="popular-topic-tags-deck-linker"
+                      className="form-control"
+                      value={language}
+                      onChange={e => setLanguage(e.target.value)}
+                      placeholder="e.g. general, linux, kubernetes, react..."
+                      required
+                    />
+                    <datalist id="popular-topic-tags-deck-linker">
+                      {POPULAR_TOPIC_TAGS.map(tag => (
+                        <option key={tag} value={tag} />
+                      ))}
+                    </datalist>
                   </div>
                 )}
               </div>

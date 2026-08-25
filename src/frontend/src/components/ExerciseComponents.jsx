@@ -1,16 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import MarkdownViewer from './MarkdownViewer'
-
-const LANG_BADGES = {
-  csharp:     { label: 'C#',         color: '#68217a', bg: '#f3e8f8' },
-  python:     { label: 'Python',     color: '#3572A5', bg: '#e8f4f8' },
-  javascript: { label: 'JavaScript', color: '#b5a000', bg: '#fffde8' },
-  go:         { label: 'Go',         color: '#00ADD8', bg: '#e8f9fd' },
-}
-
-function langBadgeFor(lang) {
-  return LANG_BADGES[lang] || { label: lang || 'Unknown', color: '#495057', bg: '#e9ecef' }
-}
+import { getTagBadge, langBadgeFor } from '../utils/tagUtils'
 
 export function MultipleChoiceExercise({ exercise, onRunCode, running, runResult }) {
   const [selectedIdx, setSelectedIdx] = useState(null)

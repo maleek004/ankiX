@@ -20,6 +20,7 @@ import CopyModal from '../components/CopyModal'
 import AuthModal from '../components/AuthModal'
 import MarkdownViewer from '../components/MarkdownViewer'
 import MarkdownField from '../components/MarkdownField'
+import { getTagBadge, langBadgeFor, normalizeTag, POPULAR_TOPIC_TAGS } from '../utils/tagUtils'
 
 export default function Exercises() {
   const { activeStudyGroup } = useStudyGroup() || {}
@@ -35,6 +36,7 @@ export default function Exercises() {
   const [dueQueue, setDueQueue] = useState([])
   const [enrolledIds, setEnrolledIds] = useState(new Set())
   const [activeLang, setActiveLang] = useState('')
+  const [discoveredTags, setDiscoveredTags] = useState(new Set())
   const [canCreate, setCanCreate] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
 
@@ -182,11 +184,15 @@ export default function Exercises() {
       exerciseSpec = JSON.stringify({ acceptedAnswers: [exactAnswer.trim()], caseSensitive: exactCaseSensitive })
     }
 
+    const finalLang = exerciseType === 'CodeExecution'
+      ? (language || 'csharp')
+      : normalizeTag(language)
+
     setIsCreating(true)
     try {
       const newEx = await createExercise({
         title,
-        language,
+        language: finalLang,
         exerciseType,
         exerciseSpec,
         description,
@@ -318,11 +324,15 @@ export default function Exercises() {
       exerciseSpec = JSON.stringify({ acceptedAnswers: [editExactAnswer.trim()], caseSensitive: editExactCaseSensitive })
     }
 
+    const finalLang = editExerciseType === 'CodeExecution'
+      ? (editLanguage || 'csharp')
+      : normalizeTag(editLanguage)
+
     setIsUpdating(true)
     try {
       const payload = {
         title: editTitle.trim(),
-        language: editLanguage,
+        language: finalLang,
         exerciseType: editExerciseType,
         exerciseSpec,
         description: editDescription,
@@ -411,26 +421,57 @@ export default function Exercises() {
     }
   }
 
-  const langBadges = {
-    // Programming language tags (CodeExecution exercises)
-    csharp:      { label: 'C#',           color: '#68217a', bg: '#f3e8f8' },
-    python:      { label: 'Python',       color: '#3572A5', bg: '#e8f4f8' },
-    javascript:  { label: 'JavaScript',   color: '#b5a000', bg: '#fffde8' },
-    go:          { label: 'Go',           color: '#00ADD8', bg: '#e8f9fd' },
-    // Topic tags (MCQ / Short Answer exercises)
-    general:     { label: '🏷️ General',    color: '#495057', bg: '#e9ecef' },
-    linux:       { label: '🐧 Linux',      color: '#2c5282', bg: '#ebf8ff' },
-    networking:  { label: '🌐 Networking', color: '#2c5282', bg: '#e8f4fd' },
-    devops:      { label: '⚙️ DevOps',     color: '#276749', bg: '#e6fffa' },
-    sql:         { label: '🗄️ SQL',        color: '#744210', bg: '#fefcbf' },
-    architecture:{ label: '🏛️ Architecture',color: '#44337a', bg: '#faf5ff' },
-    security:    { label: '🔐 Security',   color: '#7b341e', bg: '#fff5f5' },
-    algorithms:  { label: '🧮 Algorithms', color: '#1a365d', bg: '#ebf8ff' },
-  }
+  // Sync discovered tags whenever exercises or queue updates
+  useEffect(() => {
+    if (exercises.length > 0 || dueQueue.length > 0) {
+      setDiscoveredTags(prev => {
+        const next = new Set(prev)
+        exercises.forEach(ex => { if (ex.language) next.add(normalizeTag(ex.language)) })
+        dueQueue.forEach(ex => { if (ex.language) next.add(normalizeTag(ex.language)) })
+        return next
+      })
+    }
+  }, [exercises, dueQueue])
 
-  function langBadgeFor(lang) {
-    return langBadges[lang] || { label: lang || 'General', color: '#495057', bg: '#e9ecef' }
-  }
+  // Collect all unique tags in current exercise catalog + base runtimes + active tag
+  const availableTags = React.useMemo(() => {
+    const set = new Set(['csharp', 'python', 'javascript', 'go', 'general'])
+    discoveredTags.forEach(t => set.add(t))
+    exercises.forEach(ex => {
+      if (ex.language) {
+        set.add(normalizeTag(ex.language))
+      }
+    })
+    dueQueue.forEach(ex => {
+      if (ex.language) {
+        set.add(normalizeTag(ex.language))
+      }
+    })
+    if (activeLang) set.add(normalizeTag(activeLang))
+
+    const priority = ['csharp', 'python', 'javascript', 'go', 'general', 'linux', 'networking', 'devops', 'sql', 'architecture', 'security', 'algorithms']
+    const array = Array.from(set)
+    array.sort((a, b) => {
+      const idxA = priority.indexOf(a)
+      const idxB = priority.indexOf(b)
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB
+      if (idxA !== -1) return -1
+      if (idxB !== -1) return 1
+      return a.localeCompare(b)
+    })
+    return array
+  }, [discoveredTags, exercises, dueQueue, activeLang])
+
+  const suggestedTags = React.useMemo(() => {
+    const set = new Set(POPULAR_TOPIC_TAGS)
+    discoveredTags.forEach(t => set.add(t))
+    exercises.forEach(ex => {
+      if (ex.language && (ex.exerciseType || 'CodeExecution') !== 'CodeExecution') {
+        set.add(normalizeTag(ex.language))
+      }
+    })
+    return Array.from(set)
+  }, [discoveredTags, exercises])
 
   const typeBadges = {
     CodeExecution: { label: '⚡ Code Exec', bg: '#e7f5ff', color: '#1864ab' },
@@ -576,11 +617,9 @@ export default function Exercises() {
                             <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: typeB.bg, color: typeB.color }}>
                               {typeB.label}
                             </span>
-                            {(!ex.exerciseType || ex.exerciseType === 'CodeExecution') && (
-                              <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
-                                {badge.label}
-                              </span>
-                            )}
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
+                              {badge.label}
+                            </span>
                           </div>
                         </div>
 
@@ -639,26 +678,40 @@ export default function Exercises() {
       {/* Tab 2: All Study Group Exercises */}
       {activeTab === 'all' && (
         <div>
-          {/* Language & Difficulty Ordering Info */}
+          {/* Dynamic Language & Topic Tag Filter Chips */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 className="btn-study-tool"
-                style={{ background: activeLang === '' ? '#0d6efd' : '#fff', color: activeLang === '' ? '#fff' : '#495057', borderColor: '#0d6efd' }}
+                style={{
+                  background: activeLang === '' ? '#0d6efd' : '#fff',
+                  color: activeLang === '' ? '#fff' : '#495057',
+                  borderColor: activeLang === '' ? '#0d6efd' : '#dee2e6',
+                  fontWeight: activeLang === '' ? 700 : 500
+                }}
                 onClick={() => setActiveLang('')}
               >
-                All Languages
+                All Tags & Languages ({exercises.length})
               </button>
-              {Object.keys(langBadges).map(l => (
-                <button
-                  key={l}
-                  className="btn-study-tool"
-                  style={{ background: activeLang === l ? '#0d6efd' : '#fff', color: activeLang === l ? '#fff' : '#495057', borderColor: '#0d6efd' }}
-                  onClick={() => setActiveLang(l)}
-                >
-                  {langBadges[l].label}
-                </button>
-              ))}
+              {availableTags.map(tag => {
+                const badge = getTagBadge(tag)
+                const isSelected = activeLang.toLowerCase() === tag.toLowerCase()
+                return (
+                  <button
+                    key={tag}
+                    className="btn-study-tool"
+                    style={{
+                      background: isSelected ? badge.color : badge.bg,
+                      color: isSelected ? '#fff' : badge.color,
+                      borderColor: isSelected ? badge.color : '#dee2e6',
+                      fontWeight: isSelected ? 700 : 500
+                    }}
+                    onClick={() => setActiveLang(tag)}
+                  >
+                    {badge.label}
+                  </button>
+                )
+              })}
             </div>
 
             <span style={{ fontSize: '0.8rem', color: '#6c757d', fontStyle: 'italic' }}>
@@ -707,11 +760,9 @@ export default function Exercises() {
                           <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: diff.bg, color: diff.color }} title={`Average Ease Factor: ${ease}`}>
                             {diff.label} {reviews ? `(${ease})` : ''}
                           </span>
-                          {(!ex.exerciseType || ex.exerciseType === 'CodeExecution') && (
-                            <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
-                              {badge.label}
-                            </span>
-                          )}
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color }}>
+                            {badge.label}
+                          </span>
                         </div>
                       </div>
 
@@ -809,7 +860,7 @@ export default function Exercises() {
                 </div>
                 {exerciseType === 'CodeExecution' ? (
                   <div>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language Tag</label>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language Runtime</label>
                     <select className="form-control" value={language} onChange={e => setLanguage(e.target.value)}>
                       <option value="csharp">C#</option>
                       <option value="python">Python</option>
@@ -819,17 +870,22 @@ export default function Exercises() {
                   </div>
                 ) : (
                   <div>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Topic Tag</label>
-                    <select className="form-control" value={language} onChange={e => setLanguage(e.target.value)}>
-                      <option value="general">🏷️ General</option>
-                      <option value="linux">🐧 Linux</option>
-                      <option value="networking">🌐 Networking</option>
-                      <option value="devops">⚙️ DevOps</option>
-                      <option value="sql">🗄️ SQL</option>
-                      <option value="architecture">🏛️ Architecture</option>
-                      <option value="security">🔐 Security</option>
-                      <option value="algorithms">🧮 Algorithms</option>
-                    </select>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                      Topic / Domain Tag <span style={{ fontSize: '0.75rem', fontWeight: 400, color: '#6c757d' }}>(Select or type custom tag)</span>
+                    </label>
+                    <input
+                      list="popular-topic-tags"
+                      className="form-control"
+                      value={language}
+                      onChange={e => setLanguage(e.target.value)}
+                      placeholder="e.g. general, linux, kubernetes, react..."
+                      required
+                    />
+                    <datalist id="popular-topic-tags">
+                      {suggestedTags.map(tag => (
+                        <option key={tag} value={tag} />
+                      ))}
+                    </datalist>
                   </div>
                 )}
               </div>
@@ -931,7 +987,7 @@ export default function Exercises() {
                 </div>
                 {editExerciseType === 'CodeExecution' ? (
                   <div>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language Tag</label>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Language Runtime</label>
                     <select className="form-control" value={editLanguage} onChange={e => setEditLanguage(e.target.value)}>
                       <option value="csharp">C#</option>
                       <option value="python">Python</option>
@@ -941,17 +997,22 @@ export default function Exercises() {
                   </div>
                 ) : (
                   <div>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Topic Tag</label>
-                    <select className="form-control" value={editLanguage} onChange={e => setEditLanguage(e.target.value)}>
-                      <option value="general">🏷️ General</option>
-                      <option value="linux">🐧 Linux</option>
-                      <option value="networking">🌐 Networking</option>
-                      <option value="devops">⚙️ DevOps</option>
-                      <option value="sql">🗄️ SQL</option>
-                      <option value="architecture">🏛️ Architecture</option>
-                      <option value="security">🔐 Security</option>
-                      <option value="algorithms">🧮 Algorithms</option>
-                    </select>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                      Topic / Domain Tag <span style={{ fontSize: '0.75rem', fontWeight: 400, color: '#6c757d' }}>(Select or type custom tag)</span>
+                    </label>
+                    <input
+                      list="popular-topic-tags-edit"
+                      className="form-control"
+                      value={editLanguage}
+                      onChange={e => setEditLanguage(e.target.value)}
+                      placeholder="e.g. general, linux, kubernetes, react..."
+                      required
+                    />
+                    <datalist id="popular-topic-tags-edit">
+                      {suggestedTags.map(tag => (
+                        <option key={tag} value={tag} />
+                      ))}
+                    </datalist>
                   </div>
                 )}
               </div>
