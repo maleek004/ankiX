@@ -32,6 +32,8 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 | **FR33** | Universal Mobile-First Responsiveness & Touch Adaptive UX | Epic 7 (Story 7.0) |
 | **FR34** | Multi-Modal Exercise Integrity & Custom Topic Tagging | Epic 7 (Story 7.4) |
 | **FR35** | Exercise Editing UI & Rich Markdown Rendering across Modalities | Epic 7 (Story 7.5) |
+| **FR38** | Search Card Preview Modal Integrity & Rendering Resiliency | Epic 7 (Story 7.6) |
+| **FR39** | Shared Card Modals & Linker Refactoring | Epic 7 (Story 7.7) |
 | **FR23** | GitHub-style study activity heatmap | Epic 8 (Story 8.1) |
 
 | **FR24** | Daily study streak tracking & milestone badges | Epic 8 (Story 8.2) |
@@ -276,6 +278,30 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
   * **Rich Markdown Input Fields:** Replace plain textareas for Exercise Description / Instructions and MCQ options in both Create and Edit modals with `MarkdownField` (providing live preview, syntax hint, and tab switching).
   * **Rich Markdown Display across Modalities:** Use `MarkdownViewer` to render exercise descriptions, instructions, prompts, and MCQ option choices in both standalone exercise views (`Exercises.jsx`) and linked card modals (`ExercisePracticeModal` in `Deck.jsx`), supporting inline code, multi-line code blocks, bold/italics, and lists.
   * **Permissions & State Synchronization:** Submitting an exercise edit updates the exercise state in-place in both the catalog and active practice workspace without requiring a full page refresh.
+
+#### Story 7.6: Search Card Preview Modal Integrity & Rendering Resiliency
+
+**As a** learner or contributor searching across study groups and decks on `/search`,  
+**I want to** click the "👁 Preview" button on any search result card to inspect the full card prompt, answer, follow-ups, and linked exercises without crashing or receiving a blank screen,  
+**So that** I can preview and interact with flashcards immediately from search results.  
+
+* **Acceptance Criteria:**
+  * **Modal Render Integrity:** Clicking "👁 Preview" on any card in the `/search` page renders `CardDetailModal` seamlessly without throwing `ReferenceError: useStudyGroup is not defined` or unmounting the React tree.
+  * **Interactive Tab Switching:** Inside the preview modal, users can switch between `[Card Details]`, `[Follow-ups]`, and `[Linked Exercises]` smoothly.
+  * **Exercise Linker Form Binding:** The "✨ Create & Link New Exercise" sub-form inside the card detail linker correctly binds to the submission handler without unhandled reference errors.
+  * **Inline Editing & Synchronization:** Authorized contributors/admins can edit card prompt and answer within the preview modal, synchronizing changes with search result state upon saving.
+
+#### Story 7.7: Shared Card Modals & Linker Refactoring
+
+**As a** frontend developer maintaining AnkiX and a learner interacting with flashcards,  
+**I want** child card dialogs (`CardExerciseLinkerModal`, `ConvertFollowupModal`, and `LinkedCardsPreviewModal`) extracted into shared, reusable component files,  
+**So that** card exercise linking, follow-up conversion, and linked card carousels are unified, DRY, and maintain consistent indexing logic across both the study deck view and search preview.  
+
+* **Acceptance Criteria:**
+  * **Component Extraction:** Extract `CardExerciseLinkerModal`, `ConvertFollowupModal`, and `LinkedCardsPreviewModal` from `CardDetailModal.jsx` and `Deck.jsx` into standalone components in `src/frontend/src/components/`.
+  * **MCQ Indexing Alignment:** In the shared `CardExerciseLinkerModal`, ensure MCQ `correctIndex` resolves accurately without off-by-one shifts when option slots are left empty, matching the patched validation logic.
+  * **Unified Usage:** Both `CardDetailModal.jsx` and `Deck.jsx` import and render the shared components with identical prop interfaces and behavior.
+  * **Regression Testing:** All existing study session, search preview, deck editing, and exercise management tests continue to pass without regression.
 
 ---
 

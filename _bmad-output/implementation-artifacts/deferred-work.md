@@ -12,3 +12,9 @@
 - [x] [Review][Defer] Implement background hosted service to prune expired/revoked refresh tokens — deferred, maintenance task.
 - [x] [Review][Defer] Evaluate HttpOnly cookie storage migration for refresh tokens in future architecture review — deferred, architectural enhancement.
 
+## Deferred from: code review of 7-6-search-card-preview-modal-integrity-and-rendering-resiliency.md (2026-08-25)
+- [x] [Review][Defer] Deduplicate `CardExerciseLinkerModal` and `ConvertFollowupModal` across `CardDetailModal.jsx` and `Deck.jsx` into shared components (`CardDetailModal.jsx:650`) — ✅ **Resolved in Story 7.7**.
+- [x] [Review][Defer] Align MCQ correctIndex calculation in `Deck.jsx` copy of `CardExerciseLinkerModal` (`Deck.jsx:1445`) — ✅ **Resolved in Story 7.7**.
+- [x] [Review][Defer] Add transaction / rollback support for two-step exercise creation and linkage (`CardDetailModal.jsx:750`) — deferred, pre-existing API design.
+
+
