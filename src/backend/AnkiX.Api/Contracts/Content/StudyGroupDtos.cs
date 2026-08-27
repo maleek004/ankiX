@@ -26,6 +26,19 @@ public sealed class UpdateStudyGroupPrivacyRequest
     public string Privacy { get; set; } = string.Empty;
 }
 
+public sealed class UpdateStudyGroupRequest
+{
+    [Required]
+    [MaxLength(200)]
+    public string Name { get; set; } = string.Empty;
+
+    [MaxLength(1000)]
+    public string? Description { get; set; }
+
+    [MaxLength(2048)]
+    public string? AvatarUrl { get; set; }
+}
+
 public sealed class StudyGroupResponse
 {
     public int Id { get; set; }

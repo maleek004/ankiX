@@ -26,7 +26,10 @@ vi.mock('../api', async () => {
     requestStudyGroupAccess: vi.fn(),
     acceptStudyGroupInvitation: vi.fn(),
     declineStudyGroupInvitation: vi.fn(),
-    createStudyGroup: vi.fn()
+    createStudyGroup: vi.fn(),
+    updateStudyGroup: vi.fn(),
+    getStudyGroupMembers: vi.fn(),
+    getStudyGroupJoinRequests: vi.fn()
   }
 })
 
@@ -134,5 +137,70 @@ describe('StudyGroups Page 3-Tier Privacy UI', () => {
 
     expect(screen.getByText('Dermatology Private Pending')).toBeInTheDocument()
     expect(screen.getByText('⏳ Request Pending Review')).toBeInTheDocument()
+  })
+
+  test('allows group owner to edit group name and description from Manage modal', async () => {
+    window.alert = vi.fn()
+    api.getStudyGroups.mockResolvedValue([
+      {
+        id: 10,
+        name: 'Original Group Name',
+        slug: 'orig-slug',
+        description: 'Original group description',
+        privacy: 'Public',
+        isPublic: true,
+        memberCount: 5,
+        deckCount: 2,
+        exerciseCount: 3,
+        userRole: 'Owner',
+        userMembershipStatus: 'Active',
+        pendingRequestCount: 0
+      }
+    ])
+    api.getMyStudyGroupInvitations.mockResolvedValue([])
+    api.getStudyGroupMembers.mockResolvedValue([])
+    api.getStudyGroupJoinRequests.mockResolvedValue([])
+    api.updateStudyGroup.mockResolvedValue({
+      id: 10,
+      name: 'Edited Group Name',
+      slug: 'orig-slug',
+      description: 'Edited group description'
+    })
+
+    const { fireEvent } = await import('@testing-library/react')
+
+    render(
+      <MemoryRouter>
+        <StudyGroups />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => expect(screen.getByText('Original Group Name')).toBeInTheDocument())
+
+    // Click Manage & Settings button
+    const manageBtn = screen.getByRole('button', { name: /👥 Manage & Settings/i })
+    fireEvent.click(manageBtn)
+
+    // Click Edit Details tab
+    const editDetailsTab = await screen.findByRole('button', { name: /✏️ Edit Details/i })
+    fireEvent.click(editDetailsTab)
+
+    // Modify name and description
+    const nameInput = screen.getByDisplayValue('Original Group Name')
+    fireEvent.change(nameInput, { target: { value: 'Edited Group Name' } })
+
+    const descInput = screen.getByDisplayValue('Original group description')
+    fireEvent.change(descInput, { target: { value: 'Edited group description' } })
+
+    // Submit save
+    const saveBtn = screen.getByRole('button', { name: /💾 Save Changes/i })
+    fireEvent.click(saveBtn)
+
+    await waitFor(() => {
+      expect(api.updateStudyGroup).toHaveBeenCalledWith('orig-slug', {
+        name: 'Edited Group Name',
+        description: 'Edited group description'
+      })
+    })
   })
 })

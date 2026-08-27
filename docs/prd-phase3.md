@@ -88,8 +88,9 @@ Key focus areas for Phase 3:
 * **FR35:** Exercise Management & Rich Markdown Rendering across Modalities:
   * **UI Exercise Editing:** Allow study group admins and contributors (with content creation permissions) to edit existing exercises directly in the UI with a modal preloaded with full exercise data (title, tag, type, description, specs, code).
   * **Full Markdown Support:** Exercise inputs (descriptions, instructions, prompts, and MCQ option choices) accept full Markdown syntax and render cleanly via `MarkdownViewer` across all exercise practice views, dialogs, and catalog lists.
-
-
+* **FR40:** Study Group & Deck Name Management for Group Admins:
+  * **Group Name & Metadata Editing:** Study Group Owners, Admins, and Platform Super-Admins can edit the name, description, and avatar of a study group directly from the Group Management & Settings modal and Decks workspace header, with strict freeze guardrails preventing mutations when frozen.
+  * **Deck Name & Description Editing:** Group Admins, Contributors, and Deck Authors can edit deck titles and descriptions via an "Edit Deck" button in the actions dropdown (`Actions ▾`) on each deck card.
 
 ### Analytics & Gamification
 * **FR23:** Provide a **GitHub-style study activity heatmap** on the user dashboard displaying daily card reviews and exercise runs.

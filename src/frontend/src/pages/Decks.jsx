@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../auth/AuthProvider'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
-import { getDecks, createDeck, deleteDeck, canCreateContent } from '../api.js'
+import { getDecks, createDeck, updateDeck, deleteDeck, updateStudyGroup, canCreateContent } from '../api.js'
 import AuthModal from '../components/AuthModal'
 
 export default function Decks(){
-  const { activeStudyGroup } = useStudyGroup() || {}
+  const auth = useAuth()
+  const { activeStudyGroup, setActiveStudyGroup } = useStudyGroup() || {}
   const navigate = useNavigate()
   const [decks, setDecks] = useState([])
   const [loading, setLoading] = useState(true)
@@ -17,6 +19,12 @@ export default function Decks(){
   const [isCreating, setIsCreating] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [authModalConfig, setAuthModalConfig] = useState({ isOpen: false, title: '', subtitle: '', intent: null })
+
+  // Edit Deck Modal State
+  const [editingDeck, setEditingDeck] = useState({ isOpen: false, deck: null, title: '', description: '', loading: false })
+
+  // Edit Study Group Modal State
+  const [editingGroup, setEditingGroup] = useState({ isOpen: false, name: '', description: '', loading: false })
 
   const token = localStorage.getItem('ankix_token')
   const isGuest = !token
@@ -89,17 +97,88 @@ export default function Decks(){
     }
   }
 
+  function openEditDeck(deck) {
+    setActiveDropdown(null)
+    setEditingDeck({
+      isOpen: true,
+      deck,
+      title: deck.title || '',
+      description: deck.description || '',
+      loading: false
+    })
+  }
+
+  async function handleSaveEditDeck(e) {
+    e.preventDefault()
+    if (!editingDeck.deck || !editingDeck.title.trim()) return
+    setEditingDeck(prev => ({ ...prev, loading: true }))
+    try {
+      await updateDeck(editingDeck.deck.id, editingDeck.title.trim(), editingDeck.description.trim())
+      setDecks(prev => prev.map(d => d.id === editingDeck.deck.id ? { ...d, title: editingDeck.title.trim(), description: editingDeck.description.trim() } : d))
+      setEditingDeck({ isOpen: false, deck: null, title: '', description: '', loading: false })
+    } catch (err) {
+      alert('Update deck failed: ' + (err.message || err))
+      setEditingDeck(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  function openEditActiveGroup() {
+    if (!activeStudyGroup) return
+    setEditingGroup({
+      isOpen: true,
+      name: activeStudyGroup.name || '',
+      description: activeStudyGroup.description || '',
+      loading: false
+    })
+  }
+
+  async function handleSaveActiveGroup(e) {
+    e.preventDefault()
+    if (!activeStudyGroup || !editingGroup.name.trim()) return
+    setEditingGroup(prev => ({ ...prev, loading: true }))
+    try {
+      const updated = await updateStudyGroup(activeStudyGroup.slug, {
+        name: editingGroup.name.trim(),
+        description: editingGroup.description.trim()
+      })
+      if (setActiveStudyGroup) {
+        setActiveStudyGroup({
+          ...activeStudyGroup,
+          name: updated.name,
+          description: updated.description
+        })
+      }
+      setEditingGroup({ isOpen: false, name: '', description: '', loading: false })
+    } catch (err) {
+      alert('Update study group failed: ' + (err.message || err))
+      setEditingGroup(prev => ({ ...prev, loading: false }))
+    }
+  }
+
   return (
     <div>
       <div className="decks-header-bar">
-        <h2 style={{ margin: 0, fontWeight: 500, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-          {activeStudyGroup ? `Decks: ${activeStudyGroup.name}` : 'Public Flashcard Decks'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0, fontWeight: 500, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {activeStudyGroup ? `Decks: ${activeStudyGroup.name}` : 'Public Flashcard Decks'}
+          </h2>
+          {activeStudyGroup && (activeStudyGroup.role === 'Owner' || activeStudyGroup.role === 'Admin' || auth?.user?.role === 'Admin' || auth?.user?.role === 'SuperAdmin') && !activeStudyGroup.isFrozen && (
+            <button
+              type="button"
+              className="btn-study-tool"
+              onClick={openEditActiveGroup}
+              title="Rename study group"
+              style={{ padding: '3px 10px', fontSize: '0.8rem', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+            >
+              ✏️ Edit Group
+            </button>
+          )}
           {activeStudyGroup?.isFrozen && (
             <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 999, background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
               ❄️ Frozen
             </span>
           )}
-        </h2>
+        </div>
         {canCreate ? (
           <button 
             className="btn-primary" 
@@ -195,6 +274,11 @@ export default function Decks(){
                     {activeDropdown === d.id && (
                       <div className="dropdown-menu">
                         <Link to={`/decks/${d.id}`} className="dropdown-item">Study</Link>
+                        {!isGuest && canCreate && (
+                          <button className="dropdown-item" onClick={() => openEditDeck(d)}>
+                            Edit
+                          </button>
+                        )}
                         {!isGuest && (
                           <button className="dropdown-item" disabled={deletingId === d.id} onClick={() => handleDeleteDeck(d.id)}>
                             {deletingId === d.id ? 'Deleting...' : 'Delete'}
@@ -208,6 +292,128 @@ export default function Decks(){
             ))}
           </tbody>
         </table>
+      )}
+
+      {/* Edit Deck Modal */}
+      {editingDeck.isOpen && editingDeck.deck && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 1000
+          }}
+          onClick={() => { if (!editingDeck.loading) setEditingDeck({ isOpen: false, deck: null, title: '', description: '', loading: false }) }}
+        >
+          <div
+            style={{
+              background: '#fff', borderRadius: 16, padding: '2rem',
+              width: '100%', maxWidth: 500, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 1.25rem 0', color: '#1e293b' }}>✏️ Edit Deck</h3>
+            <form onSubmit={handleSaveEditDeck} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Deck Title *</label>
+                <input
+                  className="form-control"
+                  placeholder="Deck title"
+                  value={editingDeck.title}
+                  maxLength={200}
+                  onChange={e => setEditingDeck({ ...editingDeck, title: e.target.value })}
+                  autoFocus
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Description</label>
+                <textarea
+                  className="form-control"
+                  placeholder="Deck description (optional)"
+                  value={editingDeck.description}
+                  maxLength={1000}
+                  onChange={e => setEditingDeck({ ...editingDeck, description: e.target.value })}
+                  rows={3}
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="btn-study-tool"
+                  disabled={editingDeck.loading}
+                  onClick={() => setEditingDeck({ isOpen: false, deck: null, title: '', description: '', loading: false })}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={editingDeck.loading || !editingDeck.title.trim()}>
+                  {editingDeck.loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Active Study Group Modal */}
+      {editingGroup.isOpen && activeStudyGroup && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 1000
+          }}
+          onClick={() => { if (!editingGroup.loading) setEditingGroup({ isOpen: false, name: '', description: '', loading: false }) }}
+        >
+          <div
+            style={{
+              background: '#fff', borderRadius: 16, padding: '2rem',
+              width: '100%', maxWidth: 500, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 1.25rem 0', color: '#1e293b' }}>✏️ Edit Study Group Details</h3>
+            <form onSubmit={handleSaveActiveGroup} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Study Group Name *</label>
+                <input
+                  className="form-control"
+                  placeholder="Study group name"
+                  value={editingGroup.name}
+                  maxLength={200}
+                  onChange={e => setEditingGroup({ ...editingGroup, name: e.target.value })}
+                  autoFocus
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Description</label>
+                <textarea
+                  className="form-control"
+                  placeholder="Study group description"
+                  value={editingGroup.description}
+                  maxLength={1000}
+                  onChange={e => setEditingGroup({ ...editingGroup, description: e.target.value })}
+                  rows={3}
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="btn-study-tool"
+                  disabled={editingGroup.loading}
+                  onClick={() => setEditingGroup({ isOpen: false, name: '', description: '', loading: false })}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={editingGroup.loading || !editingGroup.name.trim()}>
+                  {editingGroup.loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       <AuthModal

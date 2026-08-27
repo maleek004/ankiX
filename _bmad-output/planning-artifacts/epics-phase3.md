@@ -34,6 +34,7 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 | **FR35** | Exercise Editing UI & Rich Markdown Rendering across Modalities | Epic 7 (Story 7.5) |
 | **FR38** | Search Card Preview Modal Integrity & Rendering Resiliency | Epic 7 (Story 7.6) |
 | **FR39** | Shared Card Modals & Linker Refactoring | Epic 7 (Story 7.7) |
+| **FR40** | Study Group & Deck Name Management for Group Admins | Epic 7 (Story 7.8) |
 | **FR23** | GitHub-style study activity heatmap | Epic 8 (Story 8.1) |
 
 | **FR24** | Daily study streak tracking & milestone badges | Epic 8 (Story 8.2) |
@@ -302,6 +303,18 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
   * **MCQ Indexing Alignment:** In the shared `CardExerciseLinkerModal`, ensure MCQ `correctIndex` resolves accurately without off-by-one shifts when option slots are left empty, matching the patched validation logic.
   * **Unified Usage:** Both `CardDetailModal.jsx` and `Deck.jsx` import and render the shared components with identical prop interfaces and behavior.
   * **Regression Testing:** All existing study session, search preview, deck editing, and exercise management tests continue to pass without regression.
+
+#### Story 7.8: Group Admin Study Group & Deck Name Management
+
+**As a** Study Group Admin, Owner, or Contributor,  
+**I want to** edit the Study Group name and description, as well as deck names and descriptions directly from the UI,  
+**So that** curricula and learning cohort titles can be updated, refined, and maintained accurately.  
+
+* **Acceptance Criteria:**
+  * **Study Group Name & Details Editing (`PUT /api/study-groups/{slug}`):** Group Owners, Admins, and Platform Super-Admins can update the group name, description, and avatar URL. If the group is frozen, the API rejects modifications with `403 Forbidden`. Unauthorized members receive `403 Forbidden`.
+  * **Deck Name & Description Editing (`PUT /api/content/decks/{deckId}`):** Group Admins, Contributors, and Deck Authors can update deck titles and descriptions. Requests enforce content management permissions and respect group freeze locks.
+  * **Deck Actions Dropdown Integration:** On `Decks.jsx`, each deck's `Actions ▾` dropdown includes an "✏️ Edit" option that opens an Edit Deck modal with preloaded Title and Description. Submitting updates the deck state immediately in the table.
+  * **Study Group Workspace Renaming:** On `StudyGroups.jsx` (inside the Manage & Settings modal) and `Decks.jsx` (in the active study group header), authorized admins see controls to edit and rename the study group, with instant UI synchronization.
 
 ---
 

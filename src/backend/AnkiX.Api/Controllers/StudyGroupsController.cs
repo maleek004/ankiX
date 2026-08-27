@@ -729,6 +729,52 @@ public sealed class StudyGroupsController : ControllerBase
     }
 
     [Authorize]
+    [HttpPut("{slug}")]
+    public async Task<ActionResult<StudyGroupResponse>> UpdateStudyGroup(string slug, [FromBody] UpdateStudyGroupRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            return BadRequest("Study group slug is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request?.Name))
+        {
+            return BadRequest("Study group name is required.");
+        }
+
+        var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
+        if (studyGroup == null) return NotFound("Study group not found.");
+
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "This study group is frozen. Details cannot be updated.");
+        }
+
+        int? currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue) return Unauthorized();
+
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        var callerMembership = await dbContext.StudyGroupMembers.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId.Value && m.Status == StudyGroupMemberStatus.Active);
+
+        bool isStudyGroupOwnerOrAdmin = callerMembership?.Role == StudyGroupRoles.Owner || callerMembership?.Role == StudyGroupRoles.Admin;
+
+        if (!isSystemAdmin && !isStudyGroupOwnerOrAdmin)
+        {
+            return Forbid();
+        }
+
+        studyGroup.Name = request.Name.Trim();
+        studyGroup.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
+        studyGroup.AvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim();
+
+        await dbContext.SaveChangesAsync();
+
+        return await GetStudyGroupBySlug(studyGroup.Slug);
+    }
+
+    [Authorize]
     [HttpPut("{slug}/privacy")]
     public async Task<ActionResult<StudyGroupResponse>> UpdateStudyGroupPrivacy(string slug, [FromBody] UpdateStudyGroupPrivacyRequest request)
     {

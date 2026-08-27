@@ -276,4 +276,128 @@ public class StudyGroupGovernanceAndFreezeTests
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Contains("already the owner", badRequest.Value?.ToString() ?? "");
     }
+
+    [Fact]
+    public async Task UpdateStudyGroup_ByOwnerOrAdmin_UpdatesNameAndDescription()
+    {
+        using var db = CreateInMemoryDbContext();
+
+        db.Users.Add(new User { Id = 1, Email = "owner@ankix.local", DisplayName = "Owner" });
+        db.StudyGroups.Add(new StudyGroup { Id = 10, Name = "Original Name", Slug = "original-slug", Description = "Old Desc", CreatedByUserId = 1 });
+        db.StudyGroupMembers.Add(new StudyGroupMember { StudyGroupId = 10, UserId = 1, Role = StudyGroupRoles.Owner, Status = StudyGroupMemberStatus.Active });
+        await db.SaveChangesAsync();
+
+        var controller = CreateStudyGroupsController(db, userId: 1);
+        var result = await controller.UpdateStudyGroup("original-slug", new UpdateStudyGroupRequest
+        {
+            Name = "Updated Name",
+            Description = "Updated Desc"
+        });
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<StudyGroupResponse>(okResult.Value);
+        Assert.Equal("Updated Name", response.Name);
+        Assert.Equal("Updated Desc", response.Description);
+
+        var updatedGroup = await db.StudyGroups.FirstOrDefaultAsync(g => g.Id == 10);
+        Assert.NotNull(updatedGroup);
+        Assert.Equal("Updated Name", updatedGroup.Name);
+        Assert.Equal("Updated Desc", updatedGroup.Description);
+    }
+
+    [Fact]
+    public async Task UpdateStudyGroup_ByRegularMember_ReturnsForbid()
+    {
+        using var db = CreateInMemoryDbContext();
+
+        db.Users.Add(new User { Id = 1, Email = "owner@ankix.local", DisplayName = "Owner" });
+        db.Users.Add(new User { Id = 2, Email = "member@ankix.local", DisplayName = "Member" });
+        db.StudyGroups.Add(new StudyGroup { Id = 10, Name = "Alpha", Slug = "alpha", CreatedByUserId = 1 });
+        db.StudyGroupMembers.Add(new StudyGroupMember { StudyGroupId = 10, UserId = 1, Role = StudyGroupRoles.Owner, Status = StudyGroupMemberStatus.Active });
+        db.StudyGroupMembers.Add(new StudyGroupMember { StudyGroupId = 10, UserId = 2, Role = StudyGroupRoles.Member, Status = StudyGroupMemberStatus.Active });
+        await db.SaveChangesAsync();
+
+        var controller = CreateStudyGroupsController(db, userId: 2);
+        var result = await controller.UpdateStudyGroup("alpha", new UpdateStudyGroupRequest
+        {
+            Name = "Hacked Name"
+        });
+
+        Assert.IsType<ForbidResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task UpdateStudyGroup_WhenFrozen_ReturnsForbidden()
+    {
+        using var db = CreateInMemoryDbContext();
+
+        db.Users.Add(new User { Id = 1, Email = "owner@ankix.local", DisplayName = "Owner" });
+        db.StudyGroups.Add(new StudyGroup { Id = 10, Name = "Alpha", Slug = "alpha", CreatedByUserId = 1, IsFrozen = true });
+        db.StudyGroupMembers.Add(new StudyGroupMember { StudyGroupId = 10, UserId = 1, Role = StudyGroupRoles.Owner, Status = StudyGroupMemberStatus.Active });
+        await db.SaveChangesAsync();
+
+        var controller = CreateStudyGroupsController(db, userId: 1);
+        var result = await controller.UpdateStudyGroup("alpha", new UpdateStudyGroupRequest
+        {
+            Name = "New Name"
+        });
+
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status403Forbidden, statusResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateStudyGroup_EmptyName_ReturnsBadRequest()
+    {
+        using var db = CreateInMemoryDbContext();
+
+        db.Users.Add(new User { Id = 1, Email = "owner@ankix.local", DisplayName = "Owner" });
+        db.StudyGroups.Add(new StudyGroup { Id = 10, Name = "Alpha", Slug = "alpha", CreatedByUserId = 1 });
+        db.StudyGroupMembers.Add(new StudyGroupMember { StudyGroupId = 10, UserId = 1, Role = StudyGroupRoles.Owner, Status = StudyGroupMemberStatus.Active });
+        await db.SaveChangesAsync();
+
+        var controller = CreateStudyGroupsController(db, userId: 1);
+        var result = await controller.UpdateStudyGroup("alpha", new UpdateStudyGroupRequest
+        {
+            Name = "   "
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task UpdateDeck_ByGroupAdmin_UpdatesTitleAndDescription()
+    {
+        using var db = CreateInMemoryDbContext();
+
+        db.Users.Add(new User { Id = 1, Email = "admin@ankix.local", DisplayName = "Admin" });
+        db.StudyGroups.Add(new StudyGroup { Id = 10, Name = "Alpha", Slug = "alpha", CreatedByUserId = 1 });
+        db.StudyGroupMembers.Add(new StudyGroupMember { StudyGroupId = 10, UserId = 1, Role = StudyGroupRoles.Admin, Status = StudyGroupMemberStatus.Active });
+        db.Decks.Add(new Deck { Id = 100, Title = "Old Title", Description = "Old Desc", StudyGroupId = 10, CreatedByUserId = 1 });
+        await db.SaveChangesAsync();
+
+        var contentController = new ContentController(db);
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, "1"),
+            new(ClaimTypes.Role, "User")
+        };
+        contentController.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) }
+        };
+
+        var result = await contentController.UpdateDeck(100, new UpdateDeckRequest
+        {
+            Title = "Updated Deck Title",
+            Description = "Updated Deck Desc"
+        });
+
+        Assert.IsType<OkResult>(result);
+
+        var deck = await db.Decks.FirstOrDefaultAsync(d => d.Id == 100);
+        Assert.NotNull(deck);
+        Assert.Equal("Updated Deck Title", deck.Title);
+        Assert.Equal("Updated Deck Desc", deck.Description);
+    }
 }

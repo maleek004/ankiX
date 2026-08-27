@@ -18,6 +18,7 @@ import {
   getMyStudyGroupInvitations,
   acceptStudyGroupInvitation,
   declineStudyGroupInvitation,
+  updateStudyGroup,
   updateStudyGroupPrivacy,
   transferStudyGroupOwnership,
   freezeStudyGroup,
@@ -52,6 +53,9 @@ export default function StudyGroups() {
   const [processingRequestId, setProcessingRequestId] = useState(null)
   const [updatingPrivacy, setUpdatingPrivacy] = useState(false)
   const [selectedPrivacy, setSelectedPrivacy] = useState('Public')
+  const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [updatingDetails, setUpdatingDetails] = useState(false)
 
   // Transfer Ownership Modal State
   const [transferModal, setTransferModal] = useState({ isOpen: false, targetUser: null, loading: false })
@@ -184,9 +188,37 @@ export default function StudyGroups() {
   async function openManageMembers(e, group) {
     e.stopPropagation()
     setManagingMembersStudyGroup(group)
+    setEditName(group.name || '')
+    setEditDescription(group.description || '')
     setSelectedPrivacy(group.privacy || (group.isPublic ? 'Public' : 'Private'))
     setActiveTab(group.pendingRequestCount > 0 ? 'requests' : 'members')
     loadGroupMembersAndRequests(group.slug)
+  }
+
+  async function handleSaveDetails(e) {
+    e.preventDefault()
+    if (!managingMembersStudyGroup || !editName.trim()) return
+    setUpdatingDetails(true)
+    try {
+      const updated = await updateStudyGroup(managingMembersStudyGroup.slug, {
+        name: editName.trim(),
+        description: editDescription.trim()
+      })
+      setManagingMembersStudyGroup(prev => prev ? ({ ...prev, name: updated.name, description: updated.description }) : null)
+      if (activeStudyGroup?.id === managingMembersStudyGroup.id && setActiveStudyGroup) {
+        setActiveStudyGroup({
+          ...activeStudyGroup,
+          name: updated.name,
+          description: updated.description
+        })
+      }
+      await loadData()
+      alert('Study group details updated successfully!')
+    } catch (err) {
+      alert(err.message || 'Failed to update study group details')
+    } finally {
+      setUpdatingDetails(false)
+    }
   }
 
   async function loadGroupMembersAndRequests(slug) {
@@ -886,6 +918,20 @@ export default function StudyGroups() {
                   ✉️ Send Invite
                 </button>
               )}
+              {(managingMembersStudyGroup.userRole === 'Owner' || managingMembersStudyGroup.userRole === 'Admin' || auth?.user?.role === 'Admin' || auth?.user?.role === 'SuperAdmin') && !managingMembersStudyGroup.isFrozen && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('details')}
+                  style={{
+                    padding: '0.5rem 1rem', border: 'none', background: 'none', cursor: 'pointer',
+                    fontWeight: activeTab === 'details' ? 600 : 'normal',
+                    color: activeTab === 'details' ? '#2563eb' : '#64748b',
+                    borderBottom: activeTab === 'details' ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  ✏️ Edit Details
+                </button>
+              )}
               {managingMembersStudyGroup.userRole === 'Owner' && !managingMembersStudyGroup.isFrozen && (
                 <button
                   type="button"
@@ -900,7 +946,7 @@ export default function StudyGroups() {
                   🔒 Privacy Settings
                 </button>
               )}
-              {(managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin') && (
+              {(managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin' || auth?.user?.role === 'SuperAdmin') && (
                 <button
                   type="button"
                   onClick={() => setActiveTab('danger')}
@@ -923,64 +969,99 @@ export default function StudyGroups() {
               ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', fontSize: '0.85rem', color: '#64748b' }}>
-                      <th style={{ padding: '8px' }}>User</th>
-                      <th style={{ padding: '8px' }}>Role</th>
-                      <th style={{ padding: '8px', textAlign: 'right' }}>Actions</th>
+                    <tr style={{ textAlign: 'left', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.85rem' }}>
+                      <th style={{ padding: '0.5rem' }}>User</th>
+                      <th style={{ padding: '0.5rem' }}>Email</th>
+                      <th style={{ padding: '0.5rem' }}>Role</th>
+                      <th style={{ padding: '0.5rem' }}>Joined</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {members.map(m => (
-                      <tr key={m.userId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px' }}>
-                          <div style={{ fontWeight: 600, color: '#1e293b' }}>{getEffectiveDisplayName(m.displayName, m.email)}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{m.email}</div>
-                        </td>
-                        <td style={{ padding: '8px' }}>
-                          <span style={{
-                            fontSize: '0.75rem', padding: '2px 8px', borderRadius: 999,
-                            background: m.role === 'Owner' ? '#fef3c7' : m.role === 'Admin' ? '#e0e7ff' : '#f1f5f9',
-                            color: m.role === 'Owner' ? '#92400e' : m.role === 'Admin' ? '#3730a3' : '#475569',
-                            fontWeight: 600
-                          }}>
-                            {m.role}
-                          </span>
-                        </td>
-                        <td style={{ padding: '8px', textAlign: 'right' }}>
-                          {m.role === 'Owner' ? (
-                            <span style={{ fontSize: '0.8rem', color: '#92400e', fontWeight: 600 }}>
-                              👑 Owner {m.userId === auth?.user?.id ? '(You)' : ''}
+                    {members.map(m => {
+                      const isTargetSelf = m.userId === auth?.user?.id
+                      const isTargetOwner = m.role === 'Owner'
+                      const isCallerOwner = managingMembersStudyGroup.userRole === 'Owner'
+                      const isCallerAdmin = managingMembersStudyGroup.userRole === 'Admin'
+                      const isSuperOrSysAdmin = auth?.user?.role === 'Admin' || auth?.user?.role === 'SuperAdmin'
+
+                      // Permissions:
+                      // Owner can change any non-owner role.
+                      // Admin can change roles of regular Members and Contributors, but cannot change Owners or fellow Admins.
+                      const canManageThisMember = !isTargetSelf && !managingMembersStudyGroup.isFrozen && (
+                        isCallerOwner || isSuperOrSysAdmin || (isCallerAdmin && m.role !== 'Owner' && m.role !== 'Admin')
+                      )
+
+                      return (
+                        <tr key={m.userId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '0.6rem 0.5rem', fontWeight: 500 }}>
+                            {getEffectiveDisplayName(m.displayName, m.email)}
+                            {isTargetSelf && <span style={{ marginLeft: 6, fontSize: '0.75rem', color: '#64748b' }}>(You)</span>}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem', color: '#64748b', fontSize: '0.85rem' }}>{m.email}</td>
+                          <td style={{ padding: '0.6rem 0.5rem' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '2px 8px',
+                              borderRadius: 4,
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              background: m.role === 'Owner' ? '#fef3c7' : m.role === 'Admin' ? '#e0e7ff' : m.role === 'Contributor' ? '#f0fdf4' : '#f1f5f9',
+                              color: m.role === 'Owner' ? '#92400e' : m.role === 'Admin' ? '#3730a3' : m.role === 'Contributor' ? '#166534' : '#475569'
+                            }}>
+                              {m.role}
                             </span>
-                          ) : (managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin' || (managingMembersStudyGroup.userRole === 'Admin' && m.role !== 'Owner')) ? (
-                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
-                              <select
-                                value={m.role}
-                                disabled={updatingRoleId === m.userId || managingMembersStudyGroup.isFrozen}
-                                onChange={e => handleRoleChange(m.userId, e.target.value)}
-                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
-                              >
-                                <option value="Admin">Admin</option>
-                                <option value="Contributor">Contributor</option>
-                                <option value="Member">Member</option>
-                              </select>
-                              {(managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin') && !managingMembersStudyGroup.isFrozen && (
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem', color: '#64748b', fontSize: '0.85rem' }}>
+                            {m.joinedAt ? new Date(m.joinedAt).toLocaleDateString() : 'N/A'}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right' }}>
+                            {canManageThisMember ? (
+                              <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                                <select
+                                  className="form-control"
+                                  style={{ padding: '2px 6px', fontSize: '0.8rem', width: 'auto' }}
+                                  value={m.role}
+                                  disabled={updatingRoleId === m.userId}
+                                  onChange={(e) => handleRoleChange(m.userId, e.target.value)}
+                                >
+                                  <option value="Member">Member</option>
+                                  <option value="Contributor">Contributor</option>
+                                  {(isCallerOwner || isSuperOrSysAdmin) && <option value="Admin">Admin</option>}
+                                </select>
                                 <button
                                   type="button"
                                   className="btn btn-secondary"
-                                  style={{ padding: '3px 8px', fontSize: '0.75rem', border: '1px solid #fde68a', background: '#fffbeb', color: '#92400e' }}
-                                  title="Transfer group ownership to this member"
-                                  onClick={() => setTransferModal({ isOpen: true, targetUser: m, loading: false })}
+                                  style={{ padding: '2px 8px', fontSize: '0.75rem', color: '#dc2626', borderColor: '#fca5a5' }}
+                                  disabled={updatingRoleId === m.userId}
+                                  onClick={() => handleRemoveMember(m.userId)}
                                 >
-                                  👑 Transfer
+                                  Remove
                                 </button>
-                              )}
-                            </div>
-                          ) : (
-                            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                              </div>
+                            ) : isTargetOwner ? (
+                              <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                                {isCallerOwner ? (
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                                    disabled={managingMembersStudyGroup.isFrozen || managingMembersStudyGroup.slug === 'sample'}
+                                    onClick={() => setTransferModal({ isOpen: true, targetUser: m, loading: false })}
+                                  >
+                                    Transfer
+                                  </button>
+                                ) : (
+                                  'Group Owner'
+                                )}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>—</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               )
@@ -991,91 +1072,97 @@ export default function StudyGroups() {
               requestsLoading ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>Loading requests...</div>
               ) : requests.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8', background: '#f8fafc', borderRadius: 8 }}>
-                  <p style={{ margin: 0 }}>No pending join requests.</p>
-                </div>
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No pending join requests.</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {requests.map(req => (
-                    <div
-                      key={req.userId}
-                      style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        padding: '0.75rem 1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 600, color: '#1e293b' }}>{getEffectiveDisplayName(req.displayName, req.email)}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{req.email} • Requested {new Date(req.requestedAt).toLocaleDateString()}</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button
-                          className="btn btn-primary"
-                          style={{ padding: '0.35rem 0.8rem', fontSize: '0.85rem' }}
-                          disabled={processingRequestId === req.userId || managingMembersStudyGroup.isFrozen}
-                          onClick={() => handleApproveRequest(req.userId)}
-                        >
-                          {processingRequestId === req.userId ? 'Processing...' : '✅ Approve'}
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          style={{ padding: '0.35rem 0.8rem', fontSize: '0.85rem' }}
-                          disabled={processingRequestId === req.userId || managingMembersStudyGroup.isFrozen}
-                          onClick={() => handleRejectRequest(req.userId)}
-                        >
-                          ✕ Reject
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.85rem' }}>
+                      <th style={{ padding: '0.5rem' }}>User</th>
+                      <th style={{ padding: '0.5rem' }}>Email</th>
+                      <th style={{ padding: '0.5rem' }}>Requested At</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {requests.map(r => (
+                      <tr key={r.userId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.6rem 0.5rem', fontWeight: 500 }}>{getEffectiveDisplayName(r.displayName, r.email)}</td>
+                        <td style={{ padding: '0.6rem 0.5rem', color: '#64748b', fontSize: '0.85rem' }}>{r.email}</td>
+                        <td style={{ padding: '0.6rem 0.5rem', color: '#64748b', fontSize: '0.85rem' }}>
+                          {r.requestedAt ? new Date(r.requestedAt).toLocaleDateString() : 'N/A'}
+                        </td>
+                        <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: 6 }}>
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                              disabled={processingRequestId === r.userId || managingMembersStudyGroup.isFrozen}
+                              onClick={() => handleApproveRequest(r.userId)}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ padding: '2px 8px', fontSize: '0.75rem', color: '#dc2626' }}
+                              disabled={processingRequestId === r.userId || managingMembersStudyGroup.isFrozen}
+                              onClick={() => handleRejectRequest(r.userId)}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )
             )}
 
             {/* TAB 3: SEND INVITE */}
-            {activeTab === 'invite' && (
+            {activeTab === 'invite' && !managingMembersStudyGroup.isFrozen && (
               <form onSubmit={handleSendInvite} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b' }}>
-                  Send an email invitation and in-app notice to a registered AnkiX user. The user will be able to accept the invitation to join.
+                  Invite a registered user to join <strong>{managingMembersStudyGroup.name}</strong>.
                 </p>
                 <div>
-                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 4, fontSize: '0.85rem' }}>User Email Address *</label>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 4, fontSize: '0.85rem' }}>User Email *</label>
                   <input
                     type="email"
                     className="form-control"
-                    placeholder="colleague@example.com"
+                    placeholder="learner@example.com"
                     value={inviteEmail}
                     onChange={e => setInviteEmail(e.target.value)}
                     required
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 4, fontSize: '0.85rem' }}>Assign Role</label>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 4, fontSize: '0.85rem' }}>Assign Initial Role</label>
                   <select
                     className="form-control"
                     value={inviteRole}
                     onChange={e => setInviteRole(e.target.value)}
                   >
-                    <option value="Member">Member (View & Practice)</option>
-                    <option value="Contributor">Contributor (Create & Edit Content)</option>
-                    <option value="Admin">Admin (Manage Members & Content)</option>
+                    <option value="Member">Member</option>
+                    <option value="Contributor">Contributor</option>
+                    {(managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin' || auth?.user?.role === 'SuperAdmin') && <option value="Admin">Admin</option>}
                   </select>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                  <button type="submit" className="btn btn-primary" disabled={inviteLoading || managingMembersStudyGroup.isFrozen}>
-                    {inviteLoading ? 'Sending Invitation...' : '✉️ Send Invitation'}
+                  <button type="submit" className="btn btn-primary" disabled={inviteLoading || !inviteEmail.trim()}>
+                    {inviteLoading ? 'Sending Invitation...' : 'Send Invitation'}
                   </button>
                 </div>
               </form>
             )}
 
             {/* TAB 4: PRIVACY SETTINGS */}
-            {activeTab === 'settings' && managingMembersStudyGroup.userRole === 'Owner' && (
+            {activeTab === 'settings' && managingMembersStudyGroup.userRole === 'Owner' && !managingMembersStudyGroup.isFrozen && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b' }}>
-                  Change the privacy and visibility tier for <strong>{managingMembersStudyGroup.name}</strong> at any time.
+                  Configure access policy and discoverability for <strong>{managingMembersStudyGroup.name}</strong>.
                 </p>
-
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <label style={{
                     display: 'flex', alignItems: 'flex-start', gap: 10, padding: '0.75rem', borderRadius: 8,
@@ -1091,8 +1178,8 @@ export default function StudyGroups() {
                       style={{ marginTop: 3 }}
                     />
                     <div>
-                      <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9rem' }}>🌐 Public (Open)</div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Visible to everyone. Any platform member can find and join instantly.</div>
+                      <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9rem' }}>🌐 Public (Open Access)</div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Anyone can discover, view, and join instantly without approval.</div>
                     </div>
                   </label>
 
@@ -1110,8 +1197,8 @@ export default function StudyGroups() {
                       style={{ marginTop: 3 }}
                     />
                     <div>
-                      <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9rem' }}>🔒 Private (Request to Join)</div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Visible in directory. Users must submit a join request that you approve.</div>
+                      <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9rem' }}>🔒 Private (Request-to-Join)</div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Visible in search. Users must submit a join request that is approved by an Owner or Admin.</div>
                     </div>
                   </label>
 
@@ -1148,8 +1235,50 @@ export default function StudyGroups() {
               </div>
             )}
 
+            {/* TAB: EDIT DETAILS */}
+            {activeTab === 'details' && (managingMembersStudyGroup.userRole === 'Owner' || managingMembersStudyGroup.userRole === 'Admin' || auth?.user?.role === 'Admin' || auth?.user?.role === 'SuperAdmin') && (
+              <form onSubmit={handleSaveDetails} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b' }}>
+                  Update the name and public description for <strong>{managingMembersStudyGroup.name}</strong>.
+                </p>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 4, fontSize: '0.85rem' }}>Study Group Name *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Study group name"
+                    value={editName}
+                    maxLength={200}
+                    onChange={e => setEditName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 4, fontSize: '0.85rem' }}>Description</label>
+                  <textarea
+                    className="form-control"
+                    placeholder="Describe the focus and goals of this study group"
+                    value={editDescription}
+                    maxLength={1000}
+                    onChange={e => setEditDescription(e.target.value)}
+                    rows={3}
+                    style={{ resize: 'vertical' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={updatingDetails || !editName.trim() || managingMembersStudyGroup.isFrozen}
+                  >
+                    {updatingDetails ? 'Saving...' : '💾 Save Changes'}
+                  </button>
+                </div>
+              </form>
+            )}
+
             {/* TAB 5: LIFECYCLE & DANGER ZONE */}
-            {activeTab === 'danger' && (managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin') && (
+            {activeTab === 'danger' && (managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin' || auth?.user?.role === 'SuperAdmin') && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 {/* Freeze Section */}
                 <div style={{ border: '1px solid #bae6fd', borderRadius: 10, padding: '1.25rem', background: '#f0f9ff' }}>

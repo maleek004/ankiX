@@ -507,6 +507,19 @@ export async function createDeck(title, description = '', studyGroupId = null){
   return res.json()
 }
 
+export async function updateDeck(deckId, title, description = ''){
+  const res = await safeFetch(`${API_BASE}/content/decks/${deckId}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ title, description })
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to update deck')
+    throw new Error(msg)
+  }
+  return true
+}
+
 export async function getDeck(id){
   const res = await safeFetch(`${API_BASE}/decks/${id}`, { headers: optionalAuthHeaders() })
   if(!res.ok) throw new Error('Failed to fetch deck')
@@ -1143,6 +1156,20 @@ export async function declineStudyGroupInvitation(slug){
   }
   return res.json()
 }
+
+export async function updateStudyGroup(slug, payload){
+  const res = await safeFetch(`${API_BASE}/study-groups/${slug}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(payload)
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to update study group')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+export const updateCommunity = updateStudyGroup
 
 export async function updateStudyGroupPrivacy(slug, privacy){
   const res = await safeFetch(`${API_BASE}/study-groups/${slug}/privacy`, {
