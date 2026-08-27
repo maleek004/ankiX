@@ -58,7 +58,7 @@ The AnkiX platform persistence layer is built on Entity Framework Core mapped to
 | Table | INSERT Endpoints | UPDATE Endpoints & Mutated Columns | DELETE / Soft-Delete Endpoints | Integrity & Concurrency Safeguards |
 |---|---|---|---|---|
 | **`Users`** | `POST /api/auth/register`<br/>`POST /api/admin/users`<br/>`Program.cs` (Seed) | `PUT /api/admin/users/{id}/role`<br/>↳ `Role` | None (Permanent user retention) | Unique index on `Email`; timing-safe password hash verify; `409 Conflict` duplicate check |
-| **`Decks`** | `POST /api/content/decks`<br/>`POST /api/decks`<br/>`Program.cs` (Seed) | `PUT /api/content/decks/{id}`<br/>`PUT /api/decks/{id}`<br/>↳ `Title`, `Description` | `DELETE /api/content/decks/{id}`<br/>`DELETE /api/decks/{id}`<br/>*(Blocked if cards exist)* | Ownership/Role check (`CanManageContentAsync`); foreign key guard prevents deck deletion with cards (`409 Conflict`) |
+| **`Decks`** | `POST /api/content/decks`<br/>`POST /api/decks`<br/>`Program.cs` (Seed) | `PUT /api/content/decks/{id}`<br/>`PUT /api/decks/{id}`<br/>↳ `Title`, `Description` | `DELETE /api/content/decks/{id}`<br/>`DELETE /api/decks/{id}`<br/>*(Two-tier: 409 if cards exist without `?cascade=true`; atomic cascade purge of `Cards`, `CardExercises`, `CardFollowups` when `cascade=true`)* | Ownership/Role check (`CanManageContentAsync`); safety guard requires `?cascade=true` confirmation; transactional cascade wipe of child cards/links while preserving `ReviewRecords` and `Exercises` |
 | **`Cards`** | `POST /api/content/cards`<br/>`POST /api/decks/{id}/cards`<br/>`POST /api/decks/{id}/import-cards`<br/>`POST /api/decks/{id}/import-cards-text`<br/>`Program.cs` (Seed) | `PUT /api/content/cards/{id}`<br/>`PUT /api/decks/{id}/cards/{id}`<br/>↳ `Type`, `Prompt`, `Answer` | `DELETE /api/content/cards/{id}`<br/>`DELETE /api/decks/{id}/cards/{id}` | Type discriminator (`basic`, `concept`); required non-empty Markdown `Prompt` & `Answer`; parent Deck existence check |
 | **`ReviewRecords`** | `POST /api/reviews` | None (Append-only immutable audit ledger) | None | Compound index on `(UserId, NextReviewAt)`; outcome validation regex (`Again\|Hard\|Good\|Easy`) |
 | *~~`CardRuns`~~* | *Dropped in Migration* | *N/A (Code execution migrated to Exercises)* | *N/A* | *Table dropped; execution runs live under `POST /api/exercises/{id}/run`* |
@@ -105,10 +105,14 @@ Groups flashcards under a specific subject and study group.
   - `PUT /api/content/decks/{deckId}` & `PUT /api/decks/{deckId}`
     - Mutated Columns: `Title`, `Description`.
 - **DELETE Endpoints**:
-  - `DELETE /api/content/decks/{deckId}` & `DELETE /api/decks/{deckId}`
-    - Hard delete of `Deck` row.
+  - `DELETE /api/content/decks/{deckId}` & `DELETE /api/decks/{deckId}` (Supports `?cascade=true`)
+    - Empty deck: Immediate hard delete of `Deck` row (`204 NoContent`).
+    - Deck with cards (`!cascade`): Returns `409 Conflict` with `{ requiresConfirmation: true, cardCount: X }`.
+    - Deck with cards (`cascade=true`): Atomically purges `Cards`, `CardExercises` junction links, and `CardFollowups` while deleting `Deck`. `ReviewRecords` and `Exercises` are preserved.
 - **Constraint Protections**:
-  - **Deletion Block Safeguard**: Pre-deletion query `dbContext.Cards.AnyAsync(card => card.DeckId == deckId)` returns `409 Conflict ("Deck cannot be deleted while cards exist.")` if cards remain.
+  - **Two-Tier Cascade Safeguard**: Safety latch returns `409 Conflict` if cards exist without explicit `?cascade=true` confirmation.
+  - **Transactional Integrity**: Cascade deletion executes inside an execution strategy with `BeginTransactionAsync()`, rolling back all changes if any error occurs.
+  - **Metrics & Content Preservation**: `ReviewRecords` (user study history and admin monthly activity trends) and `Exercises` are intentionally retained.
   - **Role-Based Authorization**: `CanManageContentAsync(deck.StudyGroupId)` checks whether caller is global `Admin`/`Contributor` or holds `Owner`/`Admin`/`Contributor` membership in the parent `StudyGroup`.
 
 ---

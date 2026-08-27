@@ -630,14 +630,23 @@ export async function copyExerciseToGroup(sourceExerciseId, targetStudyGroupId){
   return res.json()
 }
 
-export async function deleteDeck(id){
-  const res = await safeFetch(`${API_BASE}/content/decks/${id}`,{
+export async function deleteDeck(id, cascade = false){
+  const url = cascade ? `${API_BASE}/content/decks/${id}?cascade=true` : `${API_BASE}/content/decks/${id}`
+  const res = await safeFetch(url,{
     method: 'DELETE',
     headers: authHeaders()
   })
   if(!res.ok){
+    let rawData = null
+    try {
+      const clone = res.clone()
+      rawData = await clone.json()
+    } catch (_) {}
     const msg = await parseApiError(res, 'Failed to delete deck')
-    throw new Error(msg)
+    const err = new Error(msg)
+    err.status = res.status
+    err.data = rawData
+    throw err
   }
   return true
 }

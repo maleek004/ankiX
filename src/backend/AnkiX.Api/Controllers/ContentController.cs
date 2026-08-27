@@ -79,7 +79,7 @@ public sealed class ContentController : ControllerBase
     [HttpDelete("decks/{deckId:int}")]
     [HttpDelete("/api/decks/{deckId:int}")]
     [Authorize]
-    public async Task<IActionResult> DeleteDeck([FromRoute] int deckId)
+    public async Task<IActionResult> DeleteDeck([FromRoute] int deckId, [FromQuery] bool cascade = false)
     {
         Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(entity => entity.Id == deckId);
         if (deck is null)
@@ -89,14 +89,62 @@ public sealed class ContentController : ControllerBase
 
         if (!await CanManageContentAsync(deck.StudyGroupId)) return Forbid();
 
-        bool hasCards = await dbContext.Cards.AnyAsync(card => card.DeckId == deckId);
-        if (hasCards)
+        int cardCount = await dbContext.Cards.CountAsync(card => card.DeckId == deckId);
+        if (cardCount > 0 && !cascade)
         {
-            return Conflict(new { message = "Deck cannot be deleted while cards exist." });
+            return Conflict(new
+            {
+                message = $"Deck contains {cardCount} cards. Pass cascade=true to delete the deck and all its cards.",
+                requiresConfirmation = true,
+                cardCount = cardCount
+            });
         }
 
-        dbContext.Decks.Remove(deck);
-        await dbContext.SaveChangesAsync();
+        var executionStrategy = dbContext.Database.CreateExecutionStrategy();
+        await executionStrategy.ExecuteAsync(async () =>
+        {
+            dbContext.ChangeTracker.Clear();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync();
+
+            var currentDeck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == deckId);
+            if (currentDeck is null) return;
+
+            List<int> cardIds = await dbContext.Cards
+                .Where(c => c.DeckId == deckId)
+                .Select(c => c.Id)
+                .ToListAsync();
+
+            if (cardIds.Count > 0)
+            {
+                // 1. Remove CardExercises junction records (dissolves link to exercises)
+                var cardExercises = dbContext.CardExercises.Where(ce => cardIds.Contains(ce.CardId));
+                dbContext.CardExercises.RemoveRange(cardExercises);
+
+                // 2. Remove CardFollowups attached to these cards
+                var cardFollowups = dbContext.CardFollowups.Where(f => cardIds.Contains(f.CardId));
+                dbContext.CardFollowups.RemoveRange(cardFollowups);
+
+                // 3. Nullify reverse LinkedCardId references on other surviving followups
+                var reverseLinkedFollowups = await dbContext.CardFollowups
+                    .Where(f => f.LinkedCardId.HasValue && cardIds.Contains(f.LinkedCardId.Value))
+                    .ToListAsync();
+                foreach (var f in reverseLinkedFollowups)
+                {
+                    f.LinkedCardId = null;
+                }
+
+                // 4. Remove Cards
+                var cards = dbContext.Cards.Where(c => c.DeckId == deckId);
+                dbContext.Cards.RemoveRange(cards);
+            }
+
+            // 5. Remove Deck
+            dbContext.Decks.Remove(currentDeck);
+
+            await dbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+        });
+
         return NoContent();
     }
 

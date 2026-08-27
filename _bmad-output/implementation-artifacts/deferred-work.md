@@ -17,4 +17,7 @@
 - [x] [Review][Defer] Align MCQ correctIndex calculation in `Deck.jsx` copy of `CardExerciseLinkerModal` (`Deck.jsx:1445`) — ✅ **Resolved in Story 7.7**.
 - [x] [Review][Defer] Add transaction / rollback support for two-step exercise creation and linkage (`CardDetailModal.jsx:750`) — deferred, pre-existing API design.
 
+## Deferred from: code review of two-tier cascade deck deletion (2026-08-27)
+- [x] [Review][Defer] Refactor `CanManageContentAsync` to allow personal deck creators (`CreatedByUserId == currentUserId`) to manage/delete their own non-group decks (`ContentController.cs:457`) — deferred, pre-existing controller-wide authorization pattern.
+
 

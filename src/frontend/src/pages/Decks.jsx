@@ -88,9 +88,25 @@ export default function Decks(){
     if (!confirm('Are you sure you want to delete this deck?')) return
     setDeletingId(id)
     try {
-      await deleteDeck(id)
+      await deleteDeck(id, false)
       setDecks(prev => prev.filter(d => d.id !== id))
     } catch(err) {
+      if (err.status === 409) {
+        const countText = err.data?.cardCount ? ` (${err.data.cardCount} cards)` : ''
+        const proceed = confirm(`This deck contains cards${countText}.\n\nAre you sure you want to permanently delete this deck and all cards in it?\n\n(Linked coding exercises and your past study review history will be preserved).`)
+        if (proceed) {
+          try {
+            await deleteDeck(id, true)
+            setDecks(prev => prev.filter(d => d.id !== id))
+            return
+          } catch (cascadeErr) {
+            alert('Delete deck failed: ' + (cascadeErr.message || cascadeErr))
+            return
+          }
+        } else {
+          return
+        }
+      }
       alert('Delete deck failed: ' + (err.message || err))
     } finally {
       setDeletingId(null)
