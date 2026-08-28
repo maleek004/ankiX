@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import ExerciseRenderer from '../components/ExerciseComponents'
+import ColdStartRecoveryCard from '../components/ColdStartRecoveryCard'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import CopyModal from '../components/CopyModal'
 import AuthModal from '../components/AuthModal'
@@ -17,6 +18,11 @@ export default function Deck(){
   const { id } = useParams()
   const [copyModalCard, setCopyModalCard] = useState(null)
   const [authModalConfig, setAuthModalConfig] = useState({ isOpen: false, title: '', subtitle: '', intent: null })
+
+  // Opportunistic pre-warming when opening a deck
+  useEffect(() => {
+    api.prewarmBackend()
+  }, [])
 
   const token = localStorage.getItem('ankix_token')
   const isGuest = !token
@@ -826,9 +832,11 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
 
   const [practiceCode, setPracticeCode] = useState(currentEx?.starterCode || currentEx?.solutionCode || '')
   const [running, setRunning] = useState(false)
+  const [runProgress, setRunProgress] = useState(null)
   const [runResult, setRunResult] = useState(null)
   const [enrolling, setEnrolling] = useState(false)
   const [rating, setRating] = useState(false)
+  const abortControllerRef = useRef(null)
 
   useEffect(() => {
     let mounted = true
@@ -847,6 +855,7 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
         setPracticeCode(currentEx.starterCode || currentEx.solutionCode || '')
       }
       setRunResult(null)
+      setRunProgress(null)
 
       import('../api.js').then(m => m.getMyCollectionExerciseIds()).then(ids => {
         if (mounted) setIsEnrolled((ids || []).includes(currentEx.id))
@@ -878,17 +887,54 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
 
   const handleRunCode = async (submittedPayload) => {
     if (!currentEx) return
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const abortCtrl = new AbortController()
+    abortControllerRef.current = abortCtrl
+
     setRunning(true)
+    setRunResult(null)
+    setRunProgress(null)
     try {
       const codeToSubmit = typeof submittedPayload === 'string' ? submittedPayload : practiceCode
       const m = await import('../api.js')
       const targetLang = currentEx.language || 'csharp'
-      const res = await m.runExerciseCode(currentEx.id, codeToSubmit, targetLang)
+      const res = await m.runExerciseCode(currentEx.id, codeToSubmit, targetLang, {
+        onProgress: setRunProgress,
+        signal: abortCtrl.signal
+      })
       setRunResult(res)
     } catch (err) {
-      alert('Run failed: ' + (err.message || err))
+      if (err.name === 'AbortError') {
+        setRunResult(null)
+      } else if (err.isColdStartTimeout || err.message?.includes('waking up') || err.message?.includes('Cannot reach backend')) {
+        setRunResult({
+          passed: false,
+          result: 'COLD_START',
+          isColdStart: true,
+          details: err.message || 'The code execution runner is taking longer than usual to wake up.',
+          durationMs: 0
+        })
+      } else {
+        setRunResult({
+          passed: false,
+          result: 'FAIL',
+          details: 'Error: ' + (err.message || err),
+          durationMs: 0
+        })
+      }
     } finally {
       setRunning(false)
+      setRunProgress(null)
+    }
+  }
+
+  const handleCancelRun = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      setRunning(false)
+      setRunProgress(null)
     }
   }
 
@@ -1015,29 +1061,40 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
             onRunCode={handleRunCode}
             running={running}
             runResult={runResult}
+            runProgress={runProgress}
+            onCancel={handleCancelRun}
           />
 
-          {/* Result Status Badge */}
-          {runResult && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{
-                  padding: '5px 12px',
-                  borderRadius: 6,
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  background: runResult.passed ? '#d4edda' : '#f8d7da',
-                  color: runResult.passed ? '#155724' : '#721c24'
-                }}>
-                  {runResult.passed ? '✓ PASS' : '✗ FAIL'}
-                </span>
-                <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
-                  ({runResult.durationMs}ms)
-                </span>
-              </div>
-            )}
+          {/* Cold Start Recovery Card */}
+          {runResult?.isColdStart && (
+            <ColdStartRecoveryCard
+              onRetry={() => handleRunCode(practiceCode)}
+              details={runResult.details}
+              isRetrying={running}
+            />
+          )}
+
+          {/* Result Status Badge (Standard) */}
+          {runResult && !runResult.isColdStart && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{
+                padding: '5px 12px',
+                borderRadius: 6,
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                background: runResult.passed ? '#d4edda' : '#f8d7da',
+                color: runResult.passed ? '#155724' : '#721c24'
+              }}>
+                {runResult.passed ? '✓ PASS' : '✗ FAIL'}
+              </span>
+              <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
+                ({runResult.durationMs}ms)
+              </span>
+            </div>
+          )}
 
           {/* Output Details Box (Scrollable max-height) */}
-          {runResult?.details && (
+          {runResult?.details && !runResult.isColdStart && (
             <div style={{
               padding: 14,
               borderRadius: 8,

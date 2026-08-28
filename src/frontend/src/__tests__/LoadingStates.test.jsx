@@ -26,6 +26,7 @@ vi.mock('../api.js', () => ({
   getFollowups: async () => [],
   getCardExercises: async () => [],
   canCreateContent: () => true,
+  prewarmBackend: () => Promise.resolve(),
   getUser: () => ({ id: 1, email: 'test@example.com', role: 'Admin' })
 }))
 

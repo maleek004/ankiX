@@ -126,6 +126,156 @@ export async function safeFetch(url, options = {}) {
   }
 }
 
+let prewarmPromise = null
+export function prewarmBackend() {
+  if (prewarmPromise) return prewarmPromise
+  prewarmPromise = (async () => {
+    const endpoints = [
+      `${API_BASE}/health`,
+      `${API_BASE}/healthz`,
+      `${API_BASE}`,
+      '/health',
+      '/healthz'
+    ]
+    for (const ep of endpoints) {
+      try {
+        const res = await fetch(ep, { method: 'GET', keepalive: true })
+        if (res.ok) return
+      } catch {
+        // Continue to next fallback probe
+      }
+    }
+    // If all failed, reset so subsequent navigation can re-attempt prewarming
+    prewarmPromise = null
+  })()
+  return prewarmPromise
+}
+
+function waitWithAbort(delayMs, signal) {
+  if (signal?.aborted) {
+    return Promise.reject(new DOMException('Execution cancelled by user.', 'AbortError'))
+  }
+  return new Promise((resolve, reject) => {
+    let timerId = null
+    const onAbort = () => {
+      if (timerId) clearTimeout(timerId)
+      reject(new DOMException('Execution cancelled by user.', 'AbortError'))
+    }
+
+    if (signal) {
+      signal.addEventListener('abort', onAbort, { once: true })
+    }
+
+    timerId = setTimeout(() => {
+      if (signal) signal.removeEventListener('abort', onAbort)
+      resolve()
+    }, delayMs)
+  })
+}
+
+export async function safeFetchWithRetry(url, options = {}, retryConfig = {}) {
+  const {
+    maxAttempts = 5,
+    delaysMs = [0, 3000, 6000, 10000, 15000],
+    onProgress = () => {},
+    signal = null
+  } = retryConfig
+
+  const effectiveMaxAttempts = Math.max(1, maxAttempts)
+  const startTime = Date.now()
+
+  for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt++) {
+    if (signal?.aborted) {
+      const abortErr = new Error('Execution cancelled by user.')
+      abortErr.name = 'AbortError'
+      throw abortErr
+    }
+
+    const elapsedMs = Date.now() - startTime
+    onProgress({
+      attempt,
+      maxAttempts: effectiveMaxAttempts,
+      elapsedMs,
+      isRetrying: attempt > 1
+    })
+
+    try {
+      // Per-attempt timeout controller (12s per attempt)
+      const attemptController = new AbortController()
+      let timeoutId = null
+
+      const onParentAbort = () => {
+        attemptController.abort()
+      }
+      if (signal) {
+        signal.addEventListener('abort', onParentAbort, { once: true })
+      }
+
+      timeoutId = setTimeout(() => {
+        attemptController.abort()
+      }, 12000)
+
+      let res
+      try {
+        res = await safeFetch(url, {
+          ...options,
+          signal: attemptController.signal
+        })
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId)
+        if (signal) signal.removeEventListener('abort', onParentAbort)
+      }
+
+      // Intercept transient gateway and timeout errors from Render/Heroku during container spin-up
+      const isTransientStatus = res.status === 408 || res.status === 502 || res.status === 503 || res.status === 504
+      if (isTransientStatus) {
+        if (attempt < effectiveMaxAttempts) {
+          const delayIdx = Math.min(attempt - 1, delaysMs.length - 1)
+          const delay = delaysMs[delayIdx] ?? 5000
+          await waitWithAbort(delay, signal)
+          continue
+        } else {
+          const coldStartErr = new Error('The code execution runner is taking longer than usual to wake up.')
+          coldStartErr.isColdStartTimeout = true
+          coldStartErr.status = res.status
+          coldStartErr.targetUrl = typeof url === 'string' ? url : (url?.url || url?.href || url?.toString?.() || '')
+          throw coldStartErr
+        }
+      }
+
+      return res
+    } catch (err) {
+      if (signal?.aborted) {
+        throw err
+      }
+
+      const isTransient =
+        err.name === 'AbortError' ||
+        err.name === 'TypeError' ||
+        err.message?.includes('Cannot reach backend API') ||
+        err.message?.includes('Failed to fetch') ||
+        err.message?.includes('NetworkError')
+
+      if (isTransient && attempt < effectiveMaxAttempts) {
+        const delayIdx = Math.min(attempt - 1, delaysMs.length - 1)
+        const delay = delaysMs[delayIdx] ?? 5000
+        await waitWithAbort(delay, signal)
+        continue
+      }
+
+      if (isTransient) {
+        const coldStartErr = new Error('The code execution runner is taking longer than usual to wake up.')
+        coldStartErr.isColdStartTimeout = true
+        coldStartErr.originalError = err
+        coldStartErr.targetUrl = typeof url === 'string' ? url : (url?.url || url?.href || url?.toString?.() || '')
+        throw coldStartErr
+      }
+
+      throw err
+    }
+  }
+}
+
 export async function parseApiError(res, fallbackMessage = 'An unexpected error occurred.') {
   try {
     const text = await res.text()
@@ -810,14 +960,14 @@ export async function unlinkCardExercise(cardId, exerciseId){
   return true
 }
 
-export async function runCardCode(cardId, submittedCode, language = 'csharp'){
+export async function runCardCode(cardId, submittedCode, language = 'csharp', { onProgress, signal } = {}){
   const token = getToken()
   const endpoint = token ? `${API_BASE}/cards/${cardId}/run` : `${API_BASE}/cards/${cardId}/run-ephemeral`
-  const res = await safeFetch(endpoint,{
+  const res = await safeFetchWithRetry(endpoint, {
     method: 'POST',
     headers: optionalAuthHeaders(),
     body: JSON.stringify({ submittedCode, language })
-  })
+  }, { onProgress, signal })
   if(!res.ok){
     const msg = await parseApiError(res, 'Failed to run code')
     throw new Error(msg)
@@ -825,14 +975,14 @@ export async function runCardCode(cardId, submittedCode, language = 'csharp'){
   return res.json()
 }
 
-export async function runExerciseCode(exerciseId, submittedCode, language = 'csharp'){
+export async function runExerciseCode(exerciseId, submittedCode, language = 'csharp', { onProgress, signal } = {}){
   const token = getToken()
   const endpoint = token ? `${API_BASE}/exercises/${exerciseId}/run` : `${API_BASE}/exercises/${exerciseId}/run-ephemeral`
-  const res = await safeFetch(endpoint,{
+  const res = await safeFetchWithRetry(endpoint, {
     method: 'POST',
     headers: optionalAuthHeaders(),
     body: JSON.stringify({ submittedCode, language })
-  })
+  }, { onProgress, signal })
   if(!res.ok){
     const msg = await parseApiError(res, 'Failed to run exercise code')
     throw new Error(msg)

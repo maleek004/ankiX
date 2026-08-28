@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import {
@@ -13,9 +13,11 @@ import {
   getMyCollectionExerciseIds,
   enrollExercise,
   unenrollExercise,
-  getMyDueExercises
+  getMyDueExercises,
+  prewarmBackend
 } from '../api.js'
 import ExerciseRenderer from '../components/ExerciseComponents'
+import ColdStartRecoveryCard from '../components/ColdStartRecoveryCard'
 import CopyModal from '../components/CopyModal'
 import AuthModal from '../components/AuthModal'
 import MarkdownViewer from '../components/MarkdownViewer'
@@ -94,8 +96,15 @@ export default function Exercises() {
   const [practiceLang, setPracticeLang] = useState('csharp')
   const [runResult, setRunResult] = useState(null)
   const [running, setRunning] = useState(false)
+  const [runProgress, setRunProgress] = useState(null)
   const [queueIndex, setQueueIndex] = useState(0)
   const [mobilePracticeTab, setMobilePracticeTab] = useState('problem') // 'problem' | 'code' | 'output'
+  const abortControllerRef = useRef(null)
+
+  // Opportunistic pre-warming when entering the exercises catalog
+  useEffect(() => {
+    prewarmBackend()
+  }, [])
 
   const loadData = async () => {
     setLoading(true)
@@ -378,18 +387,49 @@ export default function Exercises() {
 
   const handleRunCode = async (submittedPayload) => {
     if (!activeExercise) return
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const abortCtrl = new AbortController()
+    abortControllerRef.current = abortCtrl
+
     setRunning(true)
     setRunResult(null)
+    setRunProgress(null)
     setMobilePracticeTab('output')
     try {
       const codeToSubmit = typeof submittedPayload === 'string' ? submittedPayload : practiceCode
       const targetLang = activeExercise.language || 'csharp'
-      const res = await runExerciseCode(activeExercise.id, codeToSubmit, targetLang)
+      const res = await runExerciseCode(activeExercise.id, codeToSubmit, targetLang, {
+        onProgress: setRunProgress,
+        signal: abortCtrl.signal
+      })
       setRunResult(res)
     } catch (err) {
-      setRunResult({ passed: false, result: 'FAIL', details: 'Error: ' + (err.message || err), durationMs: 0 })
+      if (err.name === 'AbortError') {
+        setRunResult(null)
+      } else if (err.isColdStartTimeout || err.message?.includes('waking up') || err.message?.includes('Cannot reach backend')) {
+        setRunResult({
+          passed: false,
+          result: 'COLD_START',
+          isColdStart: true,
+          details: err.message || 'The code execution runner is taking longer than usual to wake up.',
+          durationMs: 0
+        })
+      } else {
+        setRunResult({ passed: false, result: 'FAIL', details: 'Error: ' + (err.message || err), durationMs: 0 })
+      }
     } finally {
       setRunning(false)
+      setRunProgress(null)
+    }
+  }
+
+  const handleCancelRun = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      setRunning(false)
+      setRunProgress(null)
     }
   }
 
@@ -1191,13 +1231,24 @@ export default function Exercises() {
                   onRunCode={handleRunCode}
                   running={running}
                   runResult={runResult}
+                  runProgress={runProgress}
+                  onCancel={handleCancelRun}
                 />
               </div>
 
               {/* Tab: Terminal Output & Diffs (desktop: always visible; mobile: tab 2) */}
               <div className={mobilePracticeTab !== 'output' ? 'exercise-desktop-only' : ''}>
-                {/* Status & Output Box */}
-                {runResult && (
+                {/* Cold Start Recovery Card */}
+                {runResult?.isColdStart && (
+                  <ColdStartRecoveryCard
+                    onRetry={() => handleRunCode(practiceCode)}
+                    details={runResult.details}
+                    isRetrying={running}
+                  />
+                )}
+
+                {/* Status & Output Box (Standard test results) */}
+                {runResult && !runResult.isColdStart && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <span style={{

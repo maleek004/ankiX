@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import MarkdownViewer from './MarkdownViewer'
 import { getTagBadge, langBadgeFor } from '../utils/tagUtils'
+import WakeupProgressTicker from './WakeupProgressTicker'
+import ColdStartRecoveryCard from './ColdStartRecoveryCard'
 
-export function MultipleChoiceExercise({ exercise, onRunCode, running, runResult }) {
+export function MultipleChoiceExercise({ exercise, onRunCode, running, runResult, runProgress, onCancel }) {
   const [selectedIdx, setSelectedIdx] = useState(null)
 
   useEffect(() => {
@@ -70,11 +72,23 @@ export function MultipleChoiceExercise({ exercise, onRunCode, running, runResult
           {running ? 'Verifying Answer...' : 'Check Answer 🔘'}
         </button>
       </div>
+
+      {running && (
+        <WakeupProgressTicker running={running} progressInfo={runProgress} onCancel={onCancel} />
+      )}
+
+      {runResult?.isColdStart && (
+        <ColdStartRecoveryCard
+          onRetry={handleSubmit}
+          details={runResult.details}
+          isRetrying={running}
+        />
+      )}
     </div>
   )
 }
 
-export function ExactStringExercise({ exercise, onRunCode, running, runResult }) {
+export function ExactStringExercise({ exercise, onRunCode, running, runResult, runProgress, onCancel }) {
   const [answerInput, setAnswerInput] = useState('')
 
   useEffect(() => {
@@ -113,11 +127,23 @@ export function ExactStringExercise({ exercise, onRunCode, running, runResult })
           {running ? 'Verifying...' : 'Check Answer ✏️'}
         </button>
       </div>
+
+      {running && (
+        <WakeupProgressTicker running={running} progressInfo={runProgress} onCancel={onCancel} />
+      )}
+
+      {runResult?.isColdStart && (
+        <ColdStartRecoveryCard
+          onRetry={handleSubmit}
+          details={runResult.details}
+          isRetrying={running}
+        />
+      )}
     </form>
   )
 }
 
-export function CodeEditorExercise({ exercise, practiceCode, setPracticeCode, onRunCode, running }) {
+export function CodeEditorExercise({ exercise, practiceCode, setPracticeCode, onRunCode, running, runResult, runProgress, onCancel }) {
   const badge = langBadgeFor(exercise.language)
 
   return (
@@ -158,19 +184,62 @@ export function CodeEditorExercise({ exercise, practiceCode, setPracticeCode, on
           {running ? 'Running Solution...' : '▶ Run Solution'}
         </button>
       </div>
+
+      {running && (
+        <WakeupProgressTicker running={running} progressInfo={runProgress} onCancel={onCancel} />
+      )}
+
+      {runResult?.isColdStart && (
+        <ColdStartRecoveryCard
+          onRetry={() => onRunCode(practiceCode)}
+          details={runResult.details}
+          isRetrying={running}
+        />
+      )}
     </div>
   )
 }
 
-export default function ExerciseRenderer({ exercise, practiceCode, setPracticeCode, practiceLang, setPracticeLang, onRunCode, running, runResult }) {
+export default function ExerciseRenderer({
+  exercise,
+  practiceCode,
+  setPracticeCode,
+  practiceLang,
+  setPracticeLang,
+  onRunCode,
+  running,
+  runResult,
+  runProgress,
+  onCancel
+}) {
   const type = exercise?.exerciseType || 'CodeExecution'
 
   if (type === 'MultipleChoice') {
-    return <MultipleChoiceExercise key={exercise?.id} exercise={exercise} onRunCode={onRunCode} running={running} runResult={runResult} />
+    return (
+      <MultipleChoiceExercise
+        key={exercise?.id}
+        exercise={exercise}
+        onRunCode={onRunCode}
+        running={running}
+        runResult={runResult}
+        runProgress={runProgress}
+        onCancel={onCancel}
+      />
+    )
   }
 
   if (type === 'ExactString') {
-    return <ExactStringExercise key={exercise?.id} exercise={exercise} onRunCode={onRunCode} running={running} runResult={runResult} />
+    return (
+      <ExactStringExercise
+        key={exercise?.id}
+        exercise={exercise}
+        onRunCode={onRunCode}
+        running={running}
+        runResult={runResult}
+        runProgress={runProgress}
+        onCancel={onCancel}
+      />
+    )
   }
 
   return (
@@ -181,6 +250,9 @@ export default function ExerciseRenderer({ exercise, practiceCode, setPracticeCo
       setPracticeCode={setPracticeCode}
       onRunCode={onRunCode}
       running={running}
+      runResult={runResult}
+      runProgress={runProgress}
+      onCancel={onCancel}
     />
   )
 }

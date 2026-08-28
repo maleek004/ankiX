@@ -166,6 +166,9 @@ app.MapControllers();
 
 app.MapGet("/", () => Results.Ok(new { status = "online", service = "AnkiX API", version = "1.0.0" }));
 app.MapGet("/api", () => Results.Ok(new { status = "online", service = "AnkiX API", version = "1.0.0" }));
+app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
+app.MapGet("/api/healthz", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 app.MapGet("/healthz", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
 
