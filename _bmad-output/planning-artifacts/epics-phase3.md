@@ -35,7 +35,9 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 | **FR38** | Search Card Preview Modal Integrity & Rendering Resiliency | Epic 7 (Story 7.6) |
 | **FR39** | Shared Card Modals & Linker Refactoring | Epic 7 (Story 7.7) |
 | **FR40** | Study Group & Deck Name Management for Group Admins | Epic 7 (Story 7.8) |
+| **FR41** | User-Level Card Ghosting (Suspension) & Queue Personalization | Epic 7 (Story 7.9) |
 | **FR23** | GitHub-style study activity heatmap | Epic 8 (Story 8.1) |
+
 
 | **FR24** | Daily study streak tracking & milestone badges | Epic 8 (Story 8.2) |
 | **FR25** | Health probe endpoints (`GET /healthz`) & Load Balancer setup | Epic 9 (Story 9.1) |
@@ -316,9 +318,23 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
   * **Deck Actions Dropdown Integration:** On `Decks.jsx`, each deck's `Actions ▾` dropdown includes an "✏️ Edit" option that opens an Edit Deck modal with preloaded Title and Description. Submitting updates the deck state immediately in the table.
   * **Study Group Workspace Renaming:** On `StudyGroups.jsx` (inside the Manage & Settings modal) and `Decks.jsx` (in the active study group header), authorized admins see controls to edit and rename the study group, with instant UI synchronization.
 
+#### Story 7.9: User-Level Card Ghosting / Suspension & Queue Personalization
+
+**As a** learner reviewing cards in a large, shared, or complex deck,  
+**I want to** mark specific flashcards as "Ghosted" (👻) directly during study sessions or preview modals,  
+**So that** the spaced repetition queue permanently excludes those cards from my personal study sessions without deleting them for other members of the study group.  
+
+* **Acceptance Criteria:**
+  * **Interactive Ghost Button on Cards:** In `Deck.jsx` (during study mode) and `CardDetailModal.jsx` (card preview), an interactive "👻 Ghost Card" (and "✨ Restore Card") toggle button is available for authenticated learners.
+  * **User-Scoped Ghosting API (`POST /api/cards/{cardId}/ghost` & `DELETE /api/cards/{cardId}/ghost`):** Backend persists user-level card suspensions (e.g. `UserGhostedCard` entity / table) mapped strictly to `(UserId, CardId)`.
+  * **Queue Exclusion:** The study queue endpoint (`GET /api/decks/{deckId}/queue`) and review scheduler filter out all cards ghosted by the requesting user, reducing cognitive fatigue and deck intimidation.
+  * **"Ghosted Cards" Drawer & Restoration:** In `Deck.jsx`, learners can open a "Ghosted Cards" drawer / view to inspect all cards they have muted in that deck, and click "✨ Un-ghost" to restore any card back to their active review queue.
+  * **Shared Deck Isolation:** Ghosting a card by user $A$ has zero impact on user $B$ or the master deck definition; cards remain visible in deck totals for creators and other group members.
+
 ---
 
 ### Epic 8: Spaced Repetition Analytics & Gamification
+
 
 
 

@@ -91,6 +91,11 @@ Key focus areas for Phase 3:
 * **FR40:** Study Group & Deck Name Management for Group Admins:
   * **Group Name & Metadata Editing:** Study Group Owners, Admins, and Platform Super-Admins can edit the name, description, and avatar of a study group directly from the Group Management & Settings modal and Decks workspace header, with strict freeze guardrails preventing mutations when frozen.
   * **Deck Name & Description Editing:** Group Admins, Contributors, and Deck Authors can edit deck titles and descriptions via an "Edit Deck" button in the actions dropdown (`Actions ▾`) on each deck card.
+* **FR41:** User-Level Card Ghosting (Suspension) & Queue Personalization:
+  * **Interactive Card Ghosting:** Learners reviewing large or shared decks can click a "👻 Ghost Card" button during a study session or card preview to permanently mute that card from their personal spaced repetition study queue.
+  * **User-Scoped Isolation:** Ghosting a card applies strictly to the requesting user's study queue without deleting or modifying the card for other study group members or global learners.
+  * **Queue Exclusion & Restore Management:** Ghosted cards are automatically filtered out from active review queues (`GET /api/decks/{deckId}/queue`). A dedicated "Ghosted Cards" management drawer inside the deck view allows learners to inspect and un-ghost/restore cards at any time.
+
 
 ### Analytics & Gamification
 * **FR23:** Provide a **GitHub-style study activity heatmap** on the user dashboard displaying daily card reviews and exercise runs.
