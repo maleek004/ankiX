@@ -42,16 +42,47 @@ export default function CardDetailModal({ card, onClose, onCardUpdated }) {
   // Copy modal & Auth modal state
   const [copyModalOpen, setCopyModalOpen] = useState(false)
   const [authModalConfig, setAuthModalConfig] = useState({ isOpen: false, title: '', subtitle: '', intent: null })
+  const [isGhosting, setIsGhosting] = useState(false)
 
   const token = localStorage.getItem('ankix_token')
   const isGuest = !token
   const canCreate = api.canCreateContent(activeStudyGroup?.role)
 
+  const handleToggleGhost = async () => {
+    if (!currentCard?.id || isGuest) return
+    setIsGhosting(true)
+    try {
+      if (currentCard.isGhosted) {
+        await api.unghostCard(currentCard.id)
+        const updated = { ...currentCard, isGhosted: false }
+        setCurrentCard(updated)
+        if (onCardUpdated) onCardUpdated(updated)
+      } else {
+        await api.ghostCard(currentCard.id)
+        const updated = { ...currentCard, isGhosted: true }
+        setCurrentCard(updated)
+        if (onCardUpdated) onCardUpdated(updated)
+      }
+    } catch (err) {
+      alert((currentCard.isGhosted ? 'Failed to restore card: ' : 'Failed to ghost card: ') + (err.message || err))
+    } finally {
+      setIsGhosting(false)
+    }
+  }
+
   useEffect(() => {
     setCurrentCard(card)
     setEditPrompt(card?.prompt || '')
     setEditAnswer(card?.answer || card?.validationSpec || '')
-  }, [card])
+
+    if (card?.id && !isGuest && card.isGhosted === undefined) {
+      api.getCard(card.id).then(fullCard => {
+        if (fullCard && typeof fullCard.isGhosted === 'boolean') {
+          setCurrentCard(prev => (prev?.id === card.id ? { ...prev, isGhosted: fullCard.isGhosted } : prev))
+        }
+      }).catch(() => {})
+    }
+  }, [card, isGuest])
 
   const loadFollowups = useCallback(async () => {
     if (!currentCard?.id) return
@@ -208,6 +239,11 @@ export default function CardDetailModal({ card, onClose, onCardUpdated }) {
             <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: '#e7f5ff', color: '#1864ab' }}>
               {currentCard.type || 'basic'}
             </span>
+            {currentCard.isGhosted && (
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: '#f8d7da', color: '#842029' }}>
+                👻 Ghosted
+              </span>
+            )}
             {currentCard.deckTitle && (
               <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
                 in <strong>{currentCard.deckTitle}</strong>
@@ -360,6 +396,25 @@ export default function CardDetailModal({ card, onClose, onCardUpdated }) {
                       >
                         📋 Copy Card
                       </button>
+                      {!isGuest && (
+                        <button
+                          className="btn-study-tool"
+                          style={{
+                            fontSize: '0.85rem',
+                            padding: '5px 12px',
+                            borderColor: currentCard.isGhosted ? '#198754' : '#6c757d',
+                            color: currentCard.isGhosted ? '#198754' : '#495057',
+                            fontWeight: 600
+                          }}
+                          disabled={isGhosting}
+                          onClick={handleToggleGhost}
+                          title={currentCard.isGhosted ? "Restore card to your active review queue" : "Ghost card — exclude from your personal study queue"}
+                        >
+                          {isGhosting
+                            ? (currentCard.isGhosted ? 'Restoring...' : 'Ghosting...')
+                            : (currentCard.isGhosted ? '✨ Restore Card' : '👻 Ghost Card')}
+                        </button>
+                      )}
                       {canCreate && (
                         <button
                           className="btn-study-tool"

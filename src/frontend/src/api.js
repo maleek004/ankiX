@@ -876,6 +876,36 @@ export async function getStudyQueue(deckId){
   return res.json()
 }
 
+export async function ghostCard(cardId){
+  const res = await safeFetch(`${API_BASE}/cards/${cardId}/ghost`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to ghost card')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function unghostCard(cardId){
+  const res = await safeFetch(`${API_BASE}/cards/${cardId}/ghost`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to restore ghosted card')
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export async function getGhostedCards(deckId){
+  const res = await safeFetch(`${API_BASE}/decks/${deckId}/ghosted-cards`, { headers: authHeaders() })
+  if(!res.ok) throw new Error('Failed to fetch ghosted cards')
+  return res.json()
+}
+
 export async function getExercises(language = '', studyGroupId = null){
   const params = []
   if (language) params.push(`language=${encodeURIComponent(language)}`)

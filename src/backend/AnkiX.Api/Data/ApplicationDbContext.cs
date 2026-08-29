@@ -35,6 +35,8 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<UserGhostedCard> UserGhostedCards => Set<UserGhostedCard>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>()
@@ -98,5 +100,14 @@ public sealed class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<RefreshToken>()
             .HasIndex(rt => rt.ExpiresAt);
+
+        modelBuilder.Entity<UserGhostedCard>()
+            .HasKey(ugc => new { ugc.UserId, ugc.CardId });
+
+        modelBuilder.Entity<UserGhostedCard>()
+            .HasIndex(ugc => ugc.CardId);
+
+        modelBuilder.Entity<UserGhostedCard>()
+            .HasIndex(ugc => ugc.UserId);
     }
 }

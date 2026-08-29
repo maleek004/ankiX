@@ -37,15 +37,29 @@ public sealed class StudyQueueController : ControllerBase
             return Unauthorized(new { message = "Invalid user identity in token." });
         }
 
-        bool deckExists = await dbContext.Decks.AnyAsync(d => d.Id == deckId);
-        if (!deckExists)
+        Deck? deck = await dbContext.Decks.AsNoTracking().FirstOrDefaultAsync(d => d.Id == deckId);
+        if (deck is null)
         {
             return NotFound(new { message = "Deck not found." });
         }
 
-        // All cards in the deck
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+        if (deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0 && !isSystemAdmin)
+        {
+            var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == deck.StudyGroupId.Value);
+            if (studyGroup != null && studyGroup.Privacy != StudyGroupPrivacy.Public)
+            {
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == deck.StudyGroupId.Value && m.UserId == userId && m.Status == StudyGroupMemberStatus.Active);
+                if (!isMember)
+                {
+                    return Forbid();
+                }
+            }
+        }
+
+        // All cards in the deck, excluding cards ghosted by this user (evaluated directly in SQL via index)
         List<Card> allCards = await dbContext.Cards
-            .Where(c => c.DeckId == deckId)
+            .Where(c => c.DeckId == deckId && !dbContext.UserGhostedCards.Any(g => g.UserId == userId && g.CardId == c.Id))
             .ToListAsync();
 
         if (allCards.Count == 0)

@@ -76,7 +76,7 @@ development_status:
 
   epic-5-retrospective: optional
   epic-7: in-progress
-  7-9-user-level-card-ghosting-suspension-and-queue-personalization: ready-for-dev
+  7-9-user-level-card-ghosting-suspension-and-queue-personalization: done
   7-8-study-group-and-deck-name-editing-by-admins: done
   7-7-shared-card-modals-and-linker-refactoring: done
   7-6-search-card-preview-modal-integrity-and-rendering-resiliency: done

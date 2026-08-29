@@ -3,6 +3,7 @@ using System;
 using AnkiX.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AnkiX.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260830000000_AddUserGhostedCardsTable")]
+    partial class AddUserGhostedCardsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -75,11 +78,15 @@ namespace AnkiX.Api.Migrations
 
             modelBuilder.Entity("AnkiX.Api.Models.CardFollowup", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("integer");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AuthorDisplayName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<int>("AuthorUserId")
                         .HasColumnType("integer");
@@ -94,13 +101,12 @@ namespace AnkiX.Api.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("LinkedCardIds")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("text");
 
                     b.Property<string>("QuestionText")
                         .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
 
                     b.HasKey("Id");
 
@@ -126,16 +132,16 @@ namespace AnkiX.Api.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<int?>("StudyGroupId")
                         .HasColumnType("integer");
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
 
                     b.HasKey("Id");
 
@@ -159,8 +165,9 @@ namespace AnkiX.Api.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("Description")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
+                        .IsRequired()
+                        .HasMaxLength(50000)
+                        .HasColumnType("character varying(50000)");
 
                     b.Property<string>("ExerciseSpec")
                         .HasColumnType("text");
@@ -176,16 +183,22 @@ namespace AnkiX.Api.Migrations
                         .HasColumnType("character varying(50)");
 
                     b.Property<string>("SolutionCode")
-                        .HasColumnType("text");
+                        .IsRequired()
+                        .HasMaxLength(50000)
+                        .HasColumnType("character varying(50000)");
 
                     b.Property<string>("StarterCode")
-                        .HasColumnType("text");
+                        .IsRequired()
+                        .HasMaxLength(50000)
+                        .HasColumnType("character varying(50000)");
 
                     b.Property<int?>("StudyGroupId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("TestCasesSpec")
-                        .HasColumnType("text");
+                    b.Property<string>("TestSpec")
+                        .IsRequired()
+                        .HasMaxLength(50000)
+                        .HasColumnType("character varying(50000)");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -210,8 +223,8 @@ namespace AnkiX.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<decimal>("EaseFactor")
-                        .HasColumnType("decimal(4,2)");
+                    b.Property<double>("EaseFactor")
+                        .HasColumnType("double precision");
 
                     b.Property<int>("ExerciseId")
                         .HasColumnType("integer");
@@ -219,21 +232,21 @@ namespace AnkiX.Api.Migrations
                     b.Property<int>("IntervalDays")
                         .HasColumnType("integer");
 
-                    b.Property<int>("LearningStep")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("NextReviewAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Outcome")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Phase")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("Repetitions")
+                        .HasColumnType("integer");
 
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
@@ -304,13 +317,10 @@ namespace AnkiX.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<decimal>("EaseFactor")
-                        .HasColumnType("decimal(4,2)");
+                    b.Property<double>("EaseFactor")
+                        .HasColumnType("double precision");
 
                     b.Property<int>("IntervalDays")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("LearningStep")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("NextReviewAt")
@@ -318,13 +328,16 @@ namespace AnkiX.Api.Migrations
 
                     b.Property<string>("Outcome")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Phase")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("Repetitions")
+                        .HasColumnType("integer");
 
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
@@ -345,8 +358,8 @@ namespace AnkiX.Api.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("AvatarUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -355,8 +368,8 @@ namespace AnkiX.Api.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<DateTime?>("FrozenAt")
                         .HasColumnType("timestamp with time zone");
@@ -364,7 +377,14 @@ namespace AnkiX.Api.Migrations
                     b.Property<int?>("FrozenByUserId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("FrozenReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<bool>("IsFrozen")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsPublic")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")
@@ -398,13 +418,7 @@ namespace AnkiX.Api.Migrations
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("InvitedByUserId")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("JoinedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("RequestedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Role")

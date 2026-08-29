@@ -102,7 +102,7 @@ public sealed class DecksController : ControllerBase
                 deck.Description,
                 deck.CreatedByUserId,
                 Cards = dbContext.Cards
-                    .Where(c => c.DeckId == deck.Id)
+                    .Where(c => c.DeckId == deck.Id && (userId == 0 || !dbContext.UserGhostedCards.Any(g => g.UserId == userId && g.CardId == c.Id)))
                     .Select(c => new
                     {
                         c.Id,
@@ -272,6 +272,53 @@ public sealed class DecksController : ControllerBase
                 Type = card.Type,
                 Prompt = card.Prompt,
                 Answer = card.Answer
+            })
+            .ToListAsync();
+
+        return Ok(cards);
+    }
+
+    [HttpGet("{deckId:int}/ghosted-cards")]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<CardResponse>>> GetGhostedCardsByDeck([FromRoute] int deckId)
+    {
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            return Unauthorized(new { message = "Invalid user identity in token." });
+        }
+
+        Deck? deck = await dbContext.Decks.AsNoTracking().FirstOrDefaultAsync(d => d.Id == deckId);
+        if (deck is null)
+        {
+            return NotFound(new { message = "Deck not found." });
+        }
+
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+        if (deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0 && !isSystemAdmin)
+        {
+            var studyGroup = await dbContext.StudyGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == deck.StudyGroupId.Value);
+            if (studyGroup != null && studyGroup.Privacy != StudyGroupPrivacy.Public)
+            {
+                bool isMember = await dbContext.StudyGroupMembers.AnyAsync(m => m.StudyGroupId == deck.StudyGroupId.Value && m.UserId == userId && m.Status == StudyGroupMemberStatus.Active);
+                if (!isMember)
+                {
+                    return Forbid();
+                }
+            }
+        }
+
+        List<CardResponse> cards = await dbContext.Cards
+            .Where(card => card.DeckId == deckId && dbContext.UserGhostedCards.Any(g => g.UserId == userId && g.CardId == card.Id))
+            .OrderBy(card => card.Id)
+            .Select(card => new CardResponse
+            {
+                Id = card.Id,
+                DeckId = card.DeckId,
+                Type = card.Type,
+                Prompt = card.Prompt,
+                Answer = card.Answer,
+                IsGhosted = true
             })
             .ToListAsync();
 

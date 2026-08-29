@@ -45,6 +45,12 @@ export default function Deck(){
   const [newAnswer, setNewAnswer]             = useState('')
   const [isAddingCard, setIsAddingCard]       = useState(false)
 
+  // Ghosted Cards Drawer state
+  const [ghostedCards, setGhostedCards]       = useState([])
+  const [isGhostDrawerOpen, setIsGhostDrawerOpen] = useState(false)
+  const [ghostingCardId, setGhostingCardId]   = useState(null)
+  const [unghostingCardId, setUnghostingCardId] = useState(null)
+
   // Inline Edit Current Card state
   const [isEditingCurrent, setIsEditingCurrent] = useState(false)
   const [editPrompt, setEditPrompt]             = useState('')
@@ -93,14 +99,16 @@ export default function Deck(){
   const loadQueue = useCallback(async () => {
     setLoading(true)
     try {
-      const [d, q, cs] = await Promise.all([
+      const [d, q, cs, gcs] = await Promise.all([
         api.getDeck(id).catch(() => null),
         api.getStudyQueue(id).catch(() => ({ newCount:0, learningCount:0, reviewCount:0, dueCards:[] })),
-        api.getCards(id).catch(() => [])
+        api.getCards(id).catch(() => []),
+        !isGuest ? api.getGhostedCards(id).catch(() => []) : Promise.resolve([])
       ])
       setDeck(d)
       setQueue(q)
       setAllCards(cs || [])
+      setGhostedCards(gcs || [])
       setCurrentIndex(0)
       setShowAnswer(false)
       setShowFollowups(false)
@@ -110,7 +118,7 @@ export default function Deck(){
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, isGuest])
 
   useEffect(() => {
     setCanCreate(api.canCreateContent(activeStudyGroup?.role))
@@ -284,6 +292,7 @@ export default function Deck(){
     try {
       await api.deleteCard(id, cardId)
       setAllCards(prev => prev.filter(c => c.id !== cardId))
+      setGhostedCards(prev => prev.filter(c => c.id !== cardId))
       setQueue(prev => ({
         ...prev,
         dueCards: (prev.dueCards || []).filter(c => c.id !== cardId)
@@ -294,6 +303,53 @@ export default function Deck(){
       alert('Delete failed: ' + (err.message || err))
     } finally {
       setDeletingCardId(null)
+    }
+  }
+
+  const handleGhostCurrentCard = async () => {
+    if (!currentCard) return
+    const cardToGhost = currentCard
+    setGhostingCardId(cardToGhost.id)
+    try {
+      await api.ghostCard(cardToGhost.id)
+      setGhostedCards(prev => {
+        if (prev.some(c => c.id === cardToGhost.id)) return prev
+        return [...prev, { ...cardToGhost, isGhosted: true }]
+      })
+      const updatedDue = dueCards.filter(c => c.id !== cardToGhost.id)
+      setQueue(prev => ({
+        ...prev,
+        dueCards: (prev.dueCards || []).filter(c => c.id !== cardToGhost.id)
+      }))
+      setShowAnswer(false)
+      setUserCode('')
+      if (currentIndex >= updatedDue.length && updatedDue.length > 0) {
+        setCurrentIndex(updatedDue.length - 1)
+      }
+      // Re-fetch queue to ensure counts match server state
+      api.getStudyQueue(id).then(q => setQueue(q)).catch(() => {})
+    } catch (err) {
+      alert('Failed to ghost card: ' + (err.message || err))
+    } finally {
+      setGhostingCardId(null)
+    }
+  }
+
+  const handleUnghostCard = async (cardId) => {
+    setUnghostingCardId(cardId)
+    try {
+      await api.unghostCard(cardId)
+      setGhostedCards(prev => prev.filter(c => c.id !== cardId))
+      const [updatedQueue, updatedCards] = await Promise.all([
+        api.getStudyQueue(id).catch(() => null),
+        api.getCards(id).catch(() => null)
+      ])
+      if (updatedQueue) setQueue(updatedQueue)
+      if (updatedCards) setAllCards(updatedCards)
+    } catch (err) {
+      alert('Failed to restore card: ' + (err.message || err))
+    } finally {
+      setUnghostingCardId(null)
     }
   }
 
@@ -363,6 +419,24 @@ export default function Deck(){
               </button>
             </>
           )}
+          {!isGuest && (
+            <button
+              className="btn-study-tool"
+              style={{
+                fontWeight: 600,
+                color: ghostedCards.length > 0 ? '#495057' : '#6c757d',
+                borderColor: ghostedCards.length > 0 ? '#ced4da' : '#dee2e6'
+              }}
+              onClick={() => setIsGhostDrawerOpen(true)}
+              title="View cards suspended from your personal study queue"
+            >
+              👻 Ghosted {ghostedCards.length > 0 && (
+                <span style={{ marginLeft: 4, background: '#e9ecef', color: '#495057', padding: '1px 6px', borderRadius: 10, fontSize: '0.75rem' }}>
+                  {ghostedCards.length}
+                </span>
+              )}
+            </button>
+          )}
         </div>
         <div className="study-counts-right">
           {/* Blue = new, Red = learning, Green = review — live from backend */}
@@ -426,6 +500,93 @@ export default function Deck(){
               </span>
             </div>
           </form>
+          </div>
+        </div>
+      )}
+
+      {/* Ghosted Cards Drawer — bottom sheet on mobile */}
+      {isGhostDrawerOpen && !isGuest && (
+        <div
+          className="mobile-bottom-sheet-overlay"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 500, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setIsGhostDrawerOpen(false) }}
+        >
+          <div
+            className="mobile-bottom-sheet-content"
+            style={{ background: '#fff', borderRadius: '12px 12px 0 0', width: '100%', maxWidth: 750, maxHeight: '85vh', overflowY: 'auto', padding: 20, boxShadow: '0 -4px 20px rgba(0,0,0,0.15)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: '1px solid #dee2e6', paddingBottom: 10 }}>
+              <div>
+                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8, fontSize: '1.15rem' }}>
+                  👻 Ghosted Cards ({ghostedCards.length})
+                </h3>
+                <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#6c757d' }}>
+                  Suspended from your study queue. Click Un-ghost to resume spaced repetition.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-study-tool"
+                style={{ fontSize: '0.8rem', padding: '2px 8px' }}
+                onClick={() => setIsGhostDrawerOpen(false)}
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {ghostedCards.length === 0 ? (
+              <div className="empty-state" style={{ padding: '30px 10px', textAlign: 'center' }}>
+                <p style={{ margin: 0, color: '#6c757d', fontSize: '0.95rem' }}>
+                  No ghosted cards in this deck.
+                </p>
+                <p style={{ margin: '4px 0 0', color: '#adb5bd', fontSize: '0.8rem' }}>
+                  Click "👻 Ghost Card" during study sessions to exclude cards from your personal queue.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {ghostedCards.map((gCard) => (
+                  <div
+                    key={gCard.id}
+                    style={{
+                      border: '1px solid #e9ecef',
+                      borderRadius: 8,
+                      padding: 12,
+                      background: '#fcfcfd',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      gap: 12
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ marginBottom: 6, fontSize: '0.9rem', fontWeight: 600, color: '#212529' }}>
+                        <MarkdownViewer content={gCard.prompt} />
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: '#495057', background: '#f8f9fa', padding: '6px 10px', borderRadius: 6, border: '1px solid #f1f3f5' }}>
+                        <MarkdownViewer content={gCard.answer || 'No answer text'} />
+                      </div>
+                    </div>
+                    <button
+                      className="btn-study-tool"
+                      style={{
+                        fontSize: '0.8rem',
+                        padding: '4px 12px',
+                        borderColor: '#198754',
+                        color: '#198754',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0
+                      }}
+                      disabled={unghostingCardId === gCard.id}
+                      onClick={() => handleUnghostCard(gCard.id)}
+                    >
+                      {unghostingCardId === gCard.id ? 'Restoring...' : '✨ Un-ghost'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -565,6 +726,17 @@ export default function Deck(){
                   >
                     📋 Copy Card
                   </button>
+                  {!isGuest && (
+                    <button
+                      className="btn-study-tool"
+                      style={{ fontSize: '0.8rem', padding: '4px 10px', whiteSpace: 'nowrap', borderColor: '#6c757d', color: '#495057' }}
+                      disabled={ghostingCardId === currentCard.id}
+                      onClick={handleGhostCurrentCard}
+                      title="Ghost card — exclude from your personal study queue without deleting"
+                    >
+                      {ghostingCardId === currentCard.id ? 'Ghosting...' : '👻 Ghost Card'}
+                    </button>
+                  )}
                   {canCreate && (
                     <>
                       <button

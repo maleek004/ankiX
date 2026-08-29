@@ -133,12 +133,16 @@ public sealed class ContentController : ControllerBase
                     f.LinkedCardId = null;
                 }
 
-                // 4. Remove Cards
+                // 4. Remove UserGhostedCards for these cards
+                var ghostedCards = dbContext.UserGhostedCards.Where(g => cardIds.Contains(g.CardId));
+                dbContext.UserGhostedCards.RemoveRange(ghostedCards);
+
+                // 5. Remove Cards
                 var cards = dbContext.Cards.Where(c => c.DeckId == deckId);
                 dbContext.Cards.RemoveRange(cards);
             }
 
-            // 5. Remove Deck
+            // 6. Remove Deck
             dbContext.Decks.Remove(currentDeck);
 
             await dbContext.SaveChangesAsync();
@@ -286,13 +290,20 @@ public sealed class ContentController : ControllerBase
             }
         }
 
+        bool isGhosted = false;
+        if (userId > 0)
+        {
+            isGhosted = await dbContext.UserGhostedCards.AnyAsync(g => g.UserId == userId && g.CardId == card.Id);
+        }
+
         return Ok(new CardResponse
         {
             Id = card.Id,
             DeckId = card.DeckId,
             Type = card.Type,
             Prompt = card.Prompt,
-            Answer = card.Answer
+            Answer = card.Answer,
+            IsGhosted = isGhosted
         });
     }
 
@@ -370,9 +381,113 @@ public sealed class ContentController : ControllerBase
         Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId);
         if (!await CanManageContentAsync(deck?.StudyGroupId)) return Forbid();
 
+        var ghostedEntries = dbContext.UserGhostedCards.Where(g => g.CardId == cardId);
+        dbContext.UserGhostedCards.RemoveRange(ghostedEntries);
+
         dbContext.Cards.Remove(card);
         await dbContext.SaveChangesAsync();
         return NoContent();
+    }
+
+    [HttpPost("cards/{cardId:int}/ghost")]
+    [HttpPost("/api/cards/{cardId:int}/ghost")]
+    [Authorize]
+    public async Task<ActionResult<GhostCardStatusResponse>> GhostCard([FromRoute] int cardId)
+    {
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            return Unauthorized(new { message = "Invalid user identity in token." });
+        }
+
+        Card? card = await dbContext.Cards.FirstOrDefaultAsync(c => c.Id == cardId);
+        if (card is null)
+        {
+            return NotFound(new { message = "Card not found." });
+        }
+
+        Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId);
+        if (deck != null && !await CanReadContentAsync(deck.StudyGroupId))
+        {
+            return Forbid();
+        }
+
+        bool alreadyGhosted = await dbContext.UserGhostedCards
+            .AnyAsync(g => g.UserId == userId && g.CardId == cardId);
+
+        if (!alreadyGhosted)
+        {
+            try
+            {
+                dbContext.UserGhostedCards.Add(new UserGhostedCard
+                {
+                    UserId = userId,
+                    CardId = cardId,
+                    CreatedAt = DateTime.UtcNow
+                });
+                await dbContext.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                // Concurrently inserted by parallel request — treat as idempotent success
+            }
+        }
+
+        return Ok(new GhostCardStatusResponse
+        {
+            CardId = cardId,
+            IsGhosted = true,
+            Message = "Card ghosted successfully."
+        });
+    }
+
+    [HttpDelete("cards/{cardId:int}/ghost")]
+    [HttpDelete("/api/cards/{cardId:int}/ghost")]
+    [HttpPost("cards/{cardId:int}/unghost")]
+    [HttpPost("/api/cards/{cardId:int}/unghost")]
+    [Authorize]
+    public async Task<ActionResult<GhostCardStatusResponse>> UnghostCard([FromRoute] int cardId)
+    {
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            return Unauthorized(new { message = "Invalid user identity in token." });
+        }
+
+        Card? card = await dbContext.Cards.FirstOrDefaultAsync(c => c.Id == cardId);
+        if (card is null)
+        {
+            return NotFound(new { message = "Card not found." });
+        }
+
+        Deck? deck = await dbContext.Decks.FirstOrDefaultAsync(d => d.Id == card.DeckId);
+        if (deck != null && !await CanReadContentAsync(deck.StudyGroupId))
+        {
+            return Forbid();
+        }
+
+        var ghostRecord = await dbContext.UserGhostedCards
+            .FirstOrDefaultAsync(g => g.UserId == userId && g.CardId == cardId);
+
+        if (ghostRecord is not null)
+        {
+            try
+            {
+                dbContext.UserGhostedCards.Remove(ghostRecord);
+                await dbContext.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Concurrently deleted by parallel request — treat as idempotent success
+            }
+        }
+
+        return Ok(new GhostCardStatusResponse
+        {
+            CardId = cardId,
+            IsGhosted = false,
+            Message = "Card restored to active review queue."
+        });
     }
 
     [HttpPost("cards/copy")]

@@ -121,6 +121,7 @@ describe('AdminDashboard', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Super-Admin Command Center/i)).toBeInTheDocument()
+      expect(screen.getByText(/Refresh Data/i)).toBeInTheDocument()
     })
 
     expect(api.getAdminMetrics).toHaveBeenCalledTimes(1)

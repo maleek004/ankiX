@@ -13,6 +13,17 @@ public sealed class CardResponse
     public string Prompt { get; set; } = string.Empty;
 
     public string Answer { get; set; } = string.Empty;
+
+    public bool IsGhosted { get; set; }
+}
+
+public sealed class GhostCardStatusResponse
+{
+    public int CardId { get; set; }
+
+    public bool IsGhosted { get; set; }
+
+    public string Message { get; set; } = string.Empty;
 }
 
 public sealed class CreateCardRequest
