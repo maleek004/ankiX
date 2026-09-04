@@ -1,6 +1,7 @@
 import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import { AuthProvider } from './auth/AuthProvider'
 import { StudyGroupProvider } from './studyGroup/StudyGroupProvider'
 import RequireAuth from './auth/RequireAuth'
@@ -56,6 +57,7 @@ export default function App(){
             </main>
           </div>
           <Analytics />
+          <SpeedInsights />
         </BrowserRouter>
       </StudyGroupProvider>
     </AuthProvider>
