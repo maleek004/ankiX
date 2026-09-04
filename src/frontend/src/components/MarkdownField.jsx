@@ -8,7 +8,7 @@ export default function MarkdownField({
   placeholder = '',
   required = false,
   rows = 3,
-  hint = 'Supports Markdown: **bold**, `code`, ```lang blocks',
+  hint = 'Supports Markdown & Math: **bold**, `code`, ```code blocks, $inline$, $$block$$ (escape with \\$)',
   helpText
 }) {
   const safeValue = typeof value === 'string' ? value : String(value ?? '')

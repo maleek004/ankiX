@@ -1030,3 +1030,30 @@ main.main-content {
     display: none !important;
   }
 }
+
+/* Story 7.10: LaTeX Mathematical Notation Typography & Mobile Overflow Protection */
+.markdown-content .katex {
+  font-size: 1.05em;
+  max-width: 100%;
+}
+
+.markdown-content .katex-display {
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 8px 0;
+  margin: 12px 0;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
+}
+
+.markdown-content .katex-display::-webkit-scrollbar {
+  height: 4px;
+}
+
+.markdown-content .katex-display::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.4);
+  border-radius: 4px;
+}
+

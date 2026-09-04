@@ -1,8 +1,11 @@
 import React, { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
 import rehypeHighlight from 'rehype-highlight'
+import rehypeKatex from 'rehype-katex'
 import 'highlight.js/styles/github-dark.css'
+import 'katex/dist/katex.min.css'
 
 function extractText(node) {
   if (node === null || node === undefined) return ''
@@ -143,8 +146,8 @@ export default function MarkdownViewer({ content = '', className = '', style = {
       }}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeHighlight, [rehypeKatex, { throwOnError: false, strict: 'ignore' }]]}
         components={{
           code: CodeBlock,
           p: ({ children }) => (
@@ -207,7 +210,7 @@ export default function MarkdownViewer({ content = '', className = '', style = {
           )
         }}
       >
-        {content}
+        {safeContent}
       </ReactMarkdown>
     </div>
   )
