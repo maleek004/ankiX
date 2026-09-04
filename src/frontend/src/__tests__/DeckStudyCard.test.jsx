@@ -41,7 +41,7 @@ describe('Deck Page - Card View & Editing Workflow', () => {
     window.confirm = vi.fn(() => true)
   })
 
-  test('renders card prompt, toolbar without Limits button', async () => {
+  test('renders card prompt, deduplicated top toolbar and dedicated card action header', async () => {
     render(
       <MemoryRouter initialEntries={['/decks/1']}>
         <Routes>
@@ -55,13 +55,16 @@ describe('Deck Page - Card View & Editing Workflow', () => {
     // Limits button should NOT exist
     expect(screen.queryByText(/^Limits$/i)).not.toBeInTheDocument()
 
-    // Add Card button, Edit button, Import Cards exist
+    // Row 1: Add Card button exists, but redundant Edit and Import Cards buttons are removed
     expect(screen.getByText(/\+ Add Card/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Edit$/i })).toBeInTheDocument()
-    expect(screen.getByText(/Import Cards/i)).toBeInTheDocument()
+    expect(screen.queryByText(/📥 Import Cards/i)).not.toBeInTheDocument()
+
+    // Dedicated Card Action Header: 1-click Edit button and More Actions dropdown exist
+    expect(screen.getByRole('button', { name: /✏️ Edit/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /··· More Actions/i })).toBeInTheDocument()
   })
 
-  test('toggles lightweight Add Card drawer and keeps open on submit', async () => {
+  test('toggles lightweight Add Card drawer with segmented manual vs bulk import toggle', async () => {
     render(
       <MemoryRouter initialEntries={['/decks/1']}>
         <Routes>
@@ -75,8 +78,10 @@ describe('Deck Page - Card View & Editing Workflow', () => {
     // Click + Add Card
     fireEvent.click(screen.getByText(/\+ Add Card/i))
 
-    // Form appears without "Existing Cards" section
+    // Form appears with segmented controls
     expect(screen.getByText(/Add New Card to Deck/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /✍️ Manual Entry/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /📥 Bulk File Import/i })).toBeInTheDocument()
     expect(screen.queryByText(/Existing Cards/i)).not.toBeInTheDocument()
 
     // Fill form
@@ -108,8 +113,8 @@ describe('Deck Page - Card View & Editing Workflow', () => {
 
     await waitFor(() => expect(screen.getByText(/What is C#/i)).toBeInTheDocument())
 
-    // Click Edit button on the card or toolbar
-    const editBtn = screen.getByRole('button', { name: /^Edit$/i })
+    // Click Edit button on the card action header
+    const editBtn = screen.getByRole('button', { name: /✏️ Edit/i })
     fireEvent.click(editBtn)
 
     // Inline edit form should appear with prefilled content
@@ -127,7 +132,7 @@ describe('Deck Page - Card View & Editing Workflow', () => {
     })
   })
 
-  test('allows deleting current card from card toolbar with confirmation', async () => {
+  test('opens More Actions dropdown with Copy, Link Exercises, and Delete options', async () => {
     render(
       <MemoryRouter initialEntries={['/decks/1']}>
         <Routes>
@@ -138,7 +143,31 @@ describe('Deck Page - Card View & Editing Workflow', () => {
 
     await waitFor(() => expect(screen.getByText(/What is C#/i)).toBeInTheDocument())
 
-    const deleteBtn = screen.getByRole('button', { name: /Delete/i })
+    // Click More Actions dropdown
+    const moreBtn = screen.getByRole('button', { name: /··· More Actions/i })
+    fireEvent.click(moreBtn)
+
+    expect(screen.getByRole('menuitem', { name: /📋 Copy Card/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /🔗 Link Exercises/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /🗑️ Delete Card/i })).toBeInTheDocument()
+  })
+
+  test('allows deleting current card via More Actions overflow dropdown with confirmation', async () => {
+    render(
+      <MemoryRouter initialEntries={['/decks/1']}>
+        <Routes>
+          <Route path="/decks/:id" element={<Deck />} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    await waitFor(() => expect(screen.getByText(/What is C#/i)).toBeInTheDocument())
+
+    // Open More Actions overflow dropdown
+    const moreBtn = screen.getByRole('button', { name: /··· More Actions/i })
+    fireEvent.click(moreBtn)
+
+    const deleteBtn = screen.getByRole('menuitem', { name: /🗑️ Delete Card/i })
     fireEvent.click(deleteBtn)
 
     expect(window.confirm).toHaveBeenCalledWith('Are you sure you want to delete this card?')

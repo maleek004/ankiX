@@ -99,6 +99,7 @@ describe('Decks Page Management & Editing', () => {
 
     expect(screen.getByText('✏️ Edit Study Group Details')).toBeInTheDocument()
     const groupNameInput = screen.getByDisplayValue('Mock Group')
+    groupNameInput.focus()
     fireEvent.change(groupNameInput, { target: { value: 'Renamed Study Group' } })
 
     const saveBtn = screen.getByRole('button', { name: /Save Changes/i })
@@ -111,5 +112,28 @@ describe('Decks Page Management & Editing', () => {
       })
       expect(mockSetActiveStudyGroup).toHaveBeenCalled()
     })
+  })
+
+  test('opens Import Cards modal from Actions dropdown on /decks catalog', async () => {
+    render(
+      <MemoryRouter>
+        <Decks />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => expect(screen.getByText(/Mock Deck/i)).toBeInTheDocument())
+
+    // Click Actions dropdown
+    const actionsBtn = screen.getByRole('button', { name: /Actions/i })
+    fireEvent.click(actionsBtn)
+
+    // Click 📥 Import Cards
+    const importBtn = screen.getByRole('button', { name: /📥 Import Cards/i })
+    expect(importBtn).toBeInTheDocument()
+    fireEvent.click(importBtn)
+
+    // Verify Import Modal opens with the deck title
+    expect(screen.getByText(/Import Cards into "Mock Deck"/i)).toBeInTheDocument()
+    expect(screen.getByText(/Supported Flat File Formats/i)).toBeInTheDocument()
   })
 })

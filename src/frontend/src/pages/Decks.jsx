@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import { getDecks, createDeck, updateDeck, deleteDeck, updateStudyGroup, canCreateContent } from '../api.js'
 import AuthModal from '../components/AuthModal'
+import ImportCardsModal from '../components/ImportCardsModal'
 
 export default function Decks(){
   const auth = useAuth()
@@ -22,6 +23,9 @@ export default function Decks(){
 
   // Edit Deck Modal State
   const [editingDeck, setEditingDeck] = useState({ isOpen: false, deck: null, title: '', description: '', loading: false })
+
+  // Import Cards Modal State
+  const [importingDeck, setImportingDeck] = useState({ isOpen: false, deck: null })
 
   // Edit Study Group Modal State
   const [editingGroup, setEditingGroup] = useState({ isOpen: false, name: '', description: '', loading: false })
@@ -291,9 +295,14 @@ export default function Decks(){
                       <div className="dropdown-menu">
                         <Link to={`/decks/${d.id}`} className="dropdown-item">Study</Link>
                         {!isGuest && canCreate && (
-                          <button className="dropdown-item" onClick={() => openEditDeck(d)}>
-                            Edit
-                          </button>
+                          <>
+                            <button className="dropdown-item" onClick={() => { setActiveDropdown(null); openEditDeck(d); }}>
+                              Edit
+                            </button>
+                            <button className="dropdown-item" onClick={() => { setActiveDropdown(null); setImportingDeck({ isOpen: true, deck: d }); }}>
+                              📥 Import Cards
+                            </button>
+                          </>
                         )}
                         {!isGuest && (
                           <button className="dropdown-item" disabled={deletingId === d.id} onClick={() => handleDeleteDeck(d.id)}>
@@ -430,6 +439,19 @@ export default function Decks(){
             </form>
           </div>
         </div>
+      )}
+
+      {/* Import Cards Modal */}
+      {importingDeck.isOpen && importingDeck.deck && (
+        <ImportCardsModal
+          deckId={importingDeck.deck.id}
+          deckTitle={importingDeck.deck.title}
+          onClose={() => setImportingDeck({ isOpen: false, deck: null })}
+          onImportSuccess={() => {
+            const groupId = activeStudyGroup ? activeStudyGroup.id : null
+            getDecks(groupId).then(data => setDecks(data || []))
+          }}
+        />
       )}
 
       <AuthModal
