@@ -53,6 +53,29 @@ export default function Decks(){
     return () => { mounted = false }
   }, [activeStudyGroup?.id, activeStudyGroup?.role])
 
+  // Close row actions dropdown on outside click or Escape key
+  useEffect(() => {
+    if (!activeDropdown) return
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.actions-dropdown')) {
+        setActiveDropdown(null)
+      }
+    }
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setActiveDropdown(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside, { passive: true })
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [activeDropdown])
+
   const create = async (e) => {
     e.preventDefault()
     if (!newTitle.trim()) return
@@ -288,11 +311,21 @@ export default function Decks(){
                     <button 
                       className="btn-actions"
                       onClick={() => setActiveDropdown(activeDropdown === d.id ? null : d.id)}
+                      aria-haspopup="menu"
+                      aria-expanded={activeDropdown === d.id}
+                      title="Deck actions"
                     >
                       Actions ▾
                     </button>
                     {activeDropdown === d.id && (
-                      <div className="dropdown-menu">
+                      <div
+                        className="dropdown-menu"
+                        onBlur={(e) => {
+                          if (!e.currentTarget.contains(e.relatedTarget)) {
+                            setActiveDropdown(null)
+                          }
+                        }}
+                      >
                         <Link to={`/decks/${d.id}`} className="dropdown-item">Study</Link>
                         {!isGuest && canCreate && (
                           <>
@@ -300,7 +333,7 @@ export default function Decks(){
                               Edit
                             </button>
                             <button className="dropdown-item" onClick={() => { setActiveDropdown(null); setImportingDeck({ isOpen: true, deck: d }); }}>
-                              📥 Import Cards
+                              Import Cards
                             </button>
                           </>
                         )}

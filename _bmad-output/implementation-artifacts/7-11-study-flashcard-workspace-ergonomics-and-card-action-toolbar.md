@@ -77,5 +77,6 @@
 - [x] [Review][Patch] Avoid premature touch-scroll dismissal on document event listener [`src/frontend/src/pages/Deck.jsx:78`]
 - [x] [Review][Patch] Clean up empty spacer DOM element and move duplicated inline segmented tab styles to CSS [`src/frontend/src/pages/Deck.jsx:508`, `src/frontend/src/styles.css:270`]
 - [x] [Review][Patch] Guard against unmounted state updates on async import in ImportCardsModal [`src/frontend/src/components/ImportCardsModal.jsx:25`]
+- [x] [Review][Patch] Implement standard Light Dismiss (outside click, touchstart, Escape key) and ARIA attributes on Decks.jsx catalog row Actions ▾ dropdown [`src/frontend/src/pages/Decks.jsx:56`]
 
 

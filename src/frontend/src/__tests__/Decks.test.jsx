@@ -127,13 +127,45 @@ describe('Decks Page Management & Editing', () => {
     const actionsBtn = screen.getByRole('button', { name: /Actions/i })
     fireEvent.click(actionsBtn)
 
-    // Click 📥 Import Cards
-    const importBtn = screen.getByRole('button', { name: /📥 Import Cards/i })
+    // Click Import Cards
+    const importBtn = screen.getByRole('button', { name: /^Import Cards$/i })
     expect(importBtn).toBeInTheDocument()
     fireEvent.click(importBtn)
 
     // Verify Import Modal opens with the deck title
     expect(screen.getByText(/Import Cards into "Mock Deck"/i)).toBeInTheDocument()
     expect(screen.getByText(/Supported Flat File Formats/i)).toBeInTheDocument()
+  })
+
+  test('Actions dropdown supports Light Dismiss on outside click and Escape key', async () => {
+    render(
+      <MemoryRouter>
+        <Decks />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => expect(screen.getByText(/Mock Deck/i)).toBeInTheDocument())
+
+    const actionsBtn = screen.getByRole('button', { name: /Actions/i })
+    expect(actionsBtn).toHaveAttribute('aria-expanded', 'false')
+
+    // Open dropdown
+    fireEvent.click(actionsBtn)
+    expect(actionsBtn).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Study')).toBeInTheDocument()
+
+    // Press Escape key -> closes dropdown
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByText('Study')).not.toBeInTheDocument()
+    expect(actionsBtn).toHaveAttribute('aria-expanded', 'false')
+
+    // Re-open dropdown
+    fireEvent.click(actionsBtn)
+    expect(screen.getByText('Study')).toBeInTheDocument()
+
+    // Click outside -> closes dropdown
+    fireEvent.mouseDown(document.body)
+    expect(screen.queryByText('Study')).not.toBeInTheDocument()
+    expect(actionsBtn).toHaveAttribute('aria-expanded', 'false')
   })
 })
