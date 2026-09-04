@@ -99,6 +99,12 @@ Key focus areas for Phase 3:
   * **Inline & Block Math:** Mathematical expressions wrapped in `$inline$` (e.g. `$O(N \log N)$`) and `$$block$$` render as accessible KaTeX mathematical formulas across all flashcard study views, card previews, and exercise modalities.
   * **Live Preview & Authoring Hint:** The markdown authoring editor (`MarkdownField`) updates its hint syntax and renders LaTeX formulas in real time in the live preview tab.
   * **Mobile Math Scroll Preservation:** Long equation blocks dynamically scroll horizontally on viewports `<480px` without horizontal page blowout.
+* **FR43:** Study Flashcard Workspace Ergonomics, Card Action Toolbar & Import Repositioning:
+  * **Deduplicate Deck Bar:** The redundant `Edit` button on the primary study header (`Row 1`) is removed so the bar strictly hosts deck-level scope actions (`+ Add Card`, `Ghosted [count]`, queue status counters).
+  * **Dedicated Card Action Header:** Card-specific controls move into a dedicated header bar positioned directly *above* the prompt text inside the card canvas, guaranteeing 100% horizontal text width without flexbox squashing.
+  * **Primary vs Overflow Action Hierarchy:** `[👻 Ghost Card]` and `[✏️ Edit]` are exposed as direct 1-click buttons, while `[📋 Copy Card]`, `[🔗 Link Exercises]`, and destructive `[🗑️ Delete Card]` are grouped into a clean `··· More Actions` dropdown menu.
+  * **Reposition Import Cards:** The `[📥 Import Cards]` setup action is removed from the daily study toolbar and repositioned inside the `+ Add Card` drawer as a segmented entry mode (`[✍️ Manual Entry]` vs `[📥 Bulk File Import]`), as well as added to the `/decks` catalog `Actions ▾` dropdown.
+
 
 
 

@@ -37,7 +37,9 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 | **FR40** | Study Group & Deck Name Management for Group Admins | Epic 7 (Story 7.8) |
 | **FR41** | User-Level Card Ghosting (Suspension) & Queue Personalization | Epic 7 (Story 7.9) |
 | **FR42** | LaTeX Mathematical & Scientific Notation Rendering | Epic 7 (Story 7.10) |
+| **FR43** | Study Flashcard Workspace Ergonomics, Card Action Toolbar & Import Repositioning | Epic 7 (Story 7.11) |
 | **FR23** | GitHub-style study activity heatmap | Epic 8 (Story 8.1) |
+
 
 
 
@@ -346,9 +348,28 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
   * **Mobile Equation Overflow Protection:** Add CSS overflow handling (`overflow-x: auto`) for KaTeX display blocks so large equations scroll horizontally on mobile screens (<480px) without breaking page layout.
   * **Code Block Dollar Sign Preservation:** Verify that literal dollar signs inside code snippets (e.g. bash variables `$HOME` or PHP `$var`) remain untouched and continue to be highlighted as code.
 
+#### Story 7.11: Study Flashcard Workspace Ergonomics, Card Action Toolbar & Import Repositioning
+
+**As a** learner reviewing flashcards in a study session and a creator curating decks,  
+**I want** card-specific actions separated into a dedicated header bar above the prompt with an overflow dropdown and the Import Cards action relocated to onboarding surfaces,  
+**So that** card prompts enjoy 100% full-width typography without flexbox squishing, and study sessions remain uncluttered and focused on learning flow.  
+
+* **Acceptance Criteria:**
+  * **Deduplicate Deck Bar:** Remove the redundant `Edit` button from the top deck toolbar (`Row 1`) in `Deck.jsx`, keeping only deck-level scope controls (`+ Add Card`, `Ghosted [count]`, queue status counters).
+  * **Dedicated Card Action Header:** Position card actions in a clean, dedicated header row directly *above* the card prompt text within the card container, guaranteeing the prompt gets 100% horizontal width on desktop, tablet, and mobile.
+  * **Primary vs Overflow Action Hierarchy:**
+    * Expose high-frequency actions `[👻 Ghost Card]` and `[✏️ Edit]` as direct 1-click buttons.
+    * Group secondary and destructive actions (`[📋 Copy Card]`, `[🔗 Link Exercises]`, `[🗑️ Delete Card]`) into an accessible `··· More Actions` dropdown menu with click-outside and Escape key dismissal.
+  * **Reposition Import Cards Action:**
+    * Remove the prominent `[📥 Import Cards]` button from the daily study toolbar (`Row 1`).
+    * Integrate file importing into the `+ Add Card` drawer as a segmented entry toggle (`[✍️ Manual Entry]` vs `[📥 Bulk File Import]`).
+    * Add an `📥 Import Cards` option to each deck's `Actions ▾` dropdown on the `/decks` catalog page (`Decks.jsx`).
+  * **Mobile Touch Ergonomics:** Ensure the card header neatly aligns on screens `<480px` without horizontal overflow, wrapping, or prompt displacement.
+
 ---
 
 ### Epic 8: Spaced Repetition Analytics & Gamification
+
 
 
 
