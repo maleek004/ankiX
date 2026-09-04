@@ -36,7 +36,9 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 | **FR39** | Shared Card Modals & Linker Refactoring | Epic 7 (Story 7.7) |
 | **FR40** | Study Group & Deck Name Management for Group Admins | Epic 7 (Story 7.8) |
 | **FR41** | User-Level Card Ghosting (Suspension) & Queue Personalization | Epic 7 (Story 7.9) |
+| **FR42** | LaTeX Mathematical & Scientific Notation Rendering | Epic 7 (Story 7.10) |
 | **FR23** | GitHub-style study activity heatmap | Epic 8 (Story 8.1) |
+
 
 
 | **FR24** | Daily study streak tracking & milestone badges | Epic 8 (Story 8.2) |
@@ -331,9 +333,23 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
   * **"Ghosted Cards" Drawer & Restoration:** In `Deck.jsx`, learners can open a "Ghosted Cards" drawer / view to inspect all cards they have muted in that deck, and click "✨ Un-ghost" to restore any card back to their active review queue.
   * **Shared Deck Isolation:** Ghosting a card by user $A$ has zero impact on user $B$ or the master deck definition; cards remain visible in deck totals for creators and other group members.
 
+#### Story 7.10: LaTeX Mathematical Notation Support (KaTeX)
+
+**As a** learner reviewing algorithmic, computer science, and mathematical flashcards,  
+**I want** mathematical notation formatted with LaTeX to render clearly with formulas, superscripts, subscripts, and equations,  
+**So that** I can study algorithms, Big-O notations, data structures, and scientific formulas with proper mathematical typography.  
+
+* **Acceptance Criteria:**
+  * **Inline & Block Math Processing:** Integrate `remark-math` and `rehype-katex` into `MarkdownViewer.jsx` alongside `remark-gfm` and `rehype-highlight`. Expressions surrounded by `$formula$` render as crisp inline math, and expressions enclosed in `$$formula$$` render as centered display equations.
+  * **Visual Typography & Styling:** Import `katex/dist/katex.min.css` to render standard mathematical fonts, fractions, square roots, integrals, and summations cleanly in dark and light modes.
+  * **Authoring Live Preview & Hint:** Update `MarkdownField.jsx` hint to inform authors of LaTeX support (`$inline$`, `$$block$$`), and verify formulas render dynamically in the live markdown preview tab during card and exercise authoring.
+  * **Mobile Equation Overflow Protection:** Add CSS overflow handling (`overflow-x: auto`) for KaTeX display blocks so large equations scroll horizontally on mobile screens (<480px) without breaking page layout.
+  * **Code Block Dollar Sign Preservation:** Verify that literal dollar signs inside code snippets (e.g. bash variables `$HOME` or PHP `$var`) remain untouched and continue to be highlighted as code.
+
 ---
 
 ### Epic 8: Spaced Repetition Analytics & Gamification
+
 
 
 

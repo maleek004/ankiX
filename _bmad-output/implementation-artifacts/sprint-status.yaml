@@ -76,10 +76,12 @@ development_status:
 
   epic-5-retrospective: optional
   epic-7: in-progress
+  7-10-latex-mathematical-notation-support-katex: ready-for-dev
   7-9-user-level-card-ghosting-suspension-and-queue-personalization: done
   7-8-study-group-and-deck-name-editing-by-admins: done
   7-7-shared-card-modals-and-linker-refactoring: done
   7-6-search-card-preview-modal-integrity-and-rendering-resiliency: done
+
 
   7-5-exercise-editing-ui-and-rich-markdown-rendering: done
   7-4-multi-modal-exercise-integrity-custom-topic-tagging-and-locked-runtime-engine: done

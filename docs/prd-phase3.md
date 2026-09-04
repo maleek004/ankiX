@@ -95,6 +95,11 @@ Key focus areas for Phase 3:
   * **Interactive Card Ghosting:** Learners reviewing large or shared decks can click a "👻 Ghost Card" button during a study session or card preview to permanently mute that card from their personal spaced repetition study queue.
   * **User-Scoped Isolation:** Ghosting a card applies strictly to the requesting user's study queue without deleting or modifying the card for other study group members or global learners.
   * **Queue Exclusion & Restore Management:** Ghosted cards are automatically filtered out from active review queues (`GET /api/decks/{deckId}/queue`). A dedicated "Ghosted Cards" management drawer inside the deck view allows learners to inspect and un-ghost/restore cards at any time.
+* **FR42:** LaTeX Mathematical & Scientific Notation Rendering:
+  * **Inline & Block Math:** Mathematical expressions wrapped in `$inline$` (e.g. `$O(N \log N)$`) and `$$block$$` render as accessible KaTeX mathematical formulas across all flashcard study views, card previews, and exercise modalities.
+  * **Live Preview & Authoring Hint:** The markdown authoring editor (`MarkdownField`) updates its hint syntax and renders LaTeX formulas in real time in the live preview tab.
+  * **Mobile Math Scroll Preservation:** Long equation blocks dynamically scroll horizontally on viewports `<480px` without horizontal page blowout.
+
 
 
 ### Analytics & Gamification
