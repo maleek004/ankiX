@@ -166,7 +166,7 @@ public sealed class CodeExecutionService : ICodeExecutionService
 
             fullCodeToRun = $"package main\n\nimport (\n    \"fmt\"\n)\n\n{cleanUserCode}\n\n{mainFunc}";
         }
-        else if (!string.IsNullOrWhiteSpace(validationSpec) && (validationSpec.Contains("assert") || validationSpec.Contains("expect") || validationSpec.Contains("test") || validationSpec.Contains("panic")))
+        else if (!string.IsNullOrWhiteSpace(validationSpec))
         {
             fullCodeToRun += "\n\n" + validationSpec;
         }
@@ -442,6 +442,43 @@ public sealed class CodeExecutionService : ICodeExecutionService
 
     private static string BuildTestHarness(string code, string lang, string? spec)
     {
+        string normLang = (lang ?? "python").Trim().ToLowerInvariant();
+        string cleanSpec = spec?.Trim() ?? "";
+
+        if (normLang is "go" or "golang")
+        {
+            string cleanUserCode = code.Replace("package main", "").Trim();
+            string specCode = cleanSpec.Replace("package main", "").Trim();
+            string mainFunc = specCode.Contains("func main()")
+                ? specCode.Replace("import \"fmt\"", "").Trim()
+                : (!string.IsNullOrWhiteSpace(specCode)
+                    ? $"func main() {{\n    {specCode}\n}}"
+                    : "func main() {\n    fmt.Println(\"✓ Code Executed Successfully\")\n}");
+            return $"package main\n\nimport (\n    \"fmt\"\n)\n\n{cleanUserCode}\n\n{mainFunc}";
+        }
+        else if (normLang.Contains("csharp") || normLang is "cs" or "c#")
+        {
+            if (!code.Contains("class ") && !code.Contains("static void Main"))
+            {
+                string specSnippet = !string.IsNullOrWhiteSpace(cleanSpec) ? $"\n        {cleanSpec}" : "";
+                return $"using System;\n\npublic class Program {{\n    public static void Main() {{\n        {code}{specSnippet}\n    }}\n}}";
+            }
+            if (!string.IsNullOrWhiteSpace(cleanSpec))
+            {
+                if (!cleanSpec.Contains("class ") && !cleanSpec.Contains("static void Main"))
+                {
+                    return $"{code}\n\npublic class AnkiXRunner {{\n    public static void Main() {{\n        {cleanSpec}\n    }}\n}}";
+                }
+                return $"{code}\n\n{cleanSpec}";
+            }
+            return code;
+        }
+
+        if (!string.IsNullOrWhiteSpace(cleanSpec))
+        {
+            return $"{code}\n\n{cleanSpec}";
+        }
+
         return code;
     }
 

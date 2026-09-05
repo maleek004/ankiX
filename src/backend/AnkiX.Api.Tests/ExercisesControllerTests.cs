@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using AnkiX.Api.Contracts.Content;
+using AnkiX.Api.Contracts.Study;
 using AnkiX.Api.Controllers;
 using AnkiX.Api.Data;
 using AnkiX.Api.Models;
@@ -228,6 +229,41 @@ public class ExercisesControllerTests
         var detail = Assert.IsType<ExerciseDetailResponse>(createdAtAction.Value);
 
         Assert.Equal("general", detail.Language);
+    }
+
+    [Fact]
+    public async Task RunExercise_WhenTestCasesSpecIsEmpty_FallsBackToSolutionCodeAssertions()
+    {
+        using var db = CreateInMemoryDbContext();
+        var controller = CreateController(db, userId: 1, role: "Admin");
+
+        var ex = new Exercise
+        {
+            Id = 99,
+            Title = "Class Exercise",
+            Language = "python",
+            ExerciseType = "CodeExecution",
+            TestCasesSpec = "", // empty string as sent by frontend
+            SolutionCode = "buf = WordBuffer(['apple'])\nassert buf[0] == 'apple'"
+        };
+        db.Exercises.Add(ex);
+        await db.SaveChangesAsync();
+
+        // Faulty submission matching user's case
+        var faultySubmission = "class WordBuffer:\n    def __init__(self, words):\n        self._words = words\n    def __getitem__(self, index):\n        return self._wordsss[index]";
+        var req = new CodeRunRequest
+        {
+            SubmittedCode = faultySubmission,
+            Language = "python"
+        };
+
+        var result = await controller.RunExercise(99, req, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var runResponse = Assert.IsType<CodeRunResponse>(okResult.Value);
+
+        Assert.False(runResponse.Passed);
+        Assert.Equal("FAIL", runResponse.Result);
+        Assert.Contains("AttributeError", runResponse.Details);
     }
 }
 

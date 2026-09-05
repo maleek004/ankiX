@@ -592,10 +592,14 @@ public sealed class ExercisesController : ControllerBase
         // Lock execution strictly to the authored exercise runtime
         string lang = exercise.Language;
 
+        string? validationSpec = !string.IsNullOrWhiteSpace(exercise.TestCasesSpec)
+            ? exercise.TestCasesSpec
+            : (!string.IsNullOrWhiteSpace(exercise.SolutionCode) ? exercise.SolutionCode : null);
+
         CodeExecutionResult execResult = await codeExecutionService.ExecuteAsync(
             request.SubmittedCode,
             lang,
-            exercise.TestCasesSpec ?? exercise.SolutionCode,
+            validationSpec,
             cancellationToken);
 
         return Ok(new CodeRunResponse

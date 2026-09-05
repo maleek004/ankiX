@@ -33,19 +33,24 @@ async function executeCode({ language, code, validationSpec }) {
   let fullCode = code
   if (normLang === 'go') {
     const cleanUserCode = code.replace('package main', '').trim()
-    const specCode = validationSpec || ''
-    const mainFunc = specCode.includes('func main()')
-      ? specCode.replace('import "fmt"', '').trim()
-      : 'func main() {\n    fmt.Println("✓ Code Executed Successfully")\n}'
+    const cleanSpecCode = (validationSpec || '').replace('package main', '').trim()
+    const mainFunc = cleanSpecCode.includes('func main()')
+      ? cleanSpecCode.replace('import "fmt"', '').trim()
+      : (cleanSpecCode ? `func main() {\n    ${cleanSpecCode}\n}` : 'func main() {\n    fmt.Println("✓ Code Executed Successfully")\n}')
     fullCode = `package main\n\nimport (\n    "fmt"\n)\n\n${cleanUserCode}\n\n${mainFunc}`
   } else if (normLang.includes('csharp') || normLang === 'cs' || normLang === 'c#') {
+    const cleanSpec = typeof validationSpec === 'string' ? validationSpec.trim() : ''
     if (!code.includes('class ') && !code.includes('static void Main')) {
-      fullCode = `using System;\n\npublic class Program {\n    public static void Main() {\n        ${code}\n    }\n}`
+      const specSnippet = cleanSpec ? `\n        ${cleanSpec}` : ''
+      fullCode = `using System;\n\npublic class Program {\n    public static void Main() {\n        ${code}${specSnippet}\n    }\n}`
+    } else if (cleanSpec) {
+      if (!cleanSpec.includes('class ') && !cleanSpec.includes('static void Main')) {
+        fullCode = `${code}\n\npublic class AnkiXRunner {\n    public static void Main() {\n        ${cleanSpec}\n    }\n}`
+      } else {
+        fullCode += '\n\n' + cleanSpec
+      }
     }
-    if (validationSpec && !fullCode.includes(validationSpec)) {
-      fullCode += '\n\n' + validationSpec
-    }
-  } else if (validationSpec && (validationSpec.includes('assert') || validationSpec.includes('expect') || validationSpec.includes('test'))) {
+  } else if (typeof validationSpec === 'string' && validationSpec.trim()) {
     fullCode += '\n\n' + validationSpec
   }
 
