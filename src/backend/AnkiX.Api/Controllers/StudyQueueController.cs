@@ -2,6 +2,7 @@ using AnkiX.Api.Contracts.Content;
 using AnkiX.Api.Contracts.Study;
 using AnkiX.Api.Data;
 using AnkiX.Api.Models;
+using AnkiX.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,10 +16,12 @@ namespace AnkiX.Api.Controllers;
 public sealed class StudyQueueController : ControllerBase
 {
     private readonly ApplicationDbContext dbContext;
+    private readonly IReviewSchedulerService reviewSchedulerService;
 
-    public StudyQueueController(ApplicationDbContext dbContext)
+    public StudyQueueController(ApplicationDbContext dbContext, IReviewSchedulerService reviewSchedulerService)
     {
         this.dbContext = dbContext;
+        this.reviewSchedulerService = reviewSchedulerService;
     }
 
     /// <summary>
@@ -96,13 +99,18 @@ public sealed class StudyQueueController : ControllerBase
             NewCount      = newCards.Count,
             LearningCount = learningDue.Count,
             ReviewCount   = reviewDue.Count,
-            DueCards      = dueCards.Select(c => new CardResponse
+            DueCards      = dueCards.Select(c =>
             {
-                Id             = c.Id,
-                DeckId         = c.DeckId,
-                Type           = c.Type,
-                Prompt         = c.Prompt,
-                Answer         = c.Answer
+                ReviewRecord? prev = latestByCard.GetValueOrDefault(c.Id);
+                return new CardResponse
+                {
+                    Id             = c.Id,
+                    DeckId         = c.DeckId,
+                    Type           = c.Type,
+                    Prompt         = c.Prompt,
+                    Answer         = c.Answer,
+                    NextIntervals  = reviewSchedulerService.CalculateNextIntervalPreviews(prev)
+                };
             }).ToList()
         });
     }

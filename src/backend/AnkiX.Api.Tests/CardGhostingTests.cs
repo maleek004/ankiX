@@ -4,6 +4,7 @@ using AnkiX.Api.Contracts.Study;
 using AnkiX.Api.Controllers;
 using AnkiX.Api.Data;
 using AnkiX.Api.Models;
+using AnkiX.Api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -55,7 +56,7 @@ public class CardGhostingTests
 
     private static StudyQueueController CreateStudyQueueController(ApplicationDbContext db, int? userId = 1)
     {
-        var controller = new StudyQueueController(db);
+        var controller = new StudyQueueController(db, new ReviewSchedulerService());
         if (userId.HasValue)
         {
             var claims = new List<Claim>

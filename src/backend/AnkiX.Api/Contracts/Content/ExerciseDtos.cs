@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using AnkiX.Api.Contracts.Study;
 
 namespace AnkiX.Api.Contracts.Content;
 
@@ -50,6 +51,9 @@ public sealed class ExerciseDetailResponse
     public int? CreatedByUserId { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>Precomputed next-interval previews for all four rating outcomes. Null for guest sessions.</summary>
+    public NextIntervalsDto? NextIntervals { get; set; }
 }
 
 public sealed class CreateExerciseRequest

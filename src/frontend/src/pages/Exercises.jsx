@@ -1291,11 +1291,23 @@ export default function Exercises() {
                     <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', marginBottom: 10, textAlign: 'center' }}>
                       Rate your recall performance for SRS schedule:
                     </div>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                      <button className="btn-rating again" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Again')}>Again (&lt;1m)</button>
-                      <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Hard')}>Hard (&lt;1m)</button>
-                      <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Good')}>Good (&lt;10m)</button>
-                      <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Easy')}>Easy (1d+)</button>
+                    <div className="rating-buttons-group" style={{ justifyContent: 'center', gap: 10 }}>
+                      <div className="rating-col">
+                        {!isGuest && activeExercise?.nextIntervals?.again && <span className="rating-interval">{activeExercise.nextIntervals.again}</span>}
+                        <button className="btn-rating again" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Again')}>Again</button>
+                      </div>
+                      <div className="rating-col">
+                        {!isGuest && activeExercise?.nextIntervals?.hard && <span className="rating-interval">{activeExercise.nextIntervals.hard}</span>}
+                        <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Hard')}>Hard</button>
+                      </div>
+                      <div className="rating-col">
+                        {!isGuest && activeExercise?.nextIntervals?.good && <span className="rating-interval">{activeExercise.nextIntervals.good}</span>}
+                        <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Good')}>Good</button>
+                      </div>
+                      <div className="rating-col">
+                        {!isGuest && activeExercise?.nextIntervals?.easy && <span className="rating-interval">{activeExercise.nextIntervals.easy}</span>}
+                        <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={submittingReview} onClick={() => handleRateExercise('Easy')}>Easy</button>
+                      </div>
                     </div>
                   </div>
                 )}

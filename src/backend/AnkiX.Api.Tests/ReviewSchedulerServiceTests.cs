@@ -303,4 +303,123 @@ public sealed class ReviewSchedulerServiceTests
             NextReviewAt = DateTime.UtcNow,
             CreatedAt    = DateTime.UtcNow
         };
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Interval Preview Tests — CalculateNextIntervalPreviews
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void IntervalPreviews_NewCard_ShowsCorrectIntervals()
+    {
+        var previews = _sut.CalculateNextIntervalPreviews(null);
+
+        Assert.Equal("<1m", previews.Again);
+        Assert.Equal("<1m", previews.Hard);
+        Assert.Equal("<10m", previews.Good);
+        Assert.Equal("1d", previews.Easy);
+    }
+
+    [Fact]
+    public void IntervalPreviews_LearningStep0_ShowsCorrectIntervals()
+    {
+        var record = MakeLearning(step: 0, ease: 2.50m);
+        var previews = _sut.CalculateNextIntervalPreviews(record);
+
+        Assert.Equal("<1m", previews.Again);
+        Assert.Equal("<1m", previews.Hard);
+        Assert.Equal("<10m", previews.Good);
+        Assert.Equal("4d", previews.Easy);
+    }
+
+    [Fact]
+    public void IntervalPreviews_LearningStep1_GoodGraduates()
+    {
+        var record = MakeLearning(step: 1, ease: 2.50m);
+        var previews = _sut.CalculateNextIntervalPreviews(record);
+
+        Assert.Equal("<1m", previews.Again);
+        Assert.Equal("<1m", previews.Hard);
+        Assert.Equal("1d", previews.Good);  // graduates to review
+        Assert.Equal("4d", previews.Easy);
+    }
+
+    [Fact]
+    public void IntervalPreviews_ReviewPhase_ShowsSM2Intervals()
+    {
+        // Interval=10d, Ease=2.50
+        // Again → lapse to learning step 0 (<1m)
+        // Hard  → round(10 * 1.2) = 12d
+        // Good  → round(10 * 2.50) = 25d
+        // Easy  → round(10 * 2.50 * 1.3) = 33d
+        var record = MakeReview(intervalDays: 10, ease: 2.50m);
+        var previews = _sut.CalculateNextIntervalPreviews(record);
+
+        Assert.Equal("<1m", previews.Again);
+        Assert.Equal("12d", previews.Hard);
+        Assert.Equal("25d", previews.Good);
+        Assert.Equal("1.1mo", previews.Easy);  // 33 days = 1.1mo
+    }
+
+    [Fact]
+    public void IntervalPreviews_MatureReview_LapseAlwaysShowsLessThan1m()
+    {
+        var record = MakeReview(intervalDays: 180, ease: 2.50m);
+        var previews = _sut.CalculateNextIntervalPreviews(record);
+
+        // Mature card Again always lapses back to learning step 0
+        Assert.Equal("<1m", previews.Again);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // FormatIntervalPreview — Formatting thresholds
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData(1, "1d")]
+    [InlineData(4, "4d")]
+    [InlineData(12, "12d")]
+    [InlineData(29, "29d")]
+    public void FormatInterval_Days_UnderThirty(int days, string expected)
+    {
+        var schedule = new ReviewScheduleResult { Phase = "review", IntervalDays = days };
+        Assert.Equal(expected, _sut.FormatIntervalPreview(schedule));
+    }
+
+    [Theory]
+    [InlineData(30, "1mo")]
+    [InlineData(60, "2mo")]
+    [InlineData(75, "2.5mo")]
+    [InlineData(90, "3mo")]
+    [InlineData(100, "3.3mo")]
+    [InlineData(364, "12.1mo")]
+    public void FormatInterval_Months(int days, string expected)
+    {
+        var schedule = new ReviewScheduleResult { Phase = "review", IntervalDays = days };
+        Assert.Equal(expected, _sut.FormatIntervalPreview(schedule));
+    }
+
+    [Theory]
+    [InlineData(365, "1y")]
+    [InlineData(475, "1.3y")]
+    [InlineData(730, "2y")]
+    [InlineData(900, "2.5y")]
+    public void FormatInterval_Years(int days, string expected)
+    {
+        var schedule = new ReviewScheduleResult { Phase = "review", IntervalDays = days };
+        Assert.Equal(expected, _sut.FormatIntervalPreview(schedule));
+    }
+
+    [Fact]
+    public void FormatInterval_LearningStep0_ShowsLessThan1m()
+    {
+        var schedule = new ReviewScheduleResult { Phase = "learning", LearningStep = 0 };
+        Assert.Equal("<1m", _sut.FormatIntervalPreview(schedule));
+    }
+
+    [Fact]
+    public void FormatInterval_LearningStep1_ShowsLessThan10m()
+    {
+        var schedule = new ReviewScheduleResult { Phase = "learning", LearningStep = 1 };
+        Assert.Equal("<10m", _sut.FormatIntervalPreview(schedule));
+    }
 }

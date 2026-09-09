@@ -387,17 +387,16 @@ export default function Deck(){
   }
 
   // Compute display label for each rating button's next-interval hint
+  // Uses precomputed dynamic intervals from backend API (Story 7.12)
   const getIntervalLabel = (outcome) => {
-    if (!currentCard) return ''
-    // These are approximate labels. The actual interval is phase-dependent.
-    // New/Learning cards: Again=1m, Hard=1m, Good=10m, Easy=Graduate
-    // Review cards: shows SM-2 days
-    const phase = currentCard._phase  // we don't have server phase in card, show sensible defaults
+    if (!currentCard || isGuest) return ''
+    const ni = currentCard.nextIntervals
+    if (!ni) return '' // guest session or missing data — suppress badges
     switch(outcome){
-      case 'Again': return '<1m'
-      case 'Hard':  return '<1m'
-      case 'Good':  return '<10m'
-      case 'Easy':  return '1d+'
+      case 'Again': return ni.again || ''
+      case 'Hard':  return ni.hard || ''
+      case 'Good':  return ni.good || ''
+      case 'Easy':  return ni.easy || ''
       default:      return ''
     }
   }
@@ -1010,19 +1009,19 @@ export default function Deck(){
               ) : (
                 <div className="rating-buttons-group">
                   <div className="rating-col">
-                    <span className="rating-interval">&lt;1m</span>
+                    {getIntervalLabel('Again') && <span className="rating-interval">{getIntervalLabel('Again')}</span>}
                     <button className="btn-rating again" disabled={submittingRating} onClick={() => rateCard('Again')}>Again</button>
                   </div>
                   <div className="rating-col">
-                    <span className="rating-interval">&lt;1m</span>
+                    {getIntervalLabel('Hard') && <span className="rating-interval">{getIntervalLabel('Hard')}</span>}
                     <button className="btn-rating" disabled={submittingRating} onClick={() => rateCard('Hard')}>Hard</button>
                   </div>
                   <div className="rating-col">
-                    <span className="rating-interval">&lt;10m</span>
+                    {getIntervalLabel('Good') && <span className="rating-interval">{getIntervalLabel('Good')}</span>}
                     <button className="btn-rating" disabled={submittingRating} onClick={() => rateCard('Good')}>Good</button>
                   </div>
                   <div className="rating-col">
-                    <span className="rating-interval">1d+</span>
+                    {getIntervalLabel('Easy') && <span className="rating-interval">{getIntervalLabel('Easy')}</span>}
                     <button className="btn-rating" disabled={submittingRating} onClick={() => rateCard('Easy')}>Easy</button>
                   </div>
                 </div>
@@ -1101,8 +1100,11 @@ export default function Deck(){
 }
 
 function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
+  const token = localStorage.getItem('ankix_token')
+  const isGuest = !token
   const [activeIdx, setActiveIdx] = useState(initialIndex)
   const currentEx = exercises[activeIdx]
+  const [fullDetail, setFullDetail] = useState(null)
 
   const [practiceCode, setPracticeCode] = useState(currentEx?.starterCode || currentEx?.solutionCode || '')
   const [running, setRunning] = useState(false)
@@ -1114,11 +1116,13 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
 
   useEffect(() => {
     let mounted = true
+    setFullDetail(null)
     if (currentEx) {
       if (!currentEx.starterCode && !currentEx.solutionCode) {
         import('../api.js').then(m => m.getExercise(currentEx.id))
           .then(fullEx => {
             if (!mounted) return
+            setFullDetail(fullEx)
             setPracticeCode(fullEx.starterCode || fullEx.solutionCode || '')
           })
           .catch(() => {
@@ -1387,19 +1391,34 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
           )}
 
           {/* SM-2 Retention Rating Section */}
-          {runResult?.passed && (
-            <div style={{ marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', marginBottom: 10, textAlign: 'center' }}>
-                Rate your recall performance for SRS schedule:
+          {runResult?.passed && (() => {
+            const exIntervals = !isGuest ? (fullDetail?.nextIntervals || currentEx?.nextIntervals) : null
+            return (
+              <div style={{ marginTop: 8, paddingTop: 16, borderTop: '1px solid #e9ecef' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#495057', marginBottom: 10, textAlign: 'center' }}>
+                  Rate your recall performance for SRS schedule:
+                </div>
+                <div className="rating-buttons-group" style={{ justifyContent: 'center', gap: 10 }}>
+                  <div className="rating-col">
+                    {exIntervals?.again && <span className="rating-interval">{exIntervals.again}</span>}
+                    <button className="btn-rating again" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={rating} onClick={() => handleRateExercise('Again')}>Again</button>
+                  </div>
+                  <div className="rating-col">
+                    {exIntervals?.hard && <span className="rating-interval">{exIntervals.hard}</span>}
+                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={rating} onClick={() => handleRateExercise('Hard')}>Hard</button>
+                  </div>
+                  <div className="rating-col">
+                    {exIntervals?.good && <span className="rating-interval">{exIntervals.good}</span>}
+                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={rating} onClick={() => handleRateExercise('Good')}>Good</button>
+                  </div>
+                  <div className="rating-col">
+                    {exIntervals?.easy && <span className="rating-interval">{exIntervals.easy}</span>}
+                    <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={rating} onClick={() => handleRateExercise('Easy')}>Easy</button>
+                  </div>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <button className="btn-rating again" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={rating} onClick={() => handleRateExercise('Again')}>Again (&lt;1m)</button>
-                <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={rating} onClick={() => handleRateExercise('Hard')}>Hard (&lt;1m)</button>
-                <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={rating} onClick={() => handleRateExercise('Good')}>Good (&lt;10m)</button>
-                <button className="btn-rating" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={rating} onClick={() => handleRateExercise('Easy')}>Easy (1d+)</button>
-              </div>
-            </div>
-          )}
+            )
+          })()}
         </div>
       </div>
     </div>

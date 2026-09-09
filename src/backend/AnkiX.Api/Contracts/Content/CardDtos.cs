@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using AnkiX.Api.Contracts.Study;
 
 namespace AnkiX.Api.Contracts.Content;
 
@@ -15,6 +16,9 @@ public sealed class CardResponse
     public string Answer { get; set; } = string.Empty;
 
     public bool IsGhosted { get; set; }
+
+    /// <summary>Precomputed next-interval previews for all four rating outcomes. Null for guest sessions.</summary>
+    public NextIntervalsDto? NextIntervals { get; set; }
 }
 
 public sealed class GhostCardStatusResponse

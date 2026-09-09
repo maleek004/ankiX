@@ -182,6 +182,31 @@ public sealed class ExercisesController : ControllerBase
             }
         }
 
+        // Compute next-interval previews for authenticated users
+        Contracts.Study.NextIntervalsDto? nextIntervals = null;
+        if (userId > 0)
+        {
+            ReviewRecord? previousRecord = await dbContext.ExerciseReviewRecords
+                .Where(r => r.UserId == userId && r.ExerciseId == id)
+                .OrderByDescending(r => r.CreatedAt)
+                .ThenByDescending(r => r.Id)
+                .Select(r => new ReviewRecord
+                {
+                    CardId = r.ExerciseId,
+                    UserId = r.UserId,
+                    Outcome = r.Outcome,
+                    EaseFactor = r.EaseFactor,
+                    IntervalDays = r.IntervalDays,
+                    NextReviewAt = r.NextReviewAt,
+                    Phase = r.Phase,
+                    LearningStep = r.LearningStep,
+                    CreatedAt = r.CreatedAt
+                })
+                .FirstOrDefaultAsync();
+
+            nextIntervals = reviewSchedulerService.CalculateNextIntervalPreviews(previousRecord);
+        }
+
         return Ok(new ExerciseDetailResponse
         {
             Id = exercise.Id,
@@ -194,7 +219,8 @@ public sealed class ExercisesController : ControllerBase
             SolutionCode = exercise.SolutionCode,
             TestCasesSpec = exercise.TestCasesSpec,
             CreatedByUserId = exercise.CreatedByUserId,
-            CreatedAt = exercise.CreatedAt
+            CreatedAt = exercise.CreatedAt,
+            NextIntervals = nextIntervals
         });
     }
 
@@ -331,6 +357,9 @@ public sealed class ExercisesController : ControllerBase
             .Select(ce => ce.ExerciseId)
             .ToListAsync();
 
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int.TryParse(userIdClaim, out int userId);
+
         List<ExerciseDetailResponse> exercises = await dbContext.Exercises
             .Where(e => exerciseIds.Contains(e.Id))
             .OrderBy(e => e.Title)
@@ -349,6 +378,37 @@ public sealed class ExercisesController : ControllerBase
                 CreatedAt = e.CreatedAt
             })
             .ToListAsync();
+
+        if (userId > 0 && exerciseIds.Count > 0)
+        {
+            List<long> latestIds = await dbContext.ExerciseReviewRecords
+                .Where(r => r.UserId == userId && exerciseIds.Contains(r.ExerciseId))
+                .GroupBy(r => r.ExerciseId)
+                .Select(g => g.Max(r => r.Id))
+                .ToListAsync();
+
+            Dictionary<int, ReviewRecord> latestRecords = await dbContext.ExerciseReviewRecords
+                .Where(r => latestIds.Contains(r.Id))
+                .Select(r => new ReviewRecord
+                {
+                    CardId = r.ExerciseId,
+                    UserId = r.UserId,
+                    Outcome = r.Outcome,
+                    EaseFactor = r.EaseFactor,
+                    IntervalDays = r.IntervalDays,
+                    NextReviewAt = r.NextReviewAt,
+                    Phase = r.Phase,
+                    LearningStep = r.LearningStep,
+                    CreatedAt = r.CreatedAt
+                })
+                .ToDictionaryAsync(r => r.CardId);
+
+            foreach (var ex in exercises)
+            {
+                ReviewRecord? prev = latestRecords.GetValueOrDefault(ex.Id);
+                ex.NextIntervals = reviewSchedulerService.CalculateNextIntervalPreviews(prev);
+            }
+        }
 
         return Ok(exercises);
     }

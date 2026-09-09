@@ -19,7 +19,7 @@ vi.mock('../api.js', async (importOriginal) => {
       newCount: 1,
       learningCount: 0,
       reviewCount: 0,
-      dueCards: [{ id: 101, prompt: 'What is C#?', answer: 'A modern OO language', type: 'basic' }]
+      dueCards: [{ id: 101, prompt: 'What is C#?', answer: 'A modern OO language', type: 'basic', nextIntervals: { again: '<1m', hard: '<1m', good: '<10m', easy: '1d' } }]
     })),
     getCards: vi.fn(async () => [
       { id: 101, prompt: 'What is C#?', answer: 'A modern OO language', type: 'basic' }
@@ -173,6 +173,60 @@ describe('Deck Page - Card View & Editing Workflow', () => {
     expect(window.confirm).toHaveBeenCalledWith('Are you sure you want to delete this card?')
     await waitFor(() => {
       expect(api.deleteCard).toHaveBeenCalledWith('1', 101)
+    })
+  })
+
+  test('renders dynamic interval preview badges above rating buttons when authenticated and nextIntervals present', async () => {
+    localStorage.setItem('ankix_token', 'mock_jwt_token')
+    try {
+      render(
+        <MemoryRouter initialEntries={['/decks/1']}>
+          <Routes>
+            <Route path="/decks/:id" element={<Deck />} />
+          </Routes>
+        </MemoryRouter>
+      )
+
+      await waitFor(() => expect(screen.getByText(/What is C#/i)).toBeInTheDocument())
+
+      // Click Show Answer to reveal rating buttons
+      fireEvent.click(screen.getByText(/Show Answer/i))
+
+      // Dynamic interval badges should render with API-provided values
+      await waitFor(() => {
+        const intervalBadges = document.querySelectorAll('.rating-interval')
+        expect(intervalBadges.length).toBe(4)
+        const badgeTexts = Array.from(intervalBadges).map(el => el.textContent)
+        expect(badgeTexts).toContain('<1m')
+        expect(badgeTexts).toContain('<10m')
+        expect(badgeTexts).toContain('1d')
+      })
+    } finally {
+      localStorage.removeItem('ankix_token')
+    }
+  })
+
+  test('omits interval badges in guest session for clean rating buttons without misleading unpersisted intervals', async () => {
+    localStorage.removeItem('ankix_token')
+    render(
+      <MemoryRouter initialEntries={['/decks/1']}>
+        <Routes>
+          <Route path="/decks/:id" element={<Deck />} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    await waitFor(() => expect(screen.getByText(/What is C#/i)).toBeInTheDocument())
+
+    // Click Show Answer to reveal rating buttons
+    fireEvent.click(screen.getByText(/Show Answer/i))
+
+    // In guest mode, interval badges must be completely omitted
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Again$/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^Good$/i })).toBeInTheDocument()
+      const intervalBadges = document.querySelectorAll('.rating-interval')
+      expect(intervalBadges.length).toBe(0)
     })
   })
 })

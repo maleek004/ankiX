@@ -20,4 +20,8 @@
 ## Deferred from: code review of two-tier cascade deck deletion (2026-08-27)
 - [x] [Review][Defer] Refactor `CanManageContentAsync` to allow personal deck creators (`CreatedByUserId == currentUserId`) to manage/delete their own non-group decks (`ContentController.cs:457`) — deferred, pre-existing controller-wide authorization pattern.
 
+## Deferred from: code review of 7-12-dynamic-spaced-repetition-next-interval-previews.md (2026-09-09)
+- [x] [Review][Defer] Missing composite DB index on `ExerciseReviewRecords(UserId, ExerciseId)` (`ApplicationDbContext.cs`) — deferred, pre-existing database optimization.
+- [x] [Review][Defer] Domain model decoupling for ReviewSchedulerService (`IReviewSchedulerService.cs`) — deferred, pre-existing domain entity usage.
+
 

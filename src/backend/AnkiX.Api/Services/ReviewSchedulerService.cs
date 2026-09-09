@@ -1,3 +1,4 @@
+using AnkiX.Api.Contracts.Study;
 using AnkiX.Api.Models;
 
 namespace AnkiX.Api.Services;
@@ -81,6 +82,48 @@ public sealed class ReviewSchedulerService : IReviewSchedulerService
         }
     }
 
+    // ── Interval Preview Methods ─────────────────────────────────────────────
+
+    public NextIntervalsDto CalculateNextIntervalPreviews(ReviewRecord? previousRecord)
+    {
+        return new NextIntervalsDto
+        {
+            Again = FormatIntervalPreview(CalculateNextSchedule(previousRecord, "Again")),
+            Hard  = FormatIntervalPreview(CalculateNextSchedule(previousRecord, "Hard")),
+            Good  = FormatIntervalPreview(CalculateNextSchedule(previousRecord, "Good")),
+            Easy  = FormatIntervalPreview(CalculateNextSchedule(previousRecord, "Easy"))
+        };
+    }
+
+    public string FormatIntervalPreview(ReviewScheduleResult schedule)
+    {
+        if (schedule is null) return string.Empty;
+
+        if (schedule.Phase == "learning")
+        {
+            int step = Math.Clamp(schedule.LearningStep, 0, LearningStepMinutes.Length - 1);
+            int minutes = LearningStepMinutes[step];
+            return $"<{minutes}m";
+        }
+
+        // Review phase — format days into d / mo / y
+        int days = schedule.IntervalDays;
+
+        if (days < 30)
+        {
+            return $"{days}d";
+        }
+
+        if (days < 365)
+        {
+            double months = days / 30.0;
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.#}mo", months);
+        }
+
+        double years = days / 365.0;
+        return string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.#}y", years);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static ReviewScheduleResult MakeLearning(int step, decimal ease)
@@ -109,3 +152,4 @@ public sealed class ReviewSchedulerService : IReviewSchedulerService
         };
     }
 }
+
