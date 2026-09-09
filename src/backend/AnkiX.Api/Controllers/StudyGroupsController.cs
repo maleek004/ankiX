@@ -175,12 +175,13 @@ public sealed class StudyGroupsController : ControllerBase
     }
 
     [HttpGet("{slug}")]
+    [HttpGet("by-slug/{slug}")]
     public async Task<ActionResult<StudyGroupResponse>> GetStudyGroupBySlug(string slug)
     {
         var studyGroup = await dbContext.StudyGroups.AsNoTracking()
             .FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
 
-        if (studyGroup == null) return NotFound("Study group not found.");
+        if (studyGroup == null) return NotFound(new { message = "Study group not found." });
 
         int? currentUserId = GetCurrentUserId();
         bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
@@ -197,7 +198,7 @@ public sealed class StudyGroupsController : ControllerBase
         {
             if (userMembership == null)
             {
-                return NotFound("Study group not found.");
+                return NotFound(new { message = "Study group not found." });
             }
         }
 
@@ -648,6 +649,234 @@ public sealed class StudyGroupsController : ControllerBase
         }
 
         return Ok(new { message = $"Invitation sent successfully to '{targetUser.Email}'." });
+    }
+
+    [HttpGet("invites/{inviteCode}")]
+    public async Task<ActionResult<StudyGroupInviteResponse>> GetInvitePreview([FromRoute] string inviteCode)
+    {
+        if (string.IsNullOrWhiteSpace(inviteCode))
+        {
+            return NotFound(new { message = "Invalid invite code." });
+        }
+
+        var studyGroup = await dbContext.StudyGroups.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.InviteCode == inviteCode);
+
+        if (studyGroup == null)
+        {
+            return NotFound(new { message = "Invalid or expired invite link." });
+        }
+
+        if (studyGroup.IsFrozen)
+        {
+            return BadRequest(new { message = "This study group is currently frozen." });
+        }
+
+        int memberCount = await dbContext.StudyGroupMembers
+            .CountAsync(m => m.StudyGroupId == studyGroup.Id && m.Status == StudyGroupMemberStatus.Active);
+
+        int? currentUserId = GetCurrentUserId();
+        bool isAlreadyMember = false;
+        string? userMembershipStatus = null;
+        string? userRole = null;
+
+        if (currentUserId.HasValue)
+        {
+            var membership = await dbContext.StudyGroupMembers.AsNoTracking()
+                .FirstOrDefaultAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId.Value);
+
+            if (membership != null)
+            {
+                userMembershipStatus = membership.Status;
+                userRole = membership.Role;
+                isAlreadyMember = membership.Status == StudyGroupMemberStatus.Active;
+            }
+        }
+
+        return Ok(new StudyGroupInviteResponse
+        {
+            StudyGroupId = studyGroup.Id,
+            Name = studyGroup.Name,
+            Slug = studyGroup.Slug,
+            Description = studyGroup.Description,
+            AvatarUrl = studyGroup.AvatarUrl,
+            MemberCount = memberCount,
+            Role = studyGroup.InviteRole ?? StudyGroupRoles.Member,
+            IsAlreadyMember = isAlreadyMember,
+            UserMembershipStatus = userMembershipStatus,
+            UserRole = userRole
+        });
+    }
+
+    [Authorize]
+    [HttpPost("invites/{inviteCode}/accept")]
+    public async Task<IActionResult> AcceptInvite([FromRoute] string inviteCode)
+    {
+        if (string.IsNullOrWhiteSpace(inviteCode))
+        {
+            return NotFound(new { message = "Invalid invite code." });
+        }
+
+        var studyGroup = await dbContext.StudyGroups
+            .FirstOrDefaultAsync(c => c.InviteCode == inviteCode);
+
+        if (studyGroup == null)
+        {
+            return NotFound(new { message = "Invalid or expired invite link." });
+        }
+
+        if (studyGroup.IsFrozen)
+        {
+            return BadRequest(new { message = "This study group is currently frozen and cannot accept new members." });
+        }
+
+        int? currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue)
+        {
+            return Unauthorized(new { message = "Authentication required to accept invitation." });
+        }
+
+        string assignRole = studyGroup.InviteRole switch
+        {
+            StudyGroupRoles.Contributor => StudyGroupRoles.Contributor,
+            _ => StudyGroupRoles.Member
+        };
+
+        var membership = await dbContext.StudyGroupMembers
+            .FirstOrDefaultAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId.Value);
+
+        if (membership != null)
+        {
+            if (membership.Status == StudyGroupMemberStatus.Active)
+            {
+                return Ok(new { message = "You are already an active member of this study group.", slug = studyGroup.Slug, role = membership.Role });
+            }
+
+            membership.Status = StudyGroupMemberStatus.Active;
+            membership.Role = assignRole;
+            membership.JoinedAt = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync();
+            return Ok(new { message = $"Successfully joined '{studyGroup.Name}'.", slug = studyGroup.Slug, role = assignRole });
+        }
+
+        var newMember = new StudyGroupMember
+        {
+            StudyGroupId = studyGroup.Id,
+            UserId = currentUserId.Value,
+            Role = assignRole,
+            Status = StudyGroupMemberStatus.Active,
+            JoinedAt = DateTime.UtcNow
+        };
+
+        dbContext.StudyGroupMembers.Add(newMember);
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new { message = $"Successfully joined '{studyGroup.Name}'.", slug = studyGroup.Slug, role = assignRole });
+    }
+
+    [Authorize]
+    [HttpGet("{slug}/invite-link")]
+    public async Task<ActionResult<StudyGroupInviteLinkResponse>> GetInviteLink([FromRoute] string slug)
+    {
+        return await GetOrCreateInviteLink(slug, null);
+    }
+
+    [Authorize]
+    [HttpPost("{slug}/invite-link")]
+    public async Task<ActionResult<StudyGroupInviteLinkResponse>> GetOrCreateInviteLink([FromRoute] string slug, [FromBody] UpdateStudyGroupInviteRoleRequest? request = null)
+    {
+        var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
+        if (studyGroup == null) return NotFound(new { message = "Study group not found." });
+
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "This study group is frozen. Invite links cannot be generated or modified." });
+        }
+
+        int? currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue) return Unauthorized();
+
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+        var callerMembership = await dbContext.StudyGroupMembers.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId.Value && m.Status == StudyGroupMemberStatus.Active);
+
+        bool isAdminOrOwner = isSystemAdmin || callerMembership?.Role == StudyGroupRoles.Owner || callerMembership?.Role == StudyGroupRoles.Admin;
+        if (!isAdminOrOwner)
+        {
+            return Forbid();
+        }
+
+        if (request != null && !string.IsNullOrWhiteSpace(request.Role))
+        {
+            string cleanRole = request.Role.Trim();
+            if (cleanRole != StudyGroupRoles.Contributor && cleanRole != StudyGroupRoles.Member)
+            {
+                return BadRequest(new { message = "Invite role must be 'Contributor' or 'Member'." });
+            }
+            studyGroup.InviteRole = cleanRole;
+        }
+
+        if (string.IsNullOrWhiteSpace(studyGroup.InviteCode))
+        {
+            studyGroup.InviteCode = GenerateSecureInviteCode();
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new StudyGroupInviteLinkResponse
+        {
+            InviteCode = studyGroup.InviteCode,
+            InviteRole = studyGroup.InviteRole ?? StudyGroupRoles.Member,
+            InviteUrl = $"/join/{studyGroup.InviteCode}"
+        });
+    }
+
+    [Authorize]
+    [HttpPost("{slug}/invite-link/reset")]
+    public async Task<ActionResult<StudyGroupInviteLinkResponse>> ResetInviteLink([FromRoute] string slug)
+    {
+        var studyGroup = await dbContext.StudyGroups.FirstOrDefaultAsync(c => c.Slug.ToLower() == slug.ToLower());
+        if (studyGroup == null) return NotFound(new { message = "Study group not found." });
+
+        if (studyGroup.IsFrozen)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "This study group is frozen. Invite links cannot be reset." });
+        }
+
+        int? currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue) return Unauthorized();
+
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+        var callerMembership = await dbContext.StudyGroupMembers.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.StudyGroupId == studyGroup.Id && m.UserId == currentUserId.Value && m.Status == StudyGroupMemberStatus.Active);
+
+        bool isAdminOrOwner = isSystemAdmin || callerMembership?.Role == StudyGroupRoles.Owner || callerMembership?.Role == StudyGroupRoles.Admin;
+        if (!isAdminOrOwner)
+        {
+            return Forbid();
+        }
+
+        string oldCode = studyGroup.InviteCode ?? string.Empty;
+        string newCode;
+        do
+        {
+            newCode = GenerateSecureInviteCode();
+        } while (newCode == oldCode);
+
+        studyGroup.InviteCode = newCode;
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new StudyGroupInviteLinkResponse
+        {
+            InviteCode = studyGroup.InviteCode,
+            InviteRole = studyGroup.InviteRole ?? StudyGroupRoles.Member,
+            InviteUrl = $"/join/{studyGroup.InviteCode}"
+        });
+    }
+
+    private static string GenerateSecureInviteCode()
+    {
+        return Guid.NewGuid().ToString("N")[..12];
     }
 
     [Authorize]

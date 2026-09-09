@@ -20,6 +20,7 @@ export default function Decks(){
   const [isCreating, setIsCreating] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [authModalConfig, setAuthModalConfig] = useState({ isOpen: false, title: '', subtitle: '', intent: null })
+  const [shareToast, setShareToast] = useState(false)
 
   // Edit Deck Modal State
   const [editingDeck, setEditingDeck] = useState({ isOpen: false, deck: null, title: '', description: '', loading: false })
@@ -99,6 +100,26 @@ export default function Decks(){
       alert('Create deck failed: ' + (err.message || err))
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  const handleShareDeck = (deckId) => {
+    const url = `${window.location.origin}/decks/${deckId}`
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url)
+          .then(() => {
+            setShareToast(true)
+            setTimeout(() => setShareToast(false), 3000)
+          })
+          .catch(() => {
+            window.prompt('Copy deck link:', url)
+          })
+      } else {
+        window.prompt('Copy deck link:', url)
+      }
+    } catch {
+      window.prompt('Copy deck link:', url)
     }
   }
 
@@ -327,6 +348,15 @@ export default function Decks(){
                         }}
                       >
                         <Link to={`/decks/${d.id}`} className="dropdown-item">Study</Link>
+                        <button
+                          className="dropdown-item"
+                          onClick={() => {
+                            setActiveDropdown(null)
+                            handleShareDeck(d.id)
+                          }}
+                        >
+                          🔗 Share Deck
+                        </button>
                         {!isGuest && canCreate && (
                           <>
                             <button className="dropdown-item" onClick={() => { setActiveDropdown(null); openEditDeck(d); }}>
@@ -491,6 +521,27 @@ export default function Decks(){
         {...authModalConfig}
         onClose={() => setAuthModalConfig(prev => ({ ...prev, isOpen: false }))}
       />
+
+      {shareToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          background: '#1e293b',
+          color: '#fff',
+          padding: '10px 18px',
+          borderRadius: 8,
+          boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+          zIndex: 9999,
+          fontSize: '0.9rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8
+        }}>
+          <span>🔗</span>
+          <span>Deck link copied to clipboard!</span>
+        </div>
+      )}
     </div>
   )
 }

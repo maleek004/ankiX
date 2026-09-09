@@ -15,6 +15,24 @@ public sealed class DeckResponse
     public int DueCount { get; set; }
 
     public int LearnCount { get; set; }
+
+    public int? StudyGroupId { get; set; }
+
+    public string? StudyGroupSlug { get; set; }
+
+    public string? StudyGroupName { get; set; }
+
+    public string? StudyGroupPrivacy { get; set; }
+
+    public string? StudyGroupAvatarUrl { get; set; }
+
+    public string? StudyGroupDescription { get; set; }
+
+    public bool IsMember { get; set; } = true;
+
+    public bool IsPrivateDeck { get; set; } = false;
+
+    public bool CanAccess { get; set; } = true;
 }
 
 public sealed class CreateDeckRequest

@@ -24,4 +24,5 @@
 - [x] [Review][Defer] Missing composite DB index on `ExerciseReviewRecords(UserId, ExerciseId)` (`ApplicationDbContext.cs`) — deferred, pre-existing database optimization.
 - [x] [Review][Defer] Domain model decoupling for ReviewSchedulerService (`IReviewSchedulerService.cs`) — deferred, pre-existing domain entity usage.
 
-
+## Deferred from: code review of 7-13-deep-linking-deck-sharing-and-shareable-invite-links.md (2026-09-09)
+- [x] [Review][Defer] StudyGroupPrivacy.Locked and Shareable Invite Links Policy (`StudyGroupsController.cs:788,834`) — deferred, reason: Want to test current implementation with users to see if it's better to disallow shareable links for locked groups or not.

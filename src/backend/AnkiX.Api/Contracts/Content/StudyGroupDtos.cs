@@ -151,3 +151,31 @@ public sealed class TransferOwnershipRequest
     public int NewOwnerUserId { get; set; }
 }
 
+public sealed class StudyGroupInviteResponse
+{
+    public int StudyGroupId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string? AvatarUrl { get; set; }
+    public int MemberCount { get; set; }
+    public string Role { get; set; } = StudyGroupRoles.Member;
+    public bool IsAlreadyMember { get; set; }
+    public string? UserMembershipStatus { get; set; }
+    public string? UserRole { get; set; }
+}
+
+public sealed class StudyGroupInviteLinkResponse
+{
+    public string InviteCode { get; set; } = string.Empty;
+    public string InviteRole { get; set; } = StudyGroupRoles.Member;
+    public string InviteUrl { get; set; } = string.Empty;
+}
+
+public sealed class UpdateStudyGroupInviteRoleRequest
+{
+    [Required]
+    public string Role { get; set; } = StudyGroupRoles.Member;
+}
+
+

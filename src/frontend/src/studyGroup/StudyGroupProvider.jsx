@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react'
 
 const StudyGroupContext = createContext(null)
 
@@ -10,7 +10,7 @@ export function StudyGroupProvider({ children }) {
     } catch { return null }
   })
 
-  const setActiveStudyGroup = (studyGroup) => {
+  const setActiveStudyGroup = useCallback((studyGroup) => {
     setActiveStudyGroupState(studyGroup)
     if (studyGroup) {
       localStorage.setItem('ankix_study_group', JSON.stringify(studyGroup))
@@ -18,16 +18,44 @@ export function StudyGroupProvider({ children }) {
       localStorage.removeItem('ankix_study_group')
       localStorage.removeItem('ankix_community')
     }
-  }
+  }, [])
 
-  const clearStudyGroup = () => {
+  const syncActiveStudyGroup = useCallback((studyGroup) => {
+    if (!studyGroup) return
+    setActiveStudyGroupState(prev => {
+      if (prev && (prev.id === studyGroup.id || (prev.slug && prev.slug === studyGroup.slug))) {
+        let changed = false
+        for (const [key, val] of Object.entries(studyGroup)) {
+          if (prev[key] !== val) {
+            changed = true
+            break
+          }
+        }
+        if (!changed) return prev
+        const merged = { ...prev, ...studyGroup }
+        localStorage.setItem('ankix_study_group', JSON.stringify(merged))
+        return merged
+      }
+      localStorage.setItem('ankix_study_group', JSON.stringify(studyGroup))
+      return studyGroup
+    })
+  }, [])
+
+  const clearStudyGroup = useCallback(() => {
     setActiveStudyGroupState(null)
     localStorage.removeItem('ankix_study_group')
     localStorage.removeItem('ankix_community')
-  }
+  }, [])
+
+  const contextValue = useMemo(() => ({
+    activeStudyGroup,
+    setActiveStudyGroup,
+    clearStudyGroup,
+    syncActiveStudyGroup
+  }), [activeStudyGroup, setActiveStudyGroup, clearStudyGroup, syncActiveStudyGroup])
 
   return (
-    <StudyGroupContext.Provider value={{ activeStudyGroup, setActiveStudyGroup, clearStudyGroup }}>
+    <StudyGroupContext.Provider value={contextValue}>
       {children}
     </StudyGroupContext.Provider>
   )

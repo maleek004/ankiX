@@ -15,10 +15,18 @@ import { getTagBadge, langBadgeFor, normalizeTag, POPULAR_TOPIC_TAGS } from '../
 import * as api from '../api'
 
 export default function Deck(){
-  const { activeStudyGroup } = useStudyGroup() || {}
+  const { activeStudyGroup, syncActiveStudyGroup } = useStudyGroup() || {}
   const { id } = useParams()
   const [copyModalCard, setCopyModalCard] = useState(null)
   const [authModalConfig, setAuthModalConfig] = useState({ isOpen: false, title: '', subtitle: '', intent: null })
+
+  // Share & Access Gate State
+  const [shareCopied, setShareCopied] = useState(false)
+  const [shareToast, setShareToast] = useState(false)
+  const [gateInviteCode, setGateInviteCode] = useState('')
+  const [gateSubmitting, setGateSubmitting] = useState(false)
+  const [gateRequestSent, setGateRequestSent] = useState(false)
+  const [gateError, setGateError] = useState('')
 
   // Opportunistic pre-warming when opening a deck
   useEffect(() => {
@@ -137,6 +145,13 @@ export default function Deck(){
         !isGuest ? api.getGhostedCards(id).catch(() => []) : Promise.resolve([])
       ])
       setDeck(d)
+      if (d?.studyGroupId && syncActiveStudyGroup) {
+        syncActiveStudyGroup({
+          id: d.studyGroupId,
+          slug: d.studyGroupSlug,
+          name: d.studyGroupName
+        })
+      }
       setQueue(q)
       setAllCards(cs || [])
       setGhostedCards(gcs || [])
@@ -149,7 +164,9 @@ export default function Deck(){
     } finally {
       setLoading(false)
     }
-  }, [id, isGuest])
+  }, [id, isGuest, syncActiveStudyGroup])
+
+  const isAccessGated = Boolean(deck && (deck.canAccess === false || (deck.isPrivateDeck && !deck.isMember)))
 
   useEffect(() => {
     setCanCreate(api.canCreateContent(activeStudyGroup?.role))
@@ -410,6 +427,66 @@ export default function Deck(){
   // Import Modal state
   const [showImportModal, setShowImportModal] = useState(false)
 
+  const handleShareDeck = () => {
+    const url = `${window.location.origin}/decks/${id}`
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url)
+          .then(() => {
+            setShareCopied(true)
+            setShareToast(true)
+            setTimeout(() => setShareCopied(false), 2500)
+            setTimeout(() => setShareToast(false), 3000)
+          })
+          .catch(() => {
+            window.prompt('Copy deck link:', url)
+          })
+      } else {
+        window.prompt('Copy deck link:', url)
+      }
+    } catch {
+      window.prompt('Copy deck link:', url)
+    }
+  }
+
+  const handleGateJoinWithCode = async (e) => {
+    e.preventDefault()
+    if (!gateInviteCode.trim()) return
+    setGateSubmitting(true)
+    setGateError('')
+    try {
+      let code = gateInviteCode.trim()
+      if (code.includes('/join/')) {
+        code = code.split('/join/')[1].split('/')[0].split('?')[0].split('#')[0].trim()
+      }
+      const joinRes = await api.acceptStudyGroupInvite(code)
+      if (deck?.studyGroupSlug && joinRes?.slug && joinRes.slug.toLowerCase() !== deck.studyGroupSlug.toLowerCase()) {
+        alert(`Note: You successfully joined "${joinRes.slug}", but this deck belongs to "${deck.studyGroupName || deck.studyGroupSlug}". Access to this deck remains restricted.`)
+      } else {
+        alert('Welcome! You have successfully joined the study group.')
+      }
+      await loadQueue()
+    } catch (err) {
+      setGateError(err.message || 'Failed to join group with this invite code')
+    } finally {
+      setGateSubmitting(false)
+    }
+  }
+
+  const handleGateRequestAccess = async () => {
+    if (!deck?.studyGroupSlug) return
+    setGateSubmitting(true)
+    setGateError('')
+    try {
+      await api.requestStudyGroupAccess(deck.studyGroupSlug)
+      setGateRequestSent(true)
+    } catch (err) {
+      setGateError(err.message || 'Failed to submit join request')
+    } finally {
+      setGateSubmitting(false)
+    }
+  }
+
   const handleResetProgress = async () => {
     if(!confirm('Are you sure you want to reset your study progress for this deck? All cards will be returned to your New Queue.')) return
     setIsResetting(true)
@@ -426,7 +503,14 @@ export default function Deck(){
       {/* Top Toolbar (Deck Scope Only) */}
       <div className="study-top-bar">
         <div className="study-toolbar-left">
-          {canCreate && (
+          <button
+            className="btn-study-tool"
+            onClick={handleShareDeck}
+            title="Copy shareable direct deck link"
+          >
+            {shareCopied ? '✓ Copied!' : '🔗 Share Deck'}
+          </button>
+          {!isAccessGated && canCreate && (
             <button
               className="btn-study-tool"
               onClick={() => setIsAddDrawerOpen(prev => !prev)}
@@ -434,7 +518,7 @@ export default function Deck(){
               {isAddDrawerOpen ? 'Close Add' : '+ Add Card'}
             </button>
           )}
-          {!isGuest && (
+          {!isAccessGated && !isGuest && (
             <button
               className="btn-study-tool"
               style={{
@@ -453,14 +537,16 @@ export default function Deck(){
             </button>
           )}
         </div>
-        <div className="study-counts-right">
-          {/* Blue = new, Red = learning, Green = review — live from backend */}
-          <span className="count-blue">{newCount}</span>
-          {' + '}
-          <span className="count-red">{learningCount}</span>
-          {' + '}
-          <span className="count-green">{reviewCount}</span>
-        </div>
+        {!isAccessGated && (
+          <div className="study-counts-right">
+            {/* Blue = new, Red = learning, Green = review — live from backend */}
+            <span className="count-blue">{newCount}</span>
+            {' + '}
+            <span className="count-red">{learningCount}</span>
+            {' + '}
+            <span className="count-green">{reviewCount}</span>
+          </div>
+        )}
       </div>
 
       {/* Add Card Drawer — bottom sheet on mobile */}
@@ -646,6 +732,124 @@ export default function Deck(){
       {loading ? (
         <div className="empty-state">
           <h3>Fetching deck cards...</h3>
+        </div>
+      ) : !deck ? (
+        <div className="empty-state">
+          <h3>Deck not found</h3>
+          <p>This deck may have been deleted or does not exist.</p>
+          <Link to="/decks" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block', marginTop: 12 }}>
+            Return to Decks
+          </Link>
+        </div>
+      ) : isAccessGated ? (
+        <div className="empty-state" style={{ maxWidth: 620, margin: '2rem auto', padding: '2.5rem 2rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>
+            {deck.studyGroupAvatarUrl ? (
+              <img src={deck.studyGroupAvatarUrl} alt={deck.studyGroupName} style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover' }} />
+            ) : '🔒'}
+          </div>
+
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 999, background: '#fef3c7', color: '#92400e', fontSize: '0.85rem', fontWeight: 600, marginBottom: '1rem' }}>
+            <span>🔒</span>
+            <span>{deck.studyGroupPrivacy || 'Private'} Study Group</span>
+          </div>
+
+          <h2 style={{ margin: '0 0 0.5rem 0', color: '#1e293b', fontSize: '1.5rem' }}>
+            {deck.title || deck.name || 'Flashcard Deck'}
+          </h2>
+
+          <p style={{ color: '#64748b', fontSize: '1rem', lineHeight: 1.5, margin: '0 0 1.5rem 0' }}>
+            This deck belongs to <strong>{deck.studyGroupName || 'a private community'}</strong>.
+            You must be a member of this study group to access and study its flashcards.
+          </p>
+
+          {deck.studyGroupDescription && (
+            <p style={{ fontStyle: 'italic', color: '#64748b', background: '#f8fafc', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              "{deck.studyGroupDescription}"
+            </p>
+          )}
+
+          {gateError && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '0.75rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '1rem' }}>
+              {gateError}
+            </div>
+          )}
+
+          {isGuest ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center' }}>
+              <button
+                className="btn-primary"
+                style={{ padding: '0.75rem 1.75rem', fontSize: '1rem', width: '100%', maxWidth: 360 }}
+                onClick={() => setAuthModalConfig({
+                  isOpen: true,
+                  title: `Join ${deck.studyGroupName || 'Study Group'}`,
+                  subtitle: 'Sign in or register to join this community and study this deck.',
+                  intent: { returnUrl: `/decks/${id}`, action: 'join_group' }
+                })}
+              >
+                Sign in to Request Access / Join
+              </button>
+              <Link to="/decks" className="btn-study-tool" style={{ textDecoration: 'none' }}>
+                Browse Public Decks
+              </Link>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%', maxWidth: 440, margin: '0 auto' }}>
+              {gateRequestSent ? (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '1rem', borderRadius: 8, fontSize: '0.95rem' }}>
+                  ✅ <strong>Join request submitted!</strong> A group administrator will review your request.
+                </div>
+              ) : (
+                deck.studyGroupPrivacy !== 'Locked' && (
+                  <button
+                    className="btn-primary"
+                    style={{ padding: '0.75rem 1.5rem', fontSize: '0.95rem', width: '100%' }}
+                    disabled={gateSubmitting}
+                    onClick={handleGateRequestAccess}
+                  >
+                    {gateSubmitting ? 'Submitting Request...' : '✋ Request to Join Group'}
+                  </button>
+                )
+              )}
+
+              {/* Enter Invite Code Form */}
+              <form onSubmit={handleGateJoinWithCode} style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#475569', textAlign: 'left' }}>
+                  Have an Invite Code or Link?
+                </label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. inv_ab12cd34 or join URL"
+                    value={gateInviteCode}
+                    onChange={(e) => setGateInviteCode(e.target.value)}
+                    style={{ fontSize: '0.9rem' }}
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    style={{ whiteSpace: 'nowrap', padding: '0.5rem 1rem' }}
+                    disabled={gateSubmitting || !gateInviteCode.trim()}
+                  >
+                    {gateSubmitting ? 'Joining...' : 'Join with Code'}
+                  </button>
+                </div>
+              </form>
+
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+                <Link to="/decks" className="btn-study-tool" style={{ textDecoration: 'none' }}>
+                  Return to Decks
+                </Link>
+                {deck.studyGroupSlug && (
+                  <Link to={`/study-groups/${deck.studyGroupSlug}`} className="btn-study-tool" style={{ textDecoration: 'none' }}>
+                    View Community
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       ) : allCards.length === 0 ? (
         <div className="empty-state">
@@ -1090,6 +1294,28 @@ export default function Deck(){
           loadQueue()
         }}
       />
+
+      {/* 1-Click Share Deck Toast Notification */}
+      {shareToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          background: '#1e293b',
+          color: '#fff',
+          padding: '10px 18px',
+          borderRadius: 8,
+          boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+          zIndex: 9999,
+          fontSize: '0.9rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8
+        }}>
+          <span>🔗</span>
+          <span>Deck link copied to clipboard!</span>
+        </div>
+      )}
 
       <AuthModal
         {...authModalConfig}

@@ -23,6 +23,7 @@ import AdminDashboard from './pages/AdminDashboard'
 import Search from './pages/Search'
 import StudyGroups from './pages/StudyGroups'
 import Profile from './pages/Profile'
+import JoinGroup from './pages/JoinGroup'
 
 export default function App(){
   return (
@@ -43,6 +44,9 @@ export default function App(){
                 <Route path="/verify-email" element={<VerifyEmail/>} />
                 <Route path="/oauth/callback" element={<OAuthCallback/>} />
                 <Route path="/study-groups" element={<StudyGroups/>} />
+                <Route path="/study-groups/:slug" element={<StudyGroups/>} />
+                <Route path="/communities/:slug" element={<StudyGroups/>} />
+                <Route path="/join/:inviteCode" element={<JoinGroup/>} />
 
                 <Route path="/communities" element={<Navigate to="/study-groups" replace />} />
                 <Route path="/search" element={<Search/>} />

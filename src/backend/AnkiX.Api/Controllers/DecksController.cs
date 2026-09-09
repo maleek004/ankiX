@@ -178,6 +178,71 @@ public sealed class DecksController : ControllerBase
         return Ok(decks);
     }
 
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<DeckResponse>> GetDeckById([FromRoute] int id)
+    {
+        var deck = await dbContext.Decks.AsNoTracking().FirstOrDefaultAsync(d => d.Id == id);
+        if (deck == null)
+        {
+            return NotFound(new { message = "Deck not found." });
+        }
+
+        string? userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int.TryParse(userIdClaim, out int userId);
+        bool isSystemAdmin = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.SuperAdmin);
+
+        StudyGroup? parentGroup = null;
+        bool isMember = false;
+        bool isPrivateDeck = false;
+
+        if (deck.StudyGroupId.HasValue && deck.StudyGroupId.Value > 0)
+        {
+            parentGroup = await dbContext.StudyGroups.AsNoTracking()
+                .FirstOrDefaultAsync(g => g.Id == deck.StudyGroupId.Value);
+
+            if (parentGroup != null)
+            {
+                isPrivateDeck = parentGroup.Privacy != StudyGroupPrivacy.Public;
+                if (userId > 0)
+                {
+                    isMember = await dbContext.StudyGroupMembers.AnyAsync(m =>
+                        m.StudyGroupId == parentGroup.Id &&
+                        m.UserId == userId &&
+                        m.Status == StudyGroupMemberStatus.Active);
+                }
+            }
+        }
+
+        bool canAccess = !isPrivateDeck || isMember || isSystemAdmin;
+
+        int learnCount = 0;
+        if (canAccess)
+        {
+            learnCount = await dbContext.Cards.CountAsync(c => c.DeckId == id);
+        }
+
+        var response = new DeckResponse
+        {
+            Id = deck.Id,
+            Title = deck.Title,
+            Description = deck.Description,
+            CreatedByUserId = deck.CreatedByUserId,
+            DueCount = 0,
+            LearnCount = learnCount,
+            StudyGroupId = deck.StudyGroupId,
+            StudyGroupSlug = parentGroup?.Slug,
+            StudyGroupName = parentGroup?.Name,
+            StudyGroupPrivacy = parentGroup?.Privacy ?? StudyGroupPrivacy.Public,
+            StudyGroupAvatarUrl = parentGroup?.AvatarUrl,
+            StudyGroupDescription = parentGroup?.Description,
+            IsMember = isMember || !isPrivateDeck,
+            IsPrivateDeck = isPrivateDeck,
+            CanAccess = canAccess
+        };
+
+        return Ok(response);
+    }
+
     [HttpGet("{deckId:int}/preview")]
     public async Task<ActionResult<object>> GetDeckPreview([FromRoute] int deckId)
     {

@@ -50,6 +50,9 @@ public sealed class ApplicationDbContext : DbContext
             .HasIndex(sg => sg.Slug)
             .IsUnique();
 
+        modelBuilder.Entity<StudyGroup>()
+            .HasIndex(sg => sg.InviteCode);
+
         modelBuilder.Entity<StudyGroupMember>()
             .HasKey(sgm => new { sgm.StudyGroupId, sgm.UserId });
 

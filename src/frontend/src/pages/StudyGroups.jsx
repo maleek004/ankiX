@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import AuthModal from '../components/AuthModal'
 import {
   getStudyGroups,
+  getStudyGroupBySlug,
   createStudyGroup,
   joinStudyGroup,
   requestStudyGroupAccess,
@@ -24,20 +25,32 @@ import {
   freezeStudyGroup,
   unfreezeStudyGroup,
   deleteStudyGroup,
+  getStudyGroupInviteLink,
+  createOrUpdateStudyGroupInviteLink,
+  resetStudyGroupInviteLink,
   getEffectiveDisplayName
 } from '../api'
 
 export default function StudyGroups() {
+  const { slug } = useParams() || {}
   const auth = useAuth()
   const { activeStudyGroup, setActiveStudyGroup } = useStudyGroup() || {}
   const navigate = useNavigate()
   const [studyGroups, setStudyGroups] = useState([])
   const [invitations, setInvitations] = useState([])
   const [loading, setLoading] = useState(true)
+  const [slugNotFound, setSlugNotFound] = useState(false)
+  const [slugGroup, setSlugGroup] = useState(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [authModalConfig, setAuthModalConfig] = useState({ isOpen: false, title: '', subtitle: '', intent: null })
   const [createForm, setCreateForm] = useState({ name: '', slug: '', description: '', privacy: 'Public' })
   const [actionLoading, setActionLoading] = useState(false)
+
+  // Shareable Invite Link State
+  const [shareableInviteLink, setShareableInviteLink] = useState(null)
+  const [shareableInviteLoading, setShareableInviteLoading] = useState(false)
+  const [inviteLinkCopied, setInviteLinkCopied] = useState(false)
+  const [resettingInviteLink, setResettingInviteLink] = useState(false)
 
   // Manage Members & Settings Modal State
   const [managingMembersStudyGroup, setManagingMembersStudyGroup] = useState(null)
@@ -70,18 +83,44 @@ export default function StudyGroups() {
 
   useEffect(() => {
     loadData()
-  }, [token])
+  }, [token, slug])
 
   async function loadData() {
     setLoading(true)
+    setSlugNotFound(false)
+    setSlugGroup(null)
     try {
-      const promises = [getStudyGroups()]
-      if (token) {
-        promises.push(getMyStudyGroupInvitations().catch(() => []))
-      }
-      const [groupsData, invitesData] = await Promise.all(promises)
+      const groupPromise = getStudyGroups()
+      const invitesPromise = token ? getMyStudyGroupInvitations().catch(() => []) : Promise.resolve([])
+      const directGroupPromise = slug ? getStudyGroupBySlug(slug).catch((err) => {
+        console.warn(`Study group with slug '${slug}' not found:`, err)
+        return null
+      }) : Promise.resolve(null)
+
+      const [groupsData, invitesData, directGroup] = await Promise.all([
+        groupPromise,
+        invitesPromise,
+        directGroupPromise
+      ])
       setStudyGroups(groupsData || [])
       setInvitations(invitesData || [])
+
+      if (slug) {
+        if (directGroup) {
+          setSlugGroup(directGroup)
+          if (setActiveStudyGroup) {
+            setActiveStudyGroup({
+              id: directGroup.id,
+              slug: directGroup.slug,
+              name: directGroup.name,
+              role: directGroup.userRole,
+              isFrozen: Boolean(directGroup.isFrozen)
+            })
+          }
+        } else {
+          setSlugNotFound(true)
+        }
+      }
     } catch (err) {
       console.error('Failed to load study groups data:', err)
     } finally {
@@ -188,11 +227,14 @@ export default function StudyGroups() {
   async function openManageMembers(e, group) {
     e.stopPropagation()
     setManagingMembersStudyGroup(group)
+    setShareableInviteLink(null)
+    setInviteLinkCopied(false)
     setEditName(group.name || '')
     setEditDescription(group.description || '')
     setSelectedPrivacy(group.privacy || (group.isPublic ? 'Public' : 'Private'))
     setActiveTab(group.pendingRequestCount > 0 ? 'requests' : 'members')
     loadGroupMembersAndRequests(group.slug)
+    loadShareableInviteLink(group.slug)
   }
 
   async function handleSaveDetails(e) {
@@ -297,6 +339,67 @@ export default function StudyGroups() {
       alert(err.message || 'Failed to reject request')
     } finally {
       setProcessingRequestId(null)
+    }
+  }
+
+  async function loadShareableInviteLink(slug) {
+    setShareableInviteLoading(true)
+    try {
+      const data = await getStudyGroupInviteLink(slug)
+      setShareableInviteLink(data)
+    } catch (err) {
+      console.error('Failed to load shareable invite link:', err)
+    } finally {
+      setShareableInviteLoading(false)
+    }
+  }
+
+  async function handleUpdateInviteRole(newRole) {
+    if (!managingMembersStudyGroup) return
+    setShareableInviteLoading(true)
+    try {
+      const data = await createOrUpdateStudyGroupInviteLink(managingMembersStudyGroup.slug, newRole)
+      setShareableInviteLink(data)
+    } catch (err) {
+      alert(err.message || 'Failed to update invite role')
+    } finally {
+      setShareableInviteLoading(false)
+    }
+  }
+
+  async function handleResetInviteLink() {
+    if (!managingMembersStudyGroup) return
+    if (!window.confirm('Are you sure you want to reset this invite link? The previous link will immediately stop working.')) return
+    setResettingInviteLink(true)
+    try {
+      const data = await resetStudyGroupInviteLink(managingMembersStudyGroup.slug)
+      setShareableInviteLink(data)
+      setInviteLinkCopied(false)
+      alert('Invite link reset successfully! A new unique URL has been generated.')
+    } catch (err) {
+      alert(err.message || 'Failed to reset invite link')
+    } finally {
+      setResettingInviteLink(false)
+    }
+  }
+
+  function handleCopyInviteLink(url) {
+    if (!url) return
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url)
+          .then(() => {
+            setInviteLinkCopied(true)
+            setTimeout(() => setInviteLinkCopied(false), 2500)
+          })
+          .catch(() => {
+            window.prompt('Copy invite link:', url)
+          })
+      } else {
+        window.prompt('Copy invite link:', url)
+      }
+    } catch {
+      window.prompt('Copy invite link:', url)
     }
   }
 
@@ -441,6 +544,69 @@ export default function StudyGroups() {
           ➕ Create Study Group
         </button>
       </div>
+
+      {/* 404 Not Found Banner for direct slug */}
+      {slugNotFound && (
+        <div style={{
+          background: '#fef2f2',
+          border: '1px solid #fecaca',
+          borderRadius: 12,
+          padding: '1.25rem',
+          marginBottom: '2rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '1rem'
+        }}>
+          <div>
+            <h3 style={{ margin: '0 0 0.25rem 0', color: '#991b1b', fontSize: '1.1rem' }}>
+              🔍 Study Group Not Found
+            </h3>
+            <p style={{ margin: 0, color: '#b91c1c', fontSize: '0.9rem' }}>
+              The study group <code>{slug}</code> could not be found or you may not have permission to view it.
+            </p>
+          </div>
+          <Link
+            to="/study-groups"
+            className="btn btn-secondary"
+            style={{ textDecoration: 'none' }}
+          >
+            Browse All Groups
+          </Link>
+        </div>
+      )}
+
+      {/* Direct Group Context Banner */}
+      {slug && slugGroup && (
+        <div style={{
+          background: '#f0fdf4',
+          border: '1px solid #bbf7d0',
+          borderRadius: 12,
+          padding: '1rem 1.25rem',
+          marginBottom: '2rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '1rem'
+        }}>
+          <div>
+            <div style={{ fontWeight: 600, color: '#166534', fontSize: '1rem' }}>
+              🎯 Viewing Direct Study Group: {slugGroup.name}
+            </div>
+            <p style={{ margin: '0.25rem 0 0 0', color: '#15803d', fontSize: '0.85rem' }}>
+              {slugGroup.description || 'Active study group synced to your session.'}
+            </p>
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={() => enterStudyGroup(slugGroup)}
+          >
+            Open Group Decks →
+          </button>
+        </div>
+      )}
 
       {/* Pending Invitations Banner */}
       {invitations.length > 0 && (
@@ -1120,41 +1286,146 @@ export default function StudyGroups() {
               )
             )}
 
-            {/* TAB 3: SEND INVITE */}
+            {/* TAB 3: SEND INVITE & SHAREABLE INVITE LINK */}
             {activeTab === 'invite' && !managingMembersStudyGroup.isFrozen && (
-              <form onSubmit={handleSendInvite} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b' }}>
-                  Invite a registered user to join <strong>{managingMembersStudyGroup.name}</strong>.
-                </p>
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 4, fontSize: '0.85rem' }}>User Email *</label>
-                  <input
-                    type="email"
-                    className="form-control"
-                    placeholder="learner@example.com"
-                    value={inviteEmail}
-                    onChange={e => setInviteEmail(e.target.value)}
-                    required
-                  />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* 1-Click Shareable Invite Link Section */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 10,
+                  padding: '1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem'
+                }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 0.25rem 0', color: '#1e293b', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      🔗 Shareable Invite Link
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+                      Anyone with this link can join <strong>{managingMembersStudyGroup.name}</strong> immediately without requiring admin approval.
+                    </p>
+                  </div>
+
+                  {shareableInviteLoading && !shareableInviteLink ? (
+                    <div style={{ color: '#64748b', fontSize: '0.9rem' }}>Loading invite link...</div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          readOnly
+                          className="form-control"
+                          aria-label="Shareable invite link"
+                          style={{
+                            backgroundColor: '#fff',
+                            color: '#1e293b',
+                            fontSize: '0.85rem',
+                            fontFamily: 'monospace'
+                          }}
+                          value={shareableInviteLink?.fullInviteUrl || (shareableInviteLink?.inviteCode ? `${window.location.origin}/join/${shareableInviteLink.inviteCode}` : '')}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{ whiteSpace: 'nowrap', minWidth: '110px' }}
+                          disabled={!shareableInviteLink?.inviteCode && !shareableInviteLink?.fullInviteUrl}
+                          onClick={() => {
+                            const url = shareableInviteLink?.fullInviteUrl || (shareableInviteLink?.inviteCode ? `${window.location.origin}/join/${shareableInviteLink.inviteCode}` : '')
+                            if (url) handleCopyInviteLink(url)
+                          }}
+                        >
+                          {inviteLinkCopied ? '✓ Copied!' : '📋 Copy Link'}
+                        </button>
+                      </div>
+
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '0.75rem',
+                        paddingTop: '0.75rem',
+                        borderTop: '1px dashed #cbd5e1'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', margin: 0 }}>
+                            Default Joined Role:
+                          </label>
+                          <select
+                            className="form-control"
+                            aria-label="Default Joined Role"
+                            style={{ width: 'auto', padding: '0.25rem 0.6rem', fontSize: '0.85rem' }}
+                            value={shareableInviteLink?.inviteRole || 'Member'}
+                            onChange={(e) => handleUpdateInviteRole(e.target.value)}
+                            disabled={shareableInviteLoading}
+                          >
+                            <option value="Member">Member (Read & Study)</option>
+                            <option value="Contributor">Contributor (Create & Edit)</option>
+                          </select>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{
+                            fontSize: '0.8rem',
+                            padding: '0.35rem 0.75rem',
+                            color: '#dc2626',
+                            borderColor: '#fca5a5',
+                            background: '#fff'
+                          }}
+                          disabled={resettingInviteLink}
+                          onClick={handleResetInviteLink}
+                        >
+                          {resettingInviteLink ? 'Resetting...' : '🔄 Revoke / Reset Link'}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 4, fontSize: '0.85rem' }}>Assign Initial Role</label>
-                  <select
-                    className="form-control"
-                    value={inviteRole}
-                    onChange={e => setInviteRole(e.target.value)}
-                  >
-                    <option value="Member">Member</option>
-                    <option value="Contributor">Contributor</option>
-                    {(managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin' || auth?.user?.role === 'SuperAdmin') && <option value="Admin">Admin</option>}
-                  </select>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                  <button type="submit" className="btn btn-primary" disabled={inviteLoading || !inviteEmail.trim()}>
-                    {inviteLoading ? 'Sending Invitation...' : 'Send Invitation'}
-                  </button>
-                </div>
-              </form>
+
+                {/* Direct Email Invite Form */}
+                <form onSubmit={handleSendInvite} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 0.25rem 0', color: '#1e293b', fontSize: '1rem' }}>
+                      ✉️ Direct Email Invite
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+                      Dispatch an invitation directly to a user's registered email address.
+                    </p>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: 4, fontSize: '0.85rem' }}>User Email *</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      placeholder="learner@example.com"
+                      value={inviteEmail}
+                      onChange={e => setInviteEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: 4, fontSize: '0.85rem' }}>Assign Initial Role</label>
+                    <select
+                      className="form-control"
+                      value={inviteRole}
+                      onChange={e => setInviteRole(e.target.value)}
+                    >
+                      <option value="Member">Member</option>
+                      <option value="Contributor">Contributor</option>
+                      {(managingMembersStudyGroup.userRole === 'Owner' || auth?.user?.role === 'Admin' || auth?.user?.role === 'SuperAdmin') && <option value="Admin">Admin</option>}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                    <button type="submit" className="btn btn-primary" disabled={inviteLoading || !inviteEmail.trim()}>
+                      {inviteLoading ? 'Sending Invitation...' : 'Send Invitation'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             )}
 
             {/* TAB 4: PRIVACY SETTINGS */}

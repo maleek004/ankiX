@@ -31,6 +31,12 @@ public sealed class StudyGroup
 
     public int CreatedByUserId { get; set; }
 
+    [MaxLength(32)]
+    public string? InviteCode { get; set; }
+
+    [MaxLength(20)]
+    public string InviteRole { get; set; } = StudyGroupRoles.Member;
+
     public bool IsFrozen { get; set; } = false;
 
     public DateTime? FrozenAt { get; set; }

@@ -1422,4 +1422,70 @@ export async function deleteStudyGroup(slug){
   return res.json()
 }
 
+export async function getStudyGroupInvitePreview(inviteCode){
+  const res = await safeFetch(`${API_BASE}/study-groups/invites/${inviteCode}`, { headers: optionalAuthHeaders() })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Invalid or expired invite link')
+    const err = new Error(msg)
+    err.status = res.status
+    throw err
+  }
+  return res.json()
+}
+
+export async function acceptStudyGroupInvite(inviteCode){
+  const res = await safeFetch(`${API_BASE}/study-groups/invites/${inviteCode}/accept`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to accept invitation')
+    const err = new Error(msg)
+    err.status = res.status
+    throw err
+  }
+  return res.json()
+}
+
+export async function getStudyGroupInviteLink(slug){
+  const res = await safeFetch(`${API_BASE}/study-groups/${slug}/invite-link`, { headers: authHeaders() })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to get invite link')
+    const err = new Error(msg)
+    err.status = res.status
+    throw err
+  }
+  return res.json()
+}
+
+export async function createOrUpdateStudyGroupInviteLink(slug, role = 'Member'){
+  const res = await safeFetch(`${API_BASE}/study-groups/${slug}/invite-link`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ role })
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to generate invite link')
+    const err = new Error(msg)
+    err.status = res.status
+    throw err
+  }
+  return res.json()
+}
+
+export async function resetStudyGroupInviteLink(slug){
+  const res = await safeFetch(`${API_BASE}/study-groups/${slug}/invite-link/reset`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+  if(!res.ok){
+    const msg = await parseApiError(res, 'Failed to reset invite link')
+    const err = new Error(msg)
+    err.status = res.status
+    throw err
+  }
+  return res.json()
+}
+
+
 
