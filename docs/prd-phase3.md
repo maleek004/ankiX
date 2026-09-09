@@ -109,6 +109,12 @@ Key focus areas for Phase 3:
   * **Multi-Surface Study Presentation:** Render dynamic interval preview badges above rating buttons during card study sessions (`Deck.jsx`), standalone exercise completion (`Exercises.jsx`), and linked card exercise modals (`Deck.jsx`).
   * **Lapse Mechanics:** Mature cards/exercises marked `Again` indicate an immediate lapse back to learning steps (`<1m` / `<10m`).
   * **Guest Session Exclusion:** Unauthenticated guest sessions omit interval badges entirely, presenting clean action buttons without displaying unpersisted intervals.
+* **FR45:** Universal Deep-Linking, Deck Sharing & Tokenized Group Invite Engine:
+  * **Direct Deck URLs & Context Auto-Sync (`ankix.tech/decks/:id`):** Provide a 1-click "🔗 Share Deck" action. Opening a shared deck URL automatically identifies the parent study group and activates it in `StudyGroupProvider` context so navigation remains synchronized.
+  * **Private Deck Access Gate:** When an unauthenticated visitor or non-member opens a link to a deck inside a private/locked study group, render a clean "Private Deck — Request to Join / Enter Invite Code" page instead of a raw 403 error.
+  * **Direct Study Group URLs (`ankix.tech/study-groups/:slug`):** Dedicated route resolves the study group by its human-readable slug, activates it in context, and presents its deck catalog.
+  * **Tokenized Shareable Invite Links (`ankix.tech/join/:inviteCode`):** Study Group Admins can generate permanent shareable invite links with a revocable "Reset Link" action; joins users as `Member` (with optional admin toggle for `Contributor`). Unauthenticated visitors clicking an invite are routed through quick registration/OAuth with intent preservation before auto-joining.
+
 
 
 

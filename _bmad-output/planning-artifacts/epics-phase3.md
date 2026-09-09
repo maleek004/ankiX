@@ -39,6 +39,7 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 | **FR42** | LaTeX Mathematical & Scientific Notation Rendering | Epic 7 (Story 7.10) |
 | **FR43** | Study Flashcard Workspace Ergonomics, Card Action Toolbar & Import Repositioning | Epic 7 (Story 7.11) |
 | **FR44** | Dynamic Spaced Repetition Next-Interval Previews on Ratings | Epic 7 (Story 7.12) |
+| **FR45** | Universal Deep-Linking, Deck Sharing & Tokenized Group Invite Engine | Epic 7 (Story 7.13) |
 | **FR23** | GitHub-style study activity heatmap | Epic 8 (Story 8.1) |
 
 
@@ -380,6 +381,18 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
   * **Dynamic Exercise Rating Badges:** In `Exercises.jsx` and `ExercisePracticeModal`, render matching dynamic next-interval badges above the exercise review rating buttons upon completing an exercise.
   * **Lapse Cycle Verification:** When a mature card or exercise in the Review phase is failed (`Again`), the interval preview confirms an immediate lapse back to learning steps (`<1m` or `<10m`).
   * **Guest Session Exclusion:** For unauthenticated visitors in ephemeral sandbox sessions, omit interval badges entirely, displaying clean rating buttons without misleading unpersisted intervals.
+
+#### Story 7.13: Deep-Linking for Decks, Direct Study Group Slugs & Shareable Invite Links
+
+**As a** learner sharing study materials and a study group admin building a learning cohort,  
+**I want to** share direct links to decks and study groups and generate tokenized invite links for private/locked groups,  
+**So that** new members can join easily from chat apps, decks retain proper group context, and private decks provide clean onboarding access gates.  
+
+* **Acceptance Criteria:**
+  * **Direct Deck URLs & Context Auto-Sync (`ankix.tech/decks/:id`):** Provide a 1-click "🔗 Share Deck" button. Opening a shared deck URL automatically identifies the parent study group and activates it in `StudyGroupProvider` context so navigation remains synchronized.
+  * **Private Deck Access Gate:** When an unauthenticated visitor or non-member opens a link to a deck inside a private/locked study group, render a clean "Private Deck — Request to Join / Enter Invite Code" page instead of a raw 403 error.
+  * **Direct Study Group URLs (`ankix.tech/study-groups/:slug`):** Dedicated route in `App.jsx` resolves the study group by its human-readable slug, activates it in context, and presents its deck catalog.
+  * **Tokenized Shareable Invite Links (`ankix.tech/join/:inviteCode`):** Study Group Admins can generate permanent shareable invite links with a revocable "Reset Link" action; joins users as `Member` (with optional admin toggle for `Contributor`). Unauthenticated visitors clicking an invite are routed through quick registration/OAuth with intent preservation before auto-joining.
 
 ---
 
