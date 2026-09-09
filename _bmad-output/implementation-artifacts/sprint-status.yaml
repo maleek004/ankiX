@@ -76,12 +76,14 @@ development_status:
 
   epic-5-retrospective: optional
   epic-7: in-progress
+  7-12-dynamic-srs-next-interval-badges-on-ratings: ready-for-dev
   7-11-study-flashcard-workspace-ergonomics-and-card-action-toolbar: done
   7-10-latex-mathematical-notation-support-katex: done
   7-9-user-level-card-ghosting-suspension-and-queue-personalization: done
   7-8-study-group-and-deck-name-editing-by-admins: done
   7-7-shared-card-modals-and-linker-refactoring: done
   7-6-search-card-preview-modal-integrity-and-rendering-resiliency: done
+
 
 
 

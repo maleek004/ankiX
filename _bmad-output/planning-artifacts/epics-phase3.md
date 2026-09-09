@@ -38,7 +38,9 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
 | **FR41** | User-Level Card Ghosting (Suspension) & Queue Personalization | Epic 7 (Story 7.9) |
 | **FR42** | LaTeX Mathematical & Scientific Notation Rendering | Epic 7 (Story 7.10) |
 | **FR43** | Study Flashcard Workspace Ergonomics, Card Action Toolbar & Import Repositioning | Epic 7 (Story 7.11) |
+| **FR44** | Dynamic Spaced Repetition Next-Interval Previews on Ratings | Epic 7 (Story 7.12) |
 | **FR23** | GitHub-style study activity heatmap | Epic 8 (Story 8.1) |
+
 
 
 
@@ -366,9 +368,23 @@ This document defines the Phase 3 Epics and User Stories for **AnkiX**, decompos
     * Add an `📥 Import Cards` option to each deck's `Actions ▾` dropdown on the `/decks` catalog page (`Decks.jsx`).
   * **Mobile Touch Ergonomics:** Ensure the card header neatly aligns on screens `<480px` without horizontal overflow, wrapping, or prompt displacement.
 
+#### Story 7.12: Dynamic Spaced Repetition Next-Interval Previews on Flashcard & Exercise Ratings
+
+**As a** learner reviewing flashcards or solving coding exercises,  
+**I want to** see the exact, dynamic next-review wait times (`<1m`, `<10m`, `1d`, `4d`, `12d`, `2.5mo`, `1.3y`) displayed above the ease buttons (`Again`, `Hard`, `Good`, `Easy`),  
+**So that** I know the exact scheduling consequences of each rating before making my study evaluation.  
+
+* **Acceptance Criteria:**
+  * **Backend SM-2 Precomputation:** In `StudyQueueController.cs` and exercise review endpoints, compute next review intervals for all 4 outcomes (`Again`, `Hard`, `Good`, `Easy`) using `ReviewSchedulerService.CalculateNextSchedule`, projecting human-readable interval strings in `NextIntervalsDto`.
+  * **Dynamic Flashcard Rating Badges:** In `Deck.jsx`, replace static placeholder text with dynamic intervals rendered above each of the 4 rating buttons.
+  * **Dynamic Exercise Rating Badges:** In `Exercises.jsx` and `ExercisePracticeModal`, render matching dynamic next-interval badges above the exercise review rating buttons upon completing an exercise.
+  * **Lapse Cycle Verification:** When a mature card or exercise in the Review phase is failed (`Again`), the interval preview confirms an immediate lapse back to learning steps (`<1m` or `<10m`).
+  * **Guest Session Exclusion:** For unauthenticated visitors in ephemeral sandbox sessions, omit interval badges entirely, displaying clean rating buttons without misleading unpersisted intervals.
+
 ---
 
 ### Epic 8: Spaced Repetition Analytics & Gamification
+
 
 
 

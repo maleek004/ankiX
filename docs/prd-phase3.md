@@ -104,6 +104,12 @@ Key focus areas for Phase 3:
   * **Dedicated Card Action Header:** Card-specific controls move into a dedicated header bar positioned directly *above* the prompt text inside the card canvas, guaranteeing 100% horizontal text width without flexbox squashing.
   * **Primary vs Overflow Action Hierarchy:** `[👻 Ghost Card]` and `[✏️ Edit]` are exposed as direct 1-click buttons, while `[📋 Copy Card]`, `[🔗 Link Exercises]`, and destructive `[🗑️ Delete Card]` are grouped into a clean `··· More Actions` dropdown menu.
   * **Reposition Import Cards:** The `[📥 Import Cards]` setup action is removed from the daily study toolbar and repositioned inside the `+ Add Card` drawer as a segmented entry mode (`[✍️ Manual Entry]` vs `[📥 Bulk File Import]`), as well as added to the `/decks` catalog `Actions ▾` dropdown.
+* **FR44:** Dynamic Spaced Repetition Next-Interval Previews on Flashcard & Exercise Ratings:
+  * **Dynamic SM-2 Interval Calculation:** Study queue endpoints (`GET /api/decks/{id}/queue` and exercise queues) compute exact, personalized next-review intervals (`<1m`, `<10m`, `1d`, `4d`, `12d`, `2.5mo`, `1.3y`) for each rating button (`Again`, `Hard`, `Good`, `Easy`) using `ReviewSchedulerService`.
+  * **Multi-Surface Study Presentation:** Render dynamic interval preview badges above rating buttons during card study sessions (`Deck.jsx`), standalone exercise completion (`Exercises.jsx`), and linked card exercise modals (`Deck.jsx`).
+  * **Lapse Mechanics:** Mature cards/exercises marked `Again` indicate an immediate lapse back to learning steps (`<1m` / `<10m`).
+  * **Guest Session Exclusion:** Unauthenticated guest sessions omit interval badges entirely, presenting clean action buttons without displaying unpersisted intervals.
+
 
 
 
