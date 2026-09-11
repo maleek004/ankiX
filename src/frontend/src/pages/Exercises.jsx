@@ -23,8 +23,10 @@ import AuthModal from '../components/AuthModal'
 import MarkdownViewer from '../components/MarkdownViewer'
 import MarkdownField from '../components/MarkdownField'
 import { getTagBadge, langBadgeFor, normalizeTag, POPULAR_TOPIC_TAGS } from '../utils/tagUtils'
+import { useToast } from '../context/ToastContext'
 
 export default function Exercises() {
+  const toast = useToast()
   const { activeStudyGroup } = useStudyGroup() || {}
   const [copyModalItem, setCopyModalItem] = useState(null)
   const [authModalConfig, setAuthModalConfig] = useState({ isOpen: false, title: '', subtitle: '', intent: null })
@@ -166,7 +168,7 @@ export default function Exercises() {
         setDueQueue(dueEx || [])
       }
     } catch (err) {
-      alert('Failed to update collection: ' + (err.message || err))
+      toast.error('Failed to update collection: ' + (err.message || err))
     } finally {
       setEnrollingId(null)
     }
@@ -180,14 +182,14 @@ export default function Exercises() {
     if (exerciseType === 'MultipleChoice') {
       const opts = [mcqOpt1, mcqOpt2, mcqOpt3, mcqOpt4].map(s => s.trim()).filter(Boolean)
       if (opts.length < 2) {
-        alert('Please provide at least 2 options for Multiple Choice exercise.')
+        toast.warning('Please provide at least 2 options for Multiple Choice exercise.')
         return
       }
       const validCorrectIdx = Math.min(Number(mcqCorrect), opts.length - 1)
       exerciseSpec = JSON.stringify({ options: opts, correctIndex: Math.max(0, validCorrectIdx) })
     } else if (exerciseType === 'ExactString') {
       if (!exactAnswer.trim()) {
-        alert('Please provide the correct answer for Exact String exercise.')
+        toast.warning('Please provide the correct answer for Exact String exercise.')
         return
       }
       exerciseSpec = JSON.stringify({ acceptedAnswers: [exactAnswer.trim()], caseSensitive: exactCaseSensitive })
@@ -224,8 +226,9 @@ export default function Exercises() {
       setShowAddForm(false)
       // Auto enroll created exercise
       await handleToggleEnroll(newEx.id)
+      toast.success(`Exercise "${newEx.title || title}" created!`)
     } catch (err) {
-      alert('Create exercise failed: ' + (err.message || err))
+      toast.error('Create exercise failed: ' + (err.message || err))
     } finally {
       setIsCreating(false)
     }
@@ -239,8 +242,9 @@ export default function Exercises() {
       await deleteExercise(exId)
       setExercises(prev => prev.filter(ex => ex.id !== exId))
       setDueQueue(prev => prev.filter(ex => ex.id !== exId))
+      toast.success(`"${exTitle}" deleted.`)
     } catch (err) {
-      alert('Delete exercise failed: ' + (err.message || err))
+      toast.error('Delete exercise failed: ' + (err.message || err))
     } finally {
       setDeletingId(null)
     }
@@ -308,7 +312,7 @@ export default function Exercises() {
 
       setShowEditForm(true)
     } catch (err) {
-      alert('Failed to open exercise for editing: ' + (err.message || err))
+      toast.error('Failed to open exercise for editing: ' + (err.message || err))
     }
   }
 
@@ -320,14 +324,14 @@ export default function Exercises() {
     if (editExerciseType === 'MultipleChoice') {
       const opts = [editMcqOpt1, editMcqOpt2, editMcqOpt3, editMcqOpt4].map(s => s.trim()).filter(Boolean)
       if (opts.length < 2) {
-        alert('Please provide at least 2 options for Multiple Choice exercise.')
+        toast.warning('Please provide at least 2 options for Multiple Choice exercise.')
         return
       }
       const validCorrectIdx = Math.min(Number(editMcqCorrect), opts.length - 1)
       exerciseSpec = JSON.stringify({ options: opts, correctIndex: Math.max(0, validCorrectIdx) })
     } else if (editExerciseType === 'ExactString') {
       if (!editExactAnswer.trim()) {
-        alert('Please provide the correct answer for Exact String exercise.')
+        toast.warning('Please provide the correct answer for Exact String exercise.')
         return
       }
       exerciseSpec = JSON.stringify({ acceptedAnswers: [editExactAnswer.trim()], caseSensitive: editExactCaseSensitive })
@@ -359,8 +363,9 @@ export default function Exercises() {
       }
       setShowEditForm(false)
       setEditingExercise(null)
+      toast.success(`Exercise "${editTitle.trim()}" updated!`)
     } catch (err) {
-      alert('Update exercise failed: ' + (err.message || err))
+      toast.error('Update exercise failed: ' + (err.message || err))
     } finally {
       setIsUpdating(false)
     }
@@ -373,7 +378,7 @@ export default function Exercises() {
       setActiveExercise(detail)
       setPracticeCode(detail.starterCode || detail.solutionCode || '')
       setRunResult(null)
-    } catch (err) {
+    } catch {
       setActiveExercise(ex)
       setPracticeCode(ex.starterCode || '')
       setRunResult(null)
@@ -454,8 +459,9 @@ export default function Exercises() {
       } else {
         setActiveExercise(null)
       }
+      toast.success(`Review recorded (${outcome})!`)
     } catch (err) {
-      alert('Failed to save exercise review: ' + (err.message || err))
+      toast.error('Failed to save exercise review: ' + (err.message || err))
     } finally {
       setSubmittingReview(false)
     }
@@ -1332,7 +1338,7 @@ export default function Exercises() {
         itemType="exercise"
         item={copyModalItem}
         onSuccess={() => {
-          alert('Exercise copied successfully!')
+          toast.success('Exercise copied successfully!')
           loadData()
         }}
       />

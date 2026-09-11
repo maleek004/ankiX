@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import MarkdownField from './MarkdownField'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
+import { useToast } from '../context/ToastContext'
 import * as api from '../api'
 
 export default function ConvertFollowupModal({ followup, parentCard, currentDeckId, onClose, onConverted }) {
+  const toast = useToast()
   const { activeStudyGroup } = useStudyGroup() || {}
   const [activeTab, setActiveTab] = useState('link')
   const [decks, setDecks] = useState([])
@@ -36,11 +38,11 @@ export default function ConvertFollowupModal({ followup, parentCard, currentDeck
     setSaving(true)
     try {
       await api.linkFollowupToCard(parentCard.id, followup.id, existingCardId)
-      alert('Follow-up question successfully linked to existing card!')
+      toast.success('Follow-up question linked to existing card!')
       if (onConverted) onConverted()
       onClose()
     } catch (err) {
-      alert('Link to card failed: ' + (err.message || err))
+      toast.error('Link to card failed: ' + (err.message || err))
     } finally {
       setSaving(false)
     }
@@ -53,11 +55,11 @@ export default function ConvertFollowupModal({ followup, parentCard, currentDeck
     try {
       const newCard = await api.createCard(targetDeckId, newPrompt.trim(), answer.trim(), 'basic')
       await api.linkFollowupToCard(parentCard.id, followup.id, newCard.id)
-      alert('Follow-up converted to a new standalone card and linked!')
+      toast.success('Follow-up converted to a new standalone card and linked!')
       if (onConverted) onConverted()
       onClose()
     } catch (err) {
-      alert('Convert failed: ' + (err.message || err))
+      toast.error('Convert failed: ' + (err.message || err))
     } finally {
       setSaving(false)
     }

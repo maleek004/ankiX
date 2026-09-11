@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
+import { useToast } from '../context/ToastContext'
 import AuthModal from '../components/AuthModal'
 import {
   getStudyGroups,
@@ -32,6 +33,7 @@ import {
 } from '../api'
 
 export default function StudyGroups() {
+  const toast = useToast()
   const { slug } = useParams() || {}
   const auth = useAuth()
   const { activeStudyGroup, setActiveStudyGroup } = useStudyGroup() || {}
@@ -153,7 +155,7 @@ export default function StudyGroups() {
       })
       navigate('/decks')
     } catch (err) {
-      alert(err.message || 'Failed to join study group')
+      toast.error(err.message || 'Failed to join study group')
     } finally {
       setActionLoading(false)
     }
@@ -163,10 +165,10 @@ export default function StudyGroups() {
     setActionLoading(true)
     try {
       await requestStudyGroupAccess(group.slug)
-      alert(`Join request for '${group.name}' submitted successfully! A group administrator will review your request.`)
+      toast.success(`Join request for '${group.name}' submitted successfully! A group administrator will review your request.`)
       await loadData()
     } catch (err) {
-      alert(err.message || 'Failed to request access')
+      toast.error(err.message || 'Failed to request access')
     } finally {
       setActionLoading(false)
     }
@@ -185,7 +187,7 @@ export default function StudyGroups() {
       })
       navigate('/decks')
     } catch (err) {
-      alert(err.message || 'Failed to accept invitation')
+      toast.error(err.message || 'Failed to accept invitation')
     } finally {
       setActionLoading(false)
     }
@@ -197,7 +199,7 @@ export default function StudyGroups() {
       await declineStudyGroupInvitation(invitation.studyGroupSlug)
       await loadData()
     } catch (err) {
-      alert(err.message || 'Failed to decline invitation')
+      toast.error(err.message || 'Failed to decline invitation')
     } finally {
       setActionLoading(false)
     }
@@ -218,7 +220,7 @@ export default function StudyGroups() {
       })
       navigate('/decks')
     } catch (err) {
-      alert(err.message || 'Failed to create study group')
+      toast.error(err.message || 'Failed to create study group')
     } finally {
       setActionLoading(false)
     }
@@ -255,9 +257,9 @@ export default function StudyGroups() {
         })
       }
       await loadData()
-      alert('Study group details updated successfully!')
+      toast.success('Study group details updated successfully!')
     } catch (err) {
-      alert(err.message || 'Failed to update study group details')
+      toast.error(err.message || 'Failed to update study group details')
     } finally {
       setUpdatingDetails(false)
     }
@@ -289,8 +291,9 @@ export default function StudyGroups() {
       const updated = await getStudyGroupMembers(managingMembersStudyGroup.slug)
       setMembers(updated || [])
       await loadData()
+      toast.success('Role updated.')
     } catch (err) {
-      alert(err.message || 'Failed to update role')
+      toast.error(err.message || 'Failed to update role')
     } finally {
       setUpdatingRoleId(null)
     }
@@ -302,13 +305,13 @@ export default function StudyGroups() {
     setInviteLoading(true)
     try {
       const res = await inviteStudyGroupMember(managingMembersStudyGroup.slug, inviteEmail.trim(), inviteRole)
-      alert(res.message || 'Invitation dispatched successfully!')
+      toast.success(res.message || 'Invitation dispatched successfully!')
       setInviteEmail('')
       setInviteRole('Member')
       await loadGroupMembersAndRequests(managingMembersStudyGroup.slug)
       await loadData()
     } catch (err) {
-      alert(err.message || 'Failed to send invitation')
+      toast.error(err.message || 'Failed to send invitation')
     } finally {
       setInviteLoading(false)
     }
@@ -321,8 +324,9 @@ export default function StudyGroups() {
       await approveStudyGroupJoinRequest(managingMembersStudyGroup.slug, userId)
       await loadGroupMembersAndRequests(managingMembersStudyGroup.slug)
       await loadData()
+      toast.success('Join request approved.')
     } catch (err) {
-      alert(err.message || 'Failed to approve request')
+      toast.error(err.message || 'Failed to approve request')
     } finally {
       setProcessingRequestId(null)
     }
@@ -335,8 +339,9 @@ export default function StudyGroups() {
       await rejectStudyGroupJoinRequest(managingMembersStudyGroup.slug, userId)
       await loadGroupMembersAndRequests(managingMembersStudyGroup.slug)
       await loadData()
+      toast.info('Join request rejected.')
     } catch (err) {
-      alert(err.message || 'Failed to reject request')
+      toast.error(err.message || 'Failed to reject request')
     } finally {
       setProcessingRequestId(null)
     }
@@ -360,8 +365,9 @@ export default function StudyGroups() {
     try {
       const data = await createOrUpdateStudyGroupInviteLink(managingMembersStudyGroup.slug, newRole)
       setShareableInviteLink(data)
+      toast.success('Invite role updated.')
     } catch (err) {
-      alert(err.message || 'Failed to update invite role')
+      toast.error(err.message || 'Failed to update invite role')
     } finally {
       setShareableInviteLoading(false)
     }
@@ -375,9 +381,9 @@ export default function StudyGroups() {
       const data = await resetStudyGroupInviteLink(managingMembersStudyGroup.slug)
       setShareableInviteLink(data)
       setInviteLinkCopied(false)
-      alert('Invite link reset successfully! A new unique URL has been generated.')
+      toast.success('Invite link reset successfully! A new unique URL has been generated.')
     } catch (err) {
-      alert(err.message || 'Failed to reset invite link')
+      toast.error(err.message || 'Failed to reset invite link')
     } finally {
       setResettingInviteLink(false)
     }
@@ -410,9 +416,9 @@ export default function StudyGroups() {
       await updateStudyGroupPrivacy(managingMembersStudyGroup.slug, selectedPrivacy)
       setManagingMembersStudyGroup(prev => prev ? ({ ...prev, privacy: selectedPrivacy }) : null)
       await loadData()
-      alert(`Study group privacy updated to '${selectedPrivacy}'.`)
+      toast.success(`Study group privacy updated to '${selectedPrivacy}'.`)
     } catch (err) {
-      alert(err.message || 'Failed to update privacy')
+      toast.error(err.message || 'Failed to update privacy')
     } finally {
       setUpdatingPrivacy(false)
     }
@@ -444,8 +450,9 @@ export default function StudyGroups() {
           isFrozen: willFreeze
         })
       }
+      toast.success(willFreeze ? `'${group.name}' is now frozen.` : `'${group.name}' is now unfrozen.`)
     } catch (err) {
-      alert(err.message || 'Failed to update freeze status')
+      toast.error(err.message || 'Failed to update freeze status')
     } finally {
       setFreezeLoading(false)
     }
@@ -456,7 +463,7 @@ export default function StudyGroups() {
     setTransferModal(prev => ({ ...prev, loading: true }))
     try {
       await transferStudyGroupOwnership(managingMembersStudyGroup.slug, transferModal.targetUser.userId)
-      alert(`Ownership of '${managingMembersStudyGroup.name}' successfully transferred to ${getEffectiveDisplayName(transferModal.targetUser.displayName, transferModal.targetUser.email)}.`)
+      toast.success(`Ownership of '${managingMembersStudyGroup.name}' successfully transferred to ${getEffectiveDisplayName(transferModal.targetUser.displayName, transferModal.targetUser.email)}.`)
       setTransferModal({ isOpen: false, targetUser: null, loading: false })
       setActiveTab('members')
       await loadGroupMembersAndRequests(managingMembersStudyGroup.slug)
@@ -469,7 +476,7 @@ export default function StudyGroups() {
         })
       }
     } catch (err) {
-      alert(err.message || 'Failed to transfer ownership')
+      toast.error(err.message || 'Failed to transfer ownership')
       setTransferModal(prev => ({ ...prev, loading: false }))
     }
   }
@@ -477,13 +484,13 @@ export default function StudyGroups() {
   async function handleConfirmDeleteGroup() {
     if (!deleteModal.group) return
     if (deleteModal.confirmSlug.trim().toLowerCase() !== deleteModal.group.slug.toLowerCase()) {
-      alert(`Please enter the exact slug '${deleteModal.group.slug}' to confirm deletion.`)
+      toast.warning(`Please enter the exact slug '${deleteModal.group.slug}' to confirm deletion.`)
       return
     }
     setDeleteModal(prev => ({ ...prev, loading: true }))
     try {
       await deleteStudyGroup(deleteModal.group.slug)
-      alert(`Study group '${deleteModal.group.name}' and all associated decks, cards, and exercises have been permanently erased.`)
+      toast.success(`Study group '${deleteModal.group.name}' and all associated decks, cards, and exercises have been permanently erased.`)
       const deletedGroupId = deleteModal.group.id
       setDeleteModal({ isOpen: false, group: null, confirmSlug: '', loading: false })
       if (managingMembersStudyGroup && managingMembersStudyGroup.id === deletedGroupId) {
@@ -494,7 +501,7 @@ export default function StudyGroups() {
       }
       await loadData()
     } catch (err) {
-      alert(err.message || 'Failed to delete study group')
+      toast.error(err.message || 'Failed to delete study group')
       setDeleteModal(prev => ({ ...prev, loading: false }))
     }
   }

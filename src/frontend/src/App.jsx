@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import { AuthProvider } from './auth/AuthProvider'
 import { StudyGroupProvider } from './studyGroup/StudyGroupProvider'
+import { ToastProvider } from './context/ToastContext'
 import RequireAuth from './auth/RequireAuth'
 import NavBar from './components/NavBar'
 import GuestBanner from './components/GuestBanner'
@@ -29,40 +30,42 @@ export default function App(){
   return (
     <AuthProvider>
       <StudyGroupProvider>
-        <BrowserRouter>
-          <div className="app">
-            <GuestBanner />
-            <NavBar />
-            <EmailVerificationBanner />
-            <main className="main-content">
-              <Routes>
-                <Route path="/" element={<Home/>} />
-                <Route path="/login" element={<Login/>} />
-                <Route path="/register" element={<Register/>} />
-                <Route path="/forgot-password" element={<ForgotPassword/>} />
-                <Route path="/reset-password" element={<ResetPassword/>} />
-                <Route path="/verify-email" element={<VerifyEmail/>} />
-                <Route path="/oauth/callback" element={<OAuthCallback/>} />
-                <Route path="/study-groups" element={<StudyGroups/>} />
-                <Route path="/study-groups/:slug" element={<StudyGroups/>} />
-                <Route path="/communities/:slug" element={<StudyGroups/>} />
-                <Route path="/join/:inviteCode" element={<JoinGroup/>} />
+        <ToastProvider>
+          <BrowserRouter>
+            <div className="app">
+              <GuestBanner />
+              <NavBar />
+              <EmailVerificationBanner />
+              <main className="main-content">
+                <Routes>
+                  <Route path="/" element={<Home/>} />
+                  <Route path="/login" element={<Login/>} />
+                  <Route path="/register" element={<Register/>} />
+                  <Route path="/forgot-password" element={<ForgotPassword/>} />
+                  <Route path="/reset-password" element={<ResetPassword/>} />
+                  <Route path="/verify-email" element={<VerifyEmail/>} />
+                  <Route path="/oauth/callback" element={<OAuthCallback/>} />
+                  <Route path="/study-groups" element={<StudyGroups/>} />
+                  <Route path="/study-groups/:slug" element={<StudyGroups/>} />
+                  <Route path="/communities/:slug" element={<StudyGroups/>} />
+                  <Route path="/join/:inviteCode" element={<JoinGroup/>} />
 
-                <Route path="/communities" element={<Navigate to="/study-groups" replace />} />
-                <Route path="/search" element={<Search/>} />
-                <Route path="/decks" element={<Decks/>} />
-                <Route path="/decks/:id" element={<Deck/>} />
-                <Route path="/exercises" element={<Exercises/>} />
-                <Route path="/profile" element={<RequireAuth><Profile/></RequireAuth>} />
-                <Route path="/admin" element={<RequireAuth><AdminDashboard/></RequireAuth>} />
-                <Route path="/admin/dashboard" element={<Navigate to="/admin" replace />} />
-                <Route path="/admin/users" element={<RequireAuth><AdminUsers/></RequireAuth>} />
-              </Routes>
-            </main>
-          </div>
-          <Analytics />
-          <SpeedInsights />
-        </BrowserRouter>
+                  <Route path="/communities" element={<Navigate to="/study-groups" replace />} />
+                  <Route path="/search" element={<Search/>} />
+                  <Route path="/decks" element={<Decks/>} />
+                  <Route path="/decks/:id" element={<Deck/>} />
+                  <Route path="/exercises" element={<Exercises/>} />
+                  <Route path="/profile" element={<RequireAuth><Profile/></RequireAuth>} />
+                  <Route path="/admin" element={<RequireAuth><AdminDashboard/></RequireAuth>} />
+                  <Route path="/admin/dashboard" element={<Navigate to="/admin" replace />} />
+                  <Route path="/admin/users" element={<RequireAuth><AdminUsers/></RequireAuth>} />
+                </Routes>
+              </main>
+            </div>
+            <Analytics />
+            <SpeedInsights />
+          </BrowserRouter>
+        </ToastProvider>
       </StudyGroupProvider>
     </AuthProvider>
   )

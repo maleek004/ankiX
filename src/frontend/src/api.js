@@ -120,7 +120,13 @@ export async function safeFetch(url, options = {}) {
   } catch (err) {
     if (err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
       const targetUrl = typeof url === 'string' ? url : (url?.url || url?.toString() || '')
-      throw new Error(`Cannot reach backend API at '${targetUrl}'. Please check VITE_API_BASE in Vercel settings (must be HTTPS, e.g. https://your-backend.herokuapp.com/api) and ensure your backend server is awake.`)
+      if (import.meta.env.DEV) {
+        console.warn(`[API Dev Diagnostic] Cannot reach backend API at '${targetUrl}'. Ensure VITE_API_BASE is set and backend is awake.`)
+      }
+      const networkErr = new Error('Unable to reach the server. Please check your internet connection and try again.')
+      networkErr.name = 'NetworkError'
+      networkErr.targetUrl = targetUrl
+      throw networkErr
     }
     throw err
   }
@@ -252,6 +258,8 @@ export async function safeFetchWithRetry(url, options = {}, retryConfig = {}) {
       const isTransient =
         err.name === 'AbortError' ||
         err.name === 'TypeError' ||
+        err.name === 'NetworkError' ||
+        err.message?.includes('Unable to reach the server') ||
         err.message?.includes('Cannot reach backend API') ||
         err.message?.includes('Failed to fetch') ||
         err.message?.includes('NetworkError')

@@ -12,9 +12,11 @@ import ConvertFollowupModal from '../components/ConvertFollowupModal'
 import LinkedCardsPreviewModal from '../components/LinkedCardsPreviewModal'
 import ImportCardsModal from '../components/ImportCardsModal'
 import { getTagBadge, langBadgeFor, normalizeTag, POPULAR_TOPIC_TAGS } from '../utils/tagUtils'
+import { useToast } from '../context/ToastContext'
 import * as api from '../api'
 
 export default function Deck(){
+  const toast = useToast()
   const { activeStudyGroup, syncActiveStudyGroup } = useStudyGroup() || {}
   const { id } = useParams()
   const [copyModalCard, setCopyModalCard] = useState(null)
@@ -120,7 +122,7 @@ export default function Deck(){
       const cards = await Promise.all(cardIds.map(id => api.getCard(id).catch(() => null)))
       const validCards = cards.filter(Boolean)
       if (validCards.length === 0) {
-        alert('Could not load linked answer cards.')
+        toast.warning('Could not load linked answer cards.')
         return
       }
       setPreviewCardModal({
@@ -130,7 +132,7 @@ export default function Deck(){
         parentCard: currentCard
       })
     } catch (err) {
-      alert('Could not load derived cards: ' + (err.message || err))
+      toast.error('Could not load derived cards: ' + (err.message || err))
     }
   }
 
@@ -238,8 +240,9 @@ export default function Deck(){
       const created = await api.addFollowup(currentCard.id, newQuestion.trim())
       setFollowups(prev => [created, ...prev])
       setNewQuestion('')
+      toast.success('Follow-up question added!')
     } catch(err) {
-      alert('Could not add follow-up: ' + (err.message || err))
+      toast.error('Could not add follow-up: ' + (err.message || err))
     } finally {
       setSubmittingFollowup(false)
     }
@@ -309,8 +312,9 @@ export default function Deck(){
         dueCards: (prev.dueCards || []).map(c => c.id === currentCard.id ? updated : c)
       }))
       setIsEditingCurrent(false)
+      toast.success('Card updated!')
     } catch (err) {
-      alert('Update card failed: ' + (err.message || err))
+      toast.error('Update card failed: ' + (err.message || err))
     } finally {
       setIsSavingEdit(false)
     }
@@ -327,8 +331,9 @@ export default function Deck(){
       setNewAnswer('')
       setAddCardTab('manual')
       await loadQueue() // refresh queue counts
+      toast.success('Card created!')
     } catch (err) {
-      alert('Create card failed: ' + (err.message || err))
+      toast.error('Create card failed: ' + (err.message || err))
     } finally {
       setIsAddingCard(false)
     }
@@ -349,8 +354,9 @@ export default function Deck(){
       }))
       setIsEditingCurrent(false)
       await loadQueue()
+      toast.success('Card deleted.')
     } catch (err) {
-      alert('Delete failed: ' + (err.message || err))
+      toast.error('Delete failed: ' + (err.message || err))
     } finally {
       setDeletingCardId(null)
     }
@@ -378,8 +384,9 @@ export default function Deck(){
       }
       // Re-fetch queue to ensure counts match server state
       api.getStudyQueue(id).then(q => setQueue(q)).catch(() => {})
+      toast.info('Card ghosted (hidden from study queue).')
     } catch (err) {
-      alert('Failed to ghost card: ' + (err.message || err))
+      toast.error('Failed to ghost card: ' + (err.message || err))
     } finally {
       setGhostingCardId(null)
     }
@@ -396,8 +403,9 @@ export default function Deck(){
       ])
       if (updatedQueue) setQueue(updatedQueue)
       if (updatedCards) setAllCards(updatedCards)
+      toast.success('Card restored to study queue!')
     } catch (err) {
-      alert('Failed to restore card: ' + (err.message || err))
+      toast.error('Failed to restore card: ' + (err.message || err))
     } finally {
       setUnghostingCardId(null)
     }
@@ -461,9 +469,9 @@ export default function Deck(){
       }
       const joinRes = await api.acceptStudyGroupInvite(code)
       if (deck?.studyGroupSlug && joinRes?.slug && joinRes.slug.toLowerCase() !== deck.studyGroupSlug.toLowerCase()) {
-        alert(`Note: You successfully joined "${joinRes.slug}", but this deck belongs to "${deck.studyGroupName || deck.studyGroupSlug}". Access to this deck remains restricted.`)
+        toast.info(`Note: You successfully joined "${joinRes.slug}", but this deck belongs to "${deck.studyGroupName || deck.studyGroupSlug}". Access to this deck remains restricted.`)
       } else {
-        alert('Welcome! You have successfully joined the study group.')
+        toast.success('Welcome! You have successfully joined the study group.')
       }
       await loadQueue()
     } catch (err) {
@@ -493,8 +501,10 @@ export default function Deck(){
     try{
       await api.resetDeckProgress(id)
       await loadQueue()
-      alert('Deck progress reset successfully! All cards are now back in your New Queue.')
-    }catch(err){ alert('Reset progress failed: ' + (err.message || err)) }
+      toast.success('Deck progress reset successfully! All cards are now back in your New Queue.')
+    }catch(err){
+      toast.error('Reset progress failed: ' + (err.message || err))
+    }
     finally { setIsResetting(false) }
   }
 
@@ -1290,7 +1300,7 @@ export default function Deck(){
         itemType="card"
         item={copyModalCard}
         onSuccess={() => {
-          alert('Card copied to deck successfully!')
+          toast.success('Card copied to deck successfully!')
           loadQueue()
         }}
       />
@@ -1326,6 +1336,7 @@ export default function Deck(){
 }
 
 function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
+  const toast = useToast()
   const token = localStorage.getItem('ankix_token')
   const isGuest = !token
   const [activeIdx, setActiveIdx] = useState(initialIndex)
@@ -1383,7 +1394,7 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
         setIsEnrolled(true)
       }
     } catch (err) {
-      alert('Failed to update collection: ' + (err.message || err))
+      toast.error('Failed to update collection: ' + (err.message || err))
     } finally {
       setEnrolling(false)
     }
@@ -1449,13 +1460,13 @@ function ExercisePracticeModal({ exercises, initialIndex = 0, onClose }) {
       const m = await import('../api.js')
       const res = await m.submitExerciseReview(currentEx.id, outcome)
       setIsEnrolled(true)
-      alert(`Exercise rating submitted (${outcome})! Next review: ${new Date(res.nextReviewAt).toLocaleDateString()}`)
+      toast.success(`Exercise rating submitted (${outcome})! Next review: ${new Date(res.nextReviewAt).toLocaleDateString()}`)
       setRunResult(null)
       if (activeIdx < exercises.length - 1) {
         setActiveIdx(prev => prev + 1)
       }
     } catch (err) {
-      alert('Submit review failed: ' + (err.message || err))
+      toast.error('Submit review failed: ' + (err.message || err))
     } finally {
       setRating(false)
     }

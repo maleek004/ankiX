@@ -1105,4 +1105,25 @@ main.main-content {
   }
 }
 
+@keyframes ankixToastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  aside[aria-label="Notifications"] {
+    right: 16px !important;
+    left: 16px !important;
+    bottom: 16px !important;
+    width: auto !important;
+    max-width: 100% !important;
+  }
+}
+
 

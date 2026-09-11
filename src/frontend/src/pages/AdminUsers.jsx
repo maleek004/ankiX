@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { getAdminUsers, updateUserRole } from '../api'
+import { useToast } from '../context/ToastContext'
 
 export default function AdminUsers() {
+  const toast = useToast()
   const { user } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -54,10 +56,10 @@ export default function AdminUsers() {
     setUpdatingUserId(userId)
     try {
       await updateUserRole(userId, newRole)
-      alert(`User role updated to '${newRole}'!`)
+      toast.success(`User role updated to '${newRole}'!`)
       await loadUsers()
     } catch (err) {
-      alert('Failed to update role: ' + (err.message || err))
+      toast.error('Failed to update role: ' + (err.message || err))
     } finally {
       setUpdatingUserId(null)
     }

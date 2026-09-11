@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { resolvePostLoginRedirect } from '../utils/intent'
+import { useToast } from '../context/ToastContext'
 
 function GoogleIcon() {
   return (
@@ -22,6 +23,7 @@ function GitHubIcon() {
 }
 
 export default function SocialButtons({ mode = 'login' }) {
+  const toast = useToast()
   const auth = useAuth()
   const [loadingProvider, setLoadingProvider] = useState(null)
   const [showPrompt, setShowPrompt] = useState(null)
@@ -42,7 +44,7 @@ export default function SocialButtons({ mode = 'login' }) {
                 await auth.oauthLogin('google', { idToken: response.credential })
                 window.location.href = resolvePostLoginRedirect()
               } catch (err) {
-                alert(`Google sign-in failed: ${err.message || err}`)
+                toast.error(`Google sign-in failed: ${err.message || err}`)
               } finally {
                 setLoadingProvider(null)
               }
@@ -95,7 +97,7 @@ export default function SocialButtons({ mode = 'login' }) {
       }
       window.location.href = resolvePostLoginRedirect()
     } catch (err) {
-      alert(`OAuth Login Failed: ${err.message || err}`)
+      toast.error(`OAuth Login Failed: ${err.message || err}`)
     } finally {
       setLoadingProvider(null)
     }

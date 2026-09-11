@@ -7,12 +7,14 @@ import AuthModal from './AuthModal'
 import ExercisePracticeModal from '../pages/Exercises'
 import { getTagBadge, langBadgeFor, normalizeTag, POPULAR_TOPIC_TAGS } from '../utils/tagUtils'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
+import { useToast } from '../context/ToastContext'
 import CardExerciseLinkerModal from './CardExerciseLinkerModal'
 import ConvertFollowupModal from './ConvertFollowupModal'
 import LinkedCardsPreviewModal from './LinkedCardsPreviewModal'
 import * as api from '../api'
 
 export default function CardDetailModal({ card, onClose, onCardUpdated }) {
+  const toast = useToast()
   const { activeStudyGroup } = useStudyGroup() || {}
   const navigate = useNavigate()
 
@@ -57,14 +59,16 @@ export default function CardDetailModal({ card, onClose, onCardUpdated }) {
         const updated = { ...currentCard, isGhosted: false }
         setCurrentCard(updated)
         if (onCardUpdated) onCardUpdated(updated)
+        toast.success('Card restored to study queue!')
       } else {
         await api.ghostCard(currentCard.id)
         const updated = { ...currentCard, isGhosted: true }
         setCurrentCard(updated)
         if (onCardUpdated) onCardUpdated(updated)
+        toast.info('Card ghosted (hidden from study queue).')
       }
     } catch (err) {
-      alert((currentCard.isGhosted ? 'Failed to restore card: ' : 'Failed to ghost card: ') + (err.message || err))
+      toast.error((currentCard.isGhosted ? 'Failed to restore card: ' : 'Failed to ghost card: ') + (err.message || err))
     } finally {
       setIsGhosting(false)
     }
@@ -133,8 +137,9 @@ export default function CardDetailModal({ card, onClose, onCardUpdated }) {
       if (onCardUpdated) {
         onCardUpdated(updated)
       }
+      toast.success('Card updated!')
     } catch (err) {
-      alert('Failed to update card: ' + (err.message || err))
+      toast.error('Failed to update card: ' + (err.message || err))
     } finally {
       setIsSavingEdit(false)
     }
@@ -158,8 +163,9 @@ export default function CardDetailModal({ card, onClose, onCardUpdated }) {
       const created = await api.addFollowup(currentCard.id, newQuestion.trim())
       setFollowups(prev => [...prev, created])
       setNewQuestion('')
+      toast.success('Follow-up question added!')
     } catch (err) {
-      alert('Could not add follow-up: ' + (err.message || err))
+      toast.error('Could not add follow-up: ' + (err.message || err))
     } finally {
       setSubmittingFollowup(false)
     }
@@ -185,7 +191,7 @@ export default function CardDetailModal({ card, onClose, onCardUpdated }) {
       const cards = await Promise.all(cardIds.map(id => api.getCard(id).catch(() => null)))
       const validCards = cards.filter(Boolean)
       if (validCards.length === 0) {
-        alert('Could not load linked answer cards.')
+        toast.warning('Could not load linked answer cards.')
         return
       }
       setPreviewAnswerCards({
@@ -195,7 +201,7 @@ export default function CardDetailModal({ card, onClose, onCardUpdated }) {
         parentCard: currentCard
       })
     } catch (err) {
-      alert('Could not load answer cards: ' + (err.message || err))
+      toast.error('Could not load answer cards: ' + (err.message || err))
     }
   }
 
@@ -656,7 +662,7 @@ export default function CardDetailModal({ card, onClose, onCardUpdated }) {
         onClose={() => setCopyModalOpen(false)}
         itemType="card"
         item={currentCard}
-        onSuccess={() => alert('Card copied to deck successfully!')}
+        onSuccess={() => toast.success('Card copied to deck successfully!')}
       />
 
       {/* Exercise Linker Modal */}

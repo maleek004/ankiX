@@ -5,8 +5,10 @@ import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
 import { getDecks, createDeck, updateDeck, deleteDeck, updateStudyGroup, canCreateContent } from '../api.js'
 import AuthModal from '../components/AuthModal'
 import ImportCardsModal from '../components/ImportCardsModal'
+import { useToast } from '../context/ToastContext'
 
 export default function Decks(){
+  const toast = useToast()
   const auth = useAuth()
   const { activeStudyGroup, setActiveStudyGroup } = useStudyGroup() || {}
   const navigate = useNavigate()
@@ -96,8 +98,9 @@ export default function Decks(){
       setNewTitle('')
       setNewDescription('')
       setShowAddForm(false)
+      toast.success(`Deck "${newTitle.trim()}" created!`)
     } catch(err) {
-      alert('Create deck failed: ' + (err.message || err))
+      toast.error('Create deck failed: ' + (err.message || err))
     } finally {
       setIsCreating(false)
     }
@@ -111,6 +114,7 @@ export default function Decks(){
           .then(() => {
             setShareToast(true)
             setTimeout(() => setShareToast(false), 3000)
+            toast.info('Deck link copied to clipboard!')
           })
           .catch(() => {
             window.prompt('Copy deck link:', url)
@@ -138,6 +142,7 @@ export default function Decks(){
     try {
       await deleteDeck(id, false)
       setDecks(prev => prev.filter(d => d.id !== id))
+      toast.success('Deck deleted.')
     } catch(err) {
       if (err.status === 409) {
         const countText = err.data?.cardCount ? ` (${err.data.cardCount} cards)` : ''
@@ -146,16 +151,17 @@ export default function Decks(){
           try {
             await deleteDeck(id, true)
             setDecks(prev => prev.filter(d => d.id !== id))
+            toast.success('Deck deleted.')
             return
           } catch (cascadeErr) {
-            alert('Delete deck failed: ' + (cascadeErr.message || cascadeErr))
+            toast.error('Delete deck failed: ' + (cascadeErr.message || cascadeErr))
             return
           }
         } else {
           return
         }
       }
-      alert('Delete deck failed: ' + (err.message || err))
+      toast.error('Delete deck failed: ' + (err.message || err))
     } finally {
       setDeletingId(null)
     }
@@ -180,8 +186,9 @@ export default function Decks(){
       await updateDeck(editingDeck.deck.id, editingDeck.title.trim(), editingDeck.description.trim())
       setDecks(prev => prev.map(d => d.id === editingDeck.deck.id ? { ...d, title: editingDeck.title.trim(), description: editingDeck.description.trim() } : d))
       setEditingDeck({ isOpen: false, deck: null, title: '', description: '', loading: false })
+      toast.success(`Deck "${editingDeck.title.trim()}" updated!`)
     } catch (err) {
-      alert('Update deck failed: ' + (err.message || err))
+      toast.error('Update deck failed: ' + (err.message || err))
       setEditingDeck(prev => ({ ...prev, loading: false }))
     }
   }
@@ -213,8 +220,9 @@ export default function Decks(){
         })
       }
       setEditingGroup({ isOpen: false, name: '', description: '', loading: false })
+      toast.success('Study group updated!')
     } catch (err) {
-      alert('Update study group failed: ' + (err.message || err))
+      toast.error('Update study group failed: ' + (err.message || err))
       setEditingGroup(prev => ({ ...prev, loading: false }))
     }
   }

@@ -7,8 +7,10 @@ import CopyModal from '../components/CopyModal'
 import CardDetailModal from '../components/CardDetailModal'
 import MarkdownViewer from '../components/MarkdownViewer'
 import { langBadgeFor } from '../utils/tagUtils'
+import { useToast } from '../context/ToastContext'
 
 export default function Search() {
+  const toast = useToast()
   const { activeStudyGroup } = useStudyGroup() || {}
   const [query, setQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('all') // 'all' | 'decks' | 'cards' | 'exercises' | 'followups'
@@ -411,7 +413,7 @@ export default function Search() {
         onClose={() => setCopyModalData(null)}
         itemType={copyModalData?.type}
         item={copyModalData?.item}
-        onSuccess={() => alert(`${copyModalData?.type === 'card' ? 'Card' : 'Exercise'} copied successfully!`)}
+        onSuccess={() => toast.success(`${copyModalData?.type === 'card' ? 'Card' : 'Exercise'} copied successfully!`)}
       />
 
       {/* Card Detail / Preview Modal */}

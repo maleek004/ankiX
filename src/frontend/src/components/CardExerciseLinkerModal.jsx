@@ -3,9 +3,11 @@ import MarkdownField from './MarkdownField'
 import MarkdownViewer from './MarkdownViewer'
 import { getTagBadge, langBadgeFor, normalizeTag, POPULAR_TOPIC_TAGS } from '../utils/tagUtils'
 import { useStudyGroup } from '../studyGroup/StudyGroupProvider'
+import { useToast } from '../context/ToastContext'
 import * as api from '../api'
 
 export default function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
+  const toast = useToast()
   const { activeStudyGroup } = useStudyGroup() || {}
   const [activeTab, setActiveTab] = useState('search') // 'search' | 'create'
   const [exercises, setExercises] = useState([])
@@ -64,8 +66,9 @@ export default function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
         setLinkedIds(prev => new Set(prev).add(exerciseId))
       }
       if (onUpdated) onUpdated()
+      toast.success(isLinked ? 'Exercise unlinked.' : 'Exercise linked to card!')
     } catch (err) {
-      alert('Link action failed: ' + (err.message || err))
+      toast.error('Link action failed: ' + (err.message || err))
     } finally {
       setLinkingId(null)
     }
@@ -80,12 +83,12 @@ export default function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
       const rawOpts = [mcqOpt1, mcqOpt2, mcqOpt3, mcqOpt4]
       const selectedText = rawOpts[mcqCorrect]?.trim()
       if (!selectedText) {
-        alert('Please enter text for the selected correct option.')
+        toast.warning('Please enter text for the selected correct option.')
         return
       }
       const opts = rawOpts.map(s => s.trim()).filter(Boolean)
       if (opts.length < 2) {
-        alert('Please provide at least 2 options for Multiple Choice exercise.')
+        toast.warning('Please provide at least 2 options for Multiple Choice exercise.')
         return
       }
       let correctIdx = opts.indexOf(selectedText)
@@ -93,7 +96,7 @@ export default function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
       exerciseSpec = JSON.stringify({ options: opts, correctIndex: correctIdx })
     } else if (exerciseType === 'ExactString') {
       if (!exactAnswer.trim()) {
-        alert('Please provide the correct answer for Exact String exercise.')
+        toast.warning('Please provide the correct answer for Exact String exercise.')
         return
       }
       exerciseSpec = JSON.stringify({ acceptedAnswers: [exactAnswer.trim()], caseSensitive: exactCaseSensitive })
@@ -113,11 +116,11 @@ export default function CardExerciseLinkerModal({ card, onClose, onUpdated }) {
         studyGroupId: activeStudyGroup?.id
       })
       await api.linkCardExercise(card.id, newEx.id)
-      alert(`Created and linked "${title}" to card!`)
+      toast.success(`Created and linked "${title}" to card!`)
       if (onUpdated) onUpdated()
       onClose()
     } catch (err) {
-      alert('Create & link failed: ' + (err.message || err))
+      toast.error('Create & link failed: ' + (err.message || err))
     } finally {
       setCreating(false)
     }

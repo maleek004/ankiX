@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import MarkdownViewer from './MarkdownViewer'
+import { useToast } from '../context/ToastContext'
 import * as api from '../api'
 
 export default function LinkedCardsPreviewModal({ modalData, onClose, onUnlinked }) {
+  const toast = useToast()
   if (!modalData) return null
 
   const cardsList = modalData.cards ? modalData.cards : [modalData]
@@ -21,11 +23,11 @@ export default function LinkedCardsPreviewModal({ modalData, onClose, onUnlinked
     setUnlinking(true)
     try {
       await api.unlinkFollowupCard(parentCard.id, followup.id, currentCard.id)
-      alert('Card unlinked successfully!')
+      toast.success('Card unlinked successfully!')
       if (onUnlinked) onUnlinked()
       onClose()
     } catch (err) {
-      alert('Failed to unlink card: ' + (err.message || err))
+      toast.error('Failed to unlink card: ' + (err.message || err))
     } finally {
       setUnlinking(false)
     }
